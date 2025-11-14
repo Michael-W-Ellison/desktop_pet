@@ -1,0 +1,4 @@
+PyQt5>=5.15.0
+Pillow>=9.0.0
+numpy>=1.21.0
+pywin32>=300; sys_platform == 'win32'
