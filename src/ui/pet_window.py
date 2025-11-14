@@ -6,8 +6,8 @@ from PyQt5.QtCore import Qt, QTimer, QPoint, QRect
 from PyQt5.QtGui import QPixmap, QCursor, QPainter, QImage
 from PIL import ImageQt
 import random
-from .sprite_generator import SpriteGenerator
-from ..core.config import BehaviorState, PET_SIZE, FPS, ANIMATION_UPDATE_INTERVAL
+from ui.sprite_generator import SpriteGenerator
+from core.config import BehaviorState, PET_SIZE, FPS, ANIMATION_UPDATE_INTERVAL
 
 
 class PetWindow(QWidget):
@@ -32,6 +32,12 @@ class PetWindow(QWidget):
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self.update_animation)
         self.animation_timer.start(int(ANIMATION_UPDATE_INTERVAL * 1000))
+
+        # Mouse tracking timer for sensory system
+        # This tracks global cursor position for AI environmental awareness
+        self.mouse_tracking_timer = QTimer()
+        self.mouse_tracking_timer.timeout.connect(self.update_mouse_tracking)
+        self.mouse_tracking_timer.start(100)  # Update every 100ms
 
     def init_ui(self):
         """Initialize the UI."""
@@ -104,6 +110,22 @@ class PetWindow(QWidget):
 
             self.move(new_x, new_y)
             creature.position = [new_x, new_y]
+
+    def update_mouse_tracking(self):
+        """
+        Update mouse position for sensory system.
+
+        Tracks global cursor position and feeds it to the AI's sensory system
+        for environmental awareness (used by MEDIUM, ADVANCED, and EXPERT AI modes).
+        """
+        # Get global cursor position
+        cursor_pos = QCursor.pos()
+        mouse_x = cursor_pos.x()
+        mouse_y = cursor_pos.y()
+
+        # Update sensory system in pet manager
+        if hasattr(self.pet_manager, 'update_sensory_inputs'):
+            self.pet_manager.update_sensory_inputs(mouse_x, mouse_y)
 
     def mousePressEvent(self, event):
         """Handle mouse press for dragging and interaction."""

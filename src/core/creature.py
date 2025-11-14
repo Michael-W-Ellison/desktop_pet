@@ -168,6 +168,194 @@ class Creature:
         """Change the creature's behavior state."""
         self.current_state = state
 
+    def get_recent_interaction_quality(self, count: int = 10) -> list:
+        """
+        Get quality scores of recent interactions for emotion network.
+
+        Args:
+            count: Number of recent interactions to return
+
+        Returns:
+            List of quality scores (0-1 scale) for recent interactions
+        """
+        if not self.interaction_history:
+            return [0.5] * count
+
+        recent = self.interaction_history[-count:]
+        quality = []
+
+        for interaction in recent:
+            # Calculate quality based on positive feedback
+            q = 1.0 if interaction.get('positive', False) else 0.3
+            quality.append(q)
+
+        # Pad if needed
+        while len(quality) < count:
+            quality.insert(0, 0.5)
+
+        return quality[:count]
+
+    def get_recent_interaction_types(self, count: int = 5) -> list:
+        """
+        Get encoding of recent interaction types for social network.
+
+        Args:
+            count: Number of recent interactions to encode
+
+        Returns:
+            List of encoded interaction types
+        """
+        if not self.interaction_history:
+            return [0.0] * count
+
+        recent = self.interaction_history[-count:]
+        type_mapping = {'feed': 0.2, 'play_ball': 0.4, 'pet': 0.6, 'talk': 0.8, 'other': 0.5}
+
+        encoded = []
+        for interaction in recent:
+            interaction_type = interaction.get('type', 'other')
+            encoded.append(type_mapping.get(interaction_type, 0.5))
+
+        # Pad if needed
+        while len(encoded) < count:
+            encoded.insert(0, 0.0)
+
+        return encoded[:count]
+
+    def get_recent_activities(self, count: int = 5) -> list:
+        """
+        Get encoding of recent activities for activity network.
+
+        Args:
+            count: Number of recent activities to return
+
+        Returns:
+            List of activity encodings (0-1 scale)
+        """
+        # This is a simplified version - in a more complete implementation,
+        # we would track activity history similar to interaction history
+        if not self.interaction_history:
+            return [0.0] * count
+
+        # Use interaction history as proxy for activities
+        recent = self.interaction_history[-count:]
+        activities = []
+
+        for interaction in recent:
+            # Map interaction types to activity encodings
+            itype = interaction.get('type', 'idle')
+            if itype == 'ball_play':
+                activities.append(0.8)
+            elif itype == 'mouse_chase':
+                activities.append(0.6)
+            elif itype in ['hide_and_seek', 'hide']:
+                activities.append(0.4)
+            elif itype == 'feed':
+                activities.append(0.2)
+            else:
+                activities.append(0.0)
+
+        # Pad if needed
+        while len(activities) < count:
+            activities.insert(0, 0.0)
+
+        return activities[:count]
+
+    def get_personality_vector(self) -> list:
+        """
+        Get one-hot encoded personality vector for networks.
+
+        Returns:
+            List representing personality as one-hot encoding
+        """
+        personalities = list(PersonalityType)
+        encoding = [0.0] * len(personalities)
+
+        try:
+            idx = personalities.index(self.personality)
+            encoding[idx] = 1.0
+        except ValueError:
+            pass
+
+        return encoding
+
+    def get_state_for_networks(self, target_x: float = None, target_y: float = None) -> Dict[str, Any]:
+        """
+        Get comprehensive state dictionary for all AI networks.
+
+        This provides all the state information needed by:
+        - MovementNetwork
+        - ActivityNetwork
+        - EmotionNetwork
+        - SocialNetwork
+        - ReinforcementLearning systems
+
+        Args:
+            target_x: Optional target x coordinate for movement
+            target_y: Optional target y coordinate for movement
+
+        Returns:
+            Dictionary with complete state information
+        """
+        import math
+
+        # Calculate distance to target if provided
+        distance_to_target = 0.0
+        if target_x is not None and target_y is not None:
+            dx = target_x - self.position[0]
+            dy = target_y - self.position[1]
+            distance_to_target = math.sqrt(dx * dx + dy * dy)
+
+        return {
+            # Basic stats
+            'hunger': self.hunger,
+            'energy': self.energy,
+            'happiness': self.happiness,
+            'age': self.age,
+
+            # Position and movement
+            'pos_x': self.position[0],
+            'pos_y': self.position[1],
+            'target_x': target_x if target_x is not None else self.position[0],
+            'target_y': target_y if target_y is not None else self.position[1],
+            'distance_to_target': distance_to_target,
+            'velocity_x': self.velocity[0],
+            'velocity_y': self.velocity[1],
+
+            # Time-based
+            'time_since_interaction': time.time() - self.last_interaction_time,
+            'time_since_fed': time.time() - self.last_fed_time,
+
+            # Personality
+            'personality': self.personality.value,
+            'personality_vector': self.get_personality_vector(),
+
+            # Learning and history
+            'recent_interaction_quality': self.get_recent_interaction_quality(10),
+            'recent_interaction_types': self.get_recent_interaction_types(5),
+            'recent_activities': self.get_recent_activities(5),
+
+            # Preferences
+            'preference_scores': self.preference_scores.copy(),
+
+            # State
+            'current_state': self.current_state.value,
+            'alive': not self.is_starving(),
+            'should_sleep': self.should_sleep(),
+
+            # Emotional state placeholder (will be filled by emotion network)
+            'emotional_state': [0.5, 0.5, 0.5, 0.5, 0.5],
+
+            # Player mood estimate (simplified - could be enhanced)
+            'player_mood_estimate': 0.5 if self.happiness > 60 else 0.3,
+
+            # Screen edge distances (will be filled by sensory system or pet_manager)
+            'edge_top': 0,
+            'edge_bottom': 0,
+            'edge_left': 0,
+            'edge_right': 0,
+        }
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert creature to dictionary for saving."""
         return {

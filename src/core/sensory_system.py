@@ -8,7 +8,7 @@ Gives creatures the ability to "sense" their environment:
 - Proximity to objects and edges
 """
 import numpy as np
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Any
 import datetime
 import math
 
