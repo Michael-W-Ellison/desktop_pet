@@ -27,9 +27,31 @@ STARVATION_THRESHOLD = 100  # Creature dies when hunger reaches this
 MAX_HUNGER = 100
 FEED_AMOUNT = 30  # How much feeding reduces hunger
 
-# Learning settings
-LEARNING_RATE = 0.01
-NEURAL_NETWORK_LAYERS = [10, 8, 6]  # Hidden layers
+# Learning settings - Basic Network
+LEARNING_RATE = 0.001  # Lower for Adam optimizer
+NEURAL_NETWORK_LAYERS = [8, 6]  # Basic hidden layers
+
+# Enhanced Learning settings (for sophisticated AI)
+USE_ADAM_OPTIMIZER = True  # Use Adam instead of SGD
+USE_LEARNING_RATE_SCHEDULE = True  # Decay learning rate over time
+GRADIENT_CLIP_NORM = 5.0  # Prevent exploding gradients
+ADAM_BETA1 = 0.9  # Momentum parameter
+ADAM_BETA2 = 0.999  # RMSprop parameter
+
+# Enhanced architecture settings
+ENHANCED_NETWORK_LAYERS = [64, 32, 16, 8]  # Larger, deeper network
+USE_DROPOUT = True  # Prevent overfitting
+DROPOUT_RATE = 0.25  # 25% dropout
+USE_BATCH_NORMALIZATION = True  # Stable training
+
+# AI Complexity levels (for different age groups)
+class AIComplexity(Enum):
+    SIMPLE = "simple"  # Basic learning, good for younger kids
+    MEDIUM = "medium"  # Enhanced learning with memory
+    ADVANCED = "advanced"  # Full RL with all networks
+    EXPERT = "expert"  # Maximum sophistication with visualization
+
+DEFAULT_AI_COMPLEXITY = AIComplexity.MEDIUM
 
 # Personality types
 class PersonalityType(Enum):

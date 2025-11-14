@@ -1,9 +1,11 @@
 """
-Simple neural network for creature learning and behavior adaptation.
+Advanced neural network for creature learning and behavior adaptation.
 """
 import numpy as np
-from typing import List
+from typing import List, Optional
 import json
+import time
+from .optimizers import AdamOptimizer, clip_gradients, LearningRateScheduler
 
 
 class NeuralNetwork:
@@ -15,7 +17,8 @@ class NeuralNetwork:
     """
 
     def __init__(self, input_size: int, hidden_layers: List[int], output_size: int,
-                 learning_rate: float = 0.01):
+                 learning_rate: float = 0.001, use_adam: bool = True,
+                 gradient_clip_norm: float = 5.0, use_lr_schedule: bool = False):
         """
         Initialize the neural network.
 
@@ -24,20 +27,41 @@ class NeuralNetwork:
             hidden_layers: List of hidden layer sizes
             output_size: Number of output neurons
             learning_rate: Learning rate for training
+            use_adam: Whether to use Adam optimizer (True) or SGD (False)
+            gradient_clip_norm: Maximum gradient norm for clipping
+            use_lr_schedule: Whether to use learning rate scheduling
         """
         self.learning_rate = learning_rate
         self.layers = [input_size] + hidden_layers + [output_size]
+        self.gradient_clip_norm = gradient_clip_norm
 
         # Initialize weights and biases
         self.weights = []
         self.biases = []
 
         for i in range(len(self.layers) - 1):
-            # Xavier initialization
+            # Xavier/He initialization (better for ReLU)
             weight = np.random.randn(self.layers[i], self.layers[i + 1]) * np.sqrt(2.0 / self.layers[i])
             bias = np.zeros((1, self.layers[i + 1]))
             self.weights.append(weight)
             self.biases.append(bias)
+
+        # Initialize optimizer
+        if use_adam:
+            self.optimizer = AdamOptimizer(learning_rate=learning_rate)
+        else:
+            from .optimizers import SGDOptimizer
+            self.optimizer = SGDOptimizer(learning_rate=learning_rate)
+
+        # Initialize learning rate scheduler
+        self.lr_scheduler = None
+        if use_lr_schedule:
+            self.lr_scheduler = LearningRateScheduler(
+                initial_lr=learning_rate,
+                schedule_type='exponential',
+                decay_rate=0.0001,
+                decay_steps=1000
+            )
 
     @staticmethod
     def sigmoid(x):
@@ -89,7 +113,7 @@ class NeuralNetwork:
 
     def backward(self, X, y, activations):
         """
-        Backward pass (backpropagation).
+        Backward pass (backpropagation) with gradient clipping and optimizer update.
 
         Args:
             X: Input data
@@ -108,10 +132,28 @@ class NeuralNetwork:
             error = np.dot(deltas[i + 1], self.weights[i + 1].T)
             deltas[i] = error * self.relu_derivative(activations[i + 1])
 
-        # Update weights and biases
+        # Calculate gradients
+        weight_gradients = []
+        bias_gradients = []
+
         for i in range(len(self.weights)):
-            self.weights[i] -= self.learning_rate * np.dot(activations[i].T, deltas[i]) / m
-            self.biases[i] -= self.learning_rate * np.sum(deltas[i], axis=0, keepdims=True) / m
+            weight_grad = np.dot(activations[i].T, deltas[i]) / m
+            bias_grad = np.sum(deltas[i], axis=0, keepdims=True) / m
+            weight_gradients.append(weight_grad)
+            bias_gradients.append(bias_grad)
+
+        # Apply gradient clipping
+        if self.gradient_clip_norm > 0:
+            weight_gradients = clip_gradients(weight_gradients, self.gradient_clip_norm)
+            bias_gradients = clip_gradients(bias_gradients, self.gradient_clip_norm)
+
+        # Update learning rate if using scheduler
+        if self.lr_scheduler:
+            self.optimizer.learning_rate = self.lr_scheduler.get_lr()
+            self.lr_scheduler.step()
+
+        # Update weights and biases using optimizer
+        self.optimizer.update(self.weights, self.biases, weight_gradients, bias_gradients)
 
     def train(self, X, y, epochs: int = 1):
         """
@@ -154,26 +196,68 @@ class NeuralNetwork:
 
     def to_dict(self):
         """Convert network to dictionary for saving."""
-        return {
+        data = {
             'learning_rate': self.learning_rate,
             'layers': self.layers,
             'weights': [w.tolist() for w in self.weights],
-            'biases': [b.tolist() for b in self.biases]
+            'biases': [b.tolist() for b in self.biases],
+            'gradient_clip_norm': self.gradient_clip_norm
         }
+
+        # Save optimizer state if it's Adam
+        if isinstance(self.optimizer, AdamOptimizer):
+            data['optimizer'] = self.optimizer.to_dict()
+        else:
+            data['optimizer'] = {'type': 'sgd', 'learning_rate': self.learning_rate}
+
+        # Save scheduler state if exists
+        if self.lr_scheduler:
+            data['lr_scheduler'] = {
+                'initial_lr': self.lr_scheduler.initial_lr,
+                'schedule_type': self.lr_scheduler.schedule_type,
+                'decay_rate': self.lr_scheduler.decay_rate,
+                'decay_steps': self.lr_scheduler.decay_steps,
+                'current_step': self.lr_scheduler.current_step
+            }
+
+        return data
 
     @classmethod
     def from_dict(cls, data):
         """Create network from dictionary."""
         layers = data['layers']
+
+        # Determine if using Adam based on saved optimizer
+        use_adam = data.get('optimizer', {}).get('type') == 'adam'
+        use_lr_schedule = 'lr_scheduler' in data
+
         network = cls(
             input_size=layers[0],
             hidden_layers=layers[1:-1],
             output_size=layers[-1],
-            learning_rate=data['learning_rate']
+            learning_rate=data['learning_rate'],
+            use_adam=use_adam,
+            gradient_clip_norm=data.get('gradient_clip_norm', 5.0),
+            use_lr_schedule=use_lr_schedule
         )
 
         network.weights = [np.array(w) for w in data['weights']]
         network.biases = [np.array(b) for b in data['biases']]
+
+        # Restore optimizer state
+        if 'optimizer' in data and data['optimizer'].get('type') == 'adam':
+            network.optimizer = AdamOptimizer.from_dict(data['optimizer'])
+
+        # Restore scheduler state
+        if 'lr_scheduler' in data:
+            sched_data = data['lr_scheduler']
+            network.lr_scheduler = LearningRateScheduler(
+                initial_lr=sched_data['initial_lr'],
+                schedule_type=sched_data['schedule_type'],
+                decay_rate=sched_data['decay_rate'],
+                decay_steps=sched_data['decay_steps']
+            )
+            network.lr_scheduler.current_step = sched_data['current_step']
 
         return network
 
@@ -267,7 +351,3 @@ class BehaviorLearner:
         learner = cls(creature)
         learner.network = NeuralNetwork.from_dict(data['network'])
         return learner
-
-
-# Fix missing import
-import time
