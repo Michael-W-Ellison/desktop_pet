@@ -811,3 +811,81 @@ SLEEP_QUALITY_NATURAL_WAKE = 1.0
 SLEEP_QUALITY_FORCED_WAKE = 0.6
 SLEEP_QUALITY_IDEAL_DURATION_HOURS = 6.0
 SLEEP_QUALITY_MIN_DURATION_HOURS = 1.0
+
+# ============================================================================
+# PHASE 9: SOCIAL & MULTI-PET SYSTEMS
+# ============================================================================
+
+# Social relationships
+INITIAL_IMPRESSION_MIN = -20.0               # Minimum initial impression
+INITIAL_IMPRESSION_MAX = 40.0                # Maximum initial impression
+FRIENDSHIP_BEST_FRIEND_THRESHOLD = 80.0      # Friendship level for best friends
+FRIENDSHIP_FRIEND_THRESHOLD = 40.0           # Friendship level for friends
+FRIENDSHIP_RIVAL_THRESHOLD = -20.0           # Friendship level for rivals (below this)
+FRIENDSHIP_ENEMY_THRESHOLD = -40.0           # Friendship level for enemies (below this)
+SOCIAL_ENERGY_LONELY_THRESHOLD = 30.0        # Social energy below which pet is lonely
+SOCIAL_ENERGY_RESTORATION_RATE = 5.0         # Points restored per positive interaction
+
+# Pet-to-pet interactions (friendship changes)
+INTERACTION_PLAY_TOGETHER_SUCCESS = 10.0     # Friendship gain from successful play
+INTERACTION_PLAY_TOGETHER_FAIL = -2.0        # Friendship loss from failed play
+INTERACTION_GROOM_EACH_OTHER = 8.0           # Friendship gain from grooming
+INTERACTION_SHARE_FOOD_SUCCESS = 12.0        # Friendship gain from sharing food
+INTERACTION_SHARE_FOOD_REFUSE = -5.0         # Friendship loss if refused
+INTERACTION_FIGHT = -15.0                    # Friendship loss from fighting
+INTERACTION_ARGUE = -8.0                     # Friendship loss from arguing
+INTERACTION_CUDDLE = 12.0                    # Friendship gain from cuddling
+INTERACTION_COMFORT = 10.0                   # Friendship gain from comforting
+INTERACTION_IGNORE = -2.0                    # Friendship loss from ignoring
+
+# Pack hierarchy
+DOMINANCE_SCORE_AGE_MAX = 25.0               # Max points from age
+DOMINANCE_SCORE_SIZE_MAX = 20.0              # Max points from size
+DOMINANCE_SCORE_CONFIDENCE_MAX = 25.0        # Max points from confidence
+DOMINANCE_SCORE_WINS_MAX = 20.0              # Max points from win/loss record
+DOMINANCE_SCORE_SENIORITY_MAX = 10.0         # Max points from time in pack
+DOMINANCE_CHALLENGE_SCORE_DIFF_THRESHOLD = 30.0  # Score difference for easy win
+DOMINANCE_CHALLENGE_WIN_BONUS = 5.0          # Dominance increase for winning challenge
+DOMINANCE_CHALLENGE_LOSE_PENALTY = 3.0       # Dominance decrease for losing challenge
+PACK_STABILITY_DECAY_PER_CHALLENGE = 0.1     # Stability loss per challenge
+PACK_STABILITY_RECOVERY_RATE = 0.1           # Stability gain per peaceful day
+
+# Hierarchy ranks
+RANK_ALPHA = "alpha"
+RANK_BETA = "beta"
+RANK_MID_RANK = "mid_rank"
+RANK_OMEGA = "omega"
+
+# Jealousy and competition
+JEALOUSY_BASE_INCREASE = 10.0                # Base jealousy per minute of attention to other
+JEALOUSY_FOOD_MULTIPLIER = 1.5               # Multiplier for food-related jealousy
+JEALOUSY_PLAY_MULTIPLIER = 1.3               # Multiplier for play-related jealousy
+JEALOUSY_DECAY_RATE = 2.0                    # Points of jealousy decay per hour
+JEALOUSY_ATTENTION_REDUCTION = 15.0          # Jealousy reduced per minute of attention received
+JEALOUSY_MILD_THRESHOLD = 20.0               # Threshold for mild jealousy
+JEALOUSY_MODERATE_THRESHOLD = 40.0           # Threshold for moderate jealousy
+JEALOUSY_HIGH_THRESHOLD = 60.0               # Threshold for high jealousy
+JEALOUSY_EXTREME_THRESHOLD = 80.0            # Threshold for extreme jealousy
+RIVALRY_LOSS_THRESHOLD = 3                   # Losses to same pet to become rivals
+COMPETITION_BASE_PROBABILITY = 0.5           # Base 50/50 chance in competition
+COMPETITION_POSSESSIVENESS_BONUS = 0.2       # Max bonus from possessiveness
+COMPETITION_JEALOUSY_BONUS = 0.3             # Max bonus from jealousy
+
+# Peer teaching
+PEER_TEACHING_BASE_SUCCESS = 0.6             # 60% base teaching success
+PEER_TEACHING_PROFICIENCY_REQUIREMENT = 0.8  # Must be 80% proficient to teach
+PEER_TEACHING_PROFICIENCY_GAIN = 0.15        # 15% proficiency gain (vs 8% solo)
+PEER_TEACHING_SKILL_IMPROVEMENT = 0.02       # Teaching skill gain per session
+PEER_TEACHING_FRIENDSHIP_BONUS_MAX = 0.2     # Max bonus from high friendship
+PEER_TEACHING_RANK_BONUS = 0.1               # Bonus if teacher outranks student
+PEER_TEACHING_BONDING_GAIN = 3.0             # Bond increase from teaching
+OBSERVATION_LEARNING_CHANCE = 0.05           # 5% chance to learn per observation
+OBSERVATION_LEARNING_GAIN = 0.05             # 5% proficiency gain from observation
+OBSERVATION_MAX_CHANCE = 0.3                 # Max 30% chance even with many observations
+
+# Multi-pet system
+MAX_PETS_ON_DESKTOP = 10                     # Maximum pets allowed simultaneously
+PET_SPACING_MIN_PIXELS = 100                 # Minimum spacing between pets
+INTERACTION_PROXIMITY_PIXELS = 150           # Distance for interaction to occur
+AUTO_INTERACTION_CHANCE = 0.1                # 10% chance per update for auto-interaction
+PACK_FORMATION_MIN_PETS = 2                  # Minimum pets to form a pack
