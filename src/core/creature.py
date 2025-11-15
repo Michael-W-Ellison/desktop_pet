@@ -7,6 +7,11 @@ Enhanced with:
 - Evolution System (baby -> juvenile -> adult -> elder stages)
 - Element System (11 element types with interactions)
 - Variant System (shiny, mystic, shadow, crystal forms)
+- Bonding System (progressive relationship levels: stranger -> best friend)
+- Trust System (builds through consistent care and interactions)
+- Emotional States (jealousy, separation anxiety, excitement on return)
+- Preference System (individual likes/dislikes for toys, foods, activities)
+- Name Calling System (responds to being called by name)
 """
 import random
 import time
@@ -22,6 +27,11 @@ from .training_system import TrainingSystem
 from .evolution_system import EvolutionSystem, EvolutionTrigger
 from .element_system import ElementSystem, create_element_system_for_species
 from .variant_system import VariantSystem, generate_random_variant
+from .bonding_system import BondingSystem, BondLevel
+from .trust_system import TrustSystem
+from .emotional_states import EmotionalStateManager, EmotionalState
+from .preference_system import PreferenceSystem
+from .name_calling import NameCallingSystem
 
 
 class Creature:
@@ -47,7 +57,6 @@ class Creature:
         self.hunger = 0.0  # 0 = not hungry, 100 = starving
         self.happiness = 100.0  # 0-100
         self.energy = 100.0  # 0-100
-        self.bond = 0.0  # 0-100, bond strength with owner (Phase 4)
         self.age = 0  # in seconds
         self.birth_time = time.time()
         self.last_fed_time = time.time()
@@ -63,13 +72,6 @@ class Creature:
         # Learning and behavior
         self.learned_behaviors = {}
         self.interaction_history = []
-        self.preference_scores = {
-            'ball_play': 0.5,
-            'mouse_chase': 0.5,
-            'hide_and_seek': 0.5,
-            'icon_interaction': 0.5,
-            'being_fed': 1.0
-        }
 
         # Personality trait modifiers
         self.trait_modifiers = PERSONALITY_TRAITS[self.personality]
@@ -98,6 +100,13 @@ class Creature:
         # Apply variant modifiers to initial stats
         variant_mods = self.variant.get_variant_modifiers()
         self.happiness *= variant_mods.get('happiness_gain', 1.0)
+
+        # Phase 5: Advanced Bonding Systems
+        self.bonding = BondingSystem(initial_bond=0.0)
+        self.trust = TrustSystem(initial_trust=0.0)
+        self.emotional_states = EmotionalStateManager()
+        self.preferences = PreferenceSystem(personality_type=self.personality.value)
+        self.name_calling = NameCallingSystem()
 
         # Record birth as first episodic memory
         birth_details = {
@@ -163,16 +172,53 @@ class Creature:
             happiness_decay = 0.05 * delta_time * (self.hunger / 50)
             self.happiness = max(0, self.happiness - happiness_decay)
 
-    def feed(self, amount: float = 30):
-        """Feed the creature, reducing hunger."""
+        # Phase 5: Update emotional states
+        self.emotional_states.update(delta_time)
+
+        # Phase 5: Process bonding decay from neglect
+        hours_since_interaction = time_since_interaction / 3600.0
+        if hours_since_interaction > 1:
+            self.bonding.process_neglect(hours_since_interaction)
+
+        # Phase 5: Update presence tracking
+        # Note: This assumes owner is present if app is running
+        # In a more complete implementation, this could track actual user presence
+        self.bonding.update_presence(is_present=True, delta_time=delta_time)
+
+    def feed(self, amount: float = 30, food_type: str = "generic"):
+        """
+        Feed the creature, reducing hunger.
+
+        Args:
+            amount: Amount to reduce hunger (default 30)
+            food_type: Type of food being given (for preferences)
+        """
         old_hunger = self.hunger
         self.hunger = max(0, self.hunger - amount)
         self.last_fed_time = time.time()
         self.happiness = min(100, self.happiness + 5)
         self.last_interaction_time = time.time()
 
-        # Update preference for being fed
-        self.preference_scores['being_fed'] = min(1.0, self.preference_scores['being_fed'] + 0.05)
+        # Phase 5: Determine if feeding was timely based on hunger level
+        timely = old_hunger > 40  # Feeding when actually hungry is timely
+
+        # Phase 5: Process bonding interaction
+        bond_gain, bond_message = self.bonding.process_interaction(
+            'feed',
+            positive=True,
+            quality=1.0 if timely else 0.7
+        )
+
+        # Phase 5: Process trust care event
+        self.trust.process_care_event('feed', timely=timely)
+
+        # Phase 5: Update food preference based on enjoyment
+        enjoyment = 0.3  # Base enjoyment from feeding
+        if old_hunger > 70:
+            enjoyment = 0.8  # Very hungry = really enjoyed food
+        elif old_hunger > 40:
+            enjoyment = 0.5  # Moderately hungry
+        self.preferences.record_experience('food', food_type, enjoyment)
 
         # Record in memory system (Phase 2)
         # Check if this is first feeding
@@ -185,35 +231,67 @@ class Creature:
                 'hunger_before': old_hunger,
                 'hunger_after': self.hunger,
                 'amount': amount,
+                'food_type': food_type,
                 'first_feeding': first_feeding,
                 'positive': True,
+                'timely': timely,
+                'bond_gain': bond_gain,
                 'stats': {'hunger': self.hunger, 'happiness': self.happiness, 'energy': self.energy}
             },
             important=first_feeding,
             emotional_intensity=0.7 if old_hunger > 70 else 0.5
         )
 
-    def interact(self, interaction_type: str, positive: bool = True):
+    def interact(self, interaction_type: str, positive: bool = True,
+                 item: str = None, gentle: bool = True):
         """
         Record an interaction with the creature.
 
         Args:
-            interaction_type: Type of interaction (e.g., 'ball_play', 'mouse_chase')
+            interaction_type: Type of interaction (e.g., 'play_ball', 'pet', 'give_toy')
             positive: Whether the interaction was positive (enjoyed) or negative
+            item: Specific item involved (toy name, food type, etc.)
+            gentle: Whether interaction was gentle (affects trust)
         """
         self.last_interaction_time = time.time()
         self.total_interactions += 1  # Phase 4: Track for evolution
 
-        # Phase 4: Build bond with positive interactions
-        if positive:
-            bond_gain = 0.5 * self.variant.get_bond_multiplier()
-            self.bond = min(100, self.bond + bond_gain)
+        # Phase 5: Determine quality of interaction
+        quality = 1.0
+        if not positive:
+            quality = 0.3
+        elif self.energy < 20:
+            quality = 0.6  # Too tired to fully enjoy
 
-        # Update preference scores based on interaction
-        if interaction_type in self.preference_scores:
-            change = 0.05 if positive else -0.03
-            self.preference_scores[interaction_type] = max(0, min(1,
-                self.preference_scores[interaction_type] + change))
+        # Phase 5: Process bonding interaction
+        bond_gain, bond_message = self.bonding.process_interaction(
+            interaction_type,
+            positive=positive,
+            quality=quality
+        )
+
+        # Phase 5: Process trust based on interaction quality
+        self.trust.process_interaction_quality(gentle=gentle)
+
+        # Phase 5: Reset attention to others tracking (receiving attention)
+        self.emotional_states.reset_attention_tracking()
+
+        # Phase 5: Update preferences based on interaction
+        if item:
+            # Map interaction type to preference category
+            category = None
+            if interaction_type in ['play_ball', 'give_toy', 'toy_interaction']:
+                category = 'toy'
+            elif interaction_type in ['feed']:
+                category = 'food'
+            elif interaction_type in ['play', 'training', 'pet', 'talk']:
+                category = 'activity'
+
+            if category:
+                enjoyment = 0.7 if positive else -0.4
+                if not gentle:
+                    enjoyment -= 0.3  # Rough handling reduces enjoyment
+                self.preferences.record_experience(category, item or interaction_type, enjoyment)
 
         # Record in history for neural network learning
         interaction_data = {
@@ -222,7 +300,9 @@ class Creature:
             'timestamp': time.time(),
             'hunger_level': self.hunger,
             'energy_level': self.energy,
-            'happiness_level': self.happiness
+            'happiness_level': self.happiness,
+            'bond_gain': bond_gain,
+            'gentle': gentle
         }
         self.interaction_history.append(interaction_data)
 
@@ -234,6 +314,11 @@ class Creature:
         happiness_change = 3 if positive else -1
         happiness_multiplier = self.trait_modifiers.get('happiness_gain', 1.0)
         variant_multiplier = self.variant.get_happiness_multiplier()  # Phase 4
+
+        # Phase 5: Apply emotional state modifiers
+        emotional_mods = self.emotional_states.get_behavioral_modifiers()
+        happiness_multiplier *= emotional_mods.get('happiness_modifier', 1.0)
+
         self.happiness = max(0, min(100, self.happiness + happiness_change * happiness_multiplier * variant_multiplier))
 
         # Phase 4: Check for evolution after interaction
@@ -245,6 +330,10 @@ class Creature:
             interaction_type,
             {
                 'positive': positive,
+                'gentle': gentle,
+                'item': item,
+                'bond_gain': bond_gain,
+                'quality': quality,
                 'stats': {
                     'hunger': self.hunger,
                     'happiness': self.happiness,
@@ -703,8 +792,196 @@ class Creature:
 
         return effects
 
+    # ============ Phase 5: Advanced Bonding Methods ============
+
+    def call_by_name(self, called_name: str) -> Dict[str, Any]:
+        """
+        Call the pet by name and get response.
+
+        Args:
+            called_name: Name being called
+
+        Returns:
+            Dictionary with response details (responded, animation, message, bond_change)
+        """
+        # Get name recognition proficiency from training system
+        name_recognition = self.training.name_recognition.proficiency
+
+        # Get current mood (basic version using happiness)
+        current_mood = None
+        if self.happiness > 80:
+            current_mood = 'happy'
+        elif self.happiness < 30:
+            current_mood = 'grumpy'
+        elif self.energy < 20:
+            current_mood = 'tired'
+
+        # Call the pet
+        result = self.name_calling.call_pet(
+            pet_name=called_name,
+            actual_name=self.name,
+            bond_level=self.bonding.bond,
+            trust_level=self.trust.trust,
+            personality=self.personality.value,
+            name_recognition_proficiency=name_recognition,
+            current_mood=current_mood
+        )
+
+        # Apply bond change if any
+        if result.get('bond_change', 0) != 0:
+            bond_change = result['bond_change']
+            if bond_change > 0:
+                self.bonding.add_bond(bond_change, 'called_by_name')
+            else:
+                self.bonding.reduce_bond(abs(bond_change), 'ignored_call')
+
+        # Record in memory if responded
+        if result['responded']:
+            self.memory.record_interaction(
+                'called_by_name',
+                {
+                    'name_called': called_name,
+                    'response_type': result.get('response_type'),
+                    'bond_change': result.get('bond_change', 0)
+                },
+                important=(self.bonding.first_time_called_by_name is None),
+                emotional_intensity=0.6
+            )
+
+            # Mark first time called by name
+            if self.bonding.first_time_called_by_name is None:
+                self.bonding.first_time_called_by_name = time.time()
+
+        return result
+
+    def check_separation_anxiety(self) -> Tuple[bool, Optional[Dict[str, Any]]]:
+        """
+        Check if pet has separation anxiety.
+
+        Returns:
+            Tuple of (has_anxiety, anxiety_info)
+        """
+        has_anxiety = self.emotional_states.has_state(EmotionalState.SEPARATION_ANXIETY)
+
+        if has_anxiety:
+            intensity = self.emotional_states.get_state_intensity(EmotionalState.SEPARATION_ANXIETY)
+            return True, {
+                'intensity': intensity,
+                'bond_level': self.bonding.bond,
+                'times_experienced': self.emotional_states.times_experienced_separation
+            }
+
+        return False, None
+
+    def process_owner_return(self, hours_away: float):
+        """
+        Process owner returning after being away.
+
+        Args:
+            hours_away: How many hours owner was gone
+        """
+        # Trigger excited return emotional state
+        self.emotional_states.trigger_excited_return(
+            bond_level=self.bonding.bond,
+            hours_away=hours_away
+        )
+
+        # Update bonding system presence
+        self.emotional_states.set_owner_presence(
+            present=True,
+            bond_level=self.bonding.bond,
+            trust_level=self.trust.trust
+        )
+
+        # Record in memory if significant absence
+        if hours_away > 2:
+            self.memory.record_interaction(
+                'owner_returned',
+                {
+                    'hours_away': hours_away,
+                    'bond_level': self.bonding.bond,
+                    'excitement_level': self.emotional_states.reunion_excitement_level
+                },
+                important=(hours_away > 6),
+                emotional_intensity=min(1.0, hours_away / 6)
+            )
+
+    def process_owner_departure(self):
+        """Process owner leaving."""
+        self.emotional_states.set_owner_presence(
+            present=False,
+            bond_level=self.bonding.bond,
+            trust_level=self.trust.trust
+        )
+
+    def trigger_jealousy(self, attention_amount: float = 0.3):
+        """
+        Trigger jealousy from seeing attention given to others.
+
+        Args:
+            attention_amount: Amount of attention given to others (0-1)
+        """
+        # Process attention to others
+        self.emotional_states.process_attention_to_other(attention_amount)
+
+        # Maybe trigger jealousy based on bond level
+        jealousy_chance = self.bonding.get_jealousy_chance(
+            self.emotional_states.attention_to_others_score
+        )
+
+        if random.random() < jealousy_chance:
+            self.emotional_states.trigger_jealousy(
+                bond_level=self.bonding.bond,
+                trigger_intensity=attention_amount
+            )
+
+    def get_preference_reaction(self, category: str, item: str) -> Dict[str, Any]:
+        """
+        Get reaction to a specific item based on preferences.
+
+        Args:
+            category: Category ('toy', 'food', 'activity')
+            item: Specific item name
+
+        Returns:
+            Dictionary with reaction info
+        """
+        return self.preferences.get_reaction_to_item(category, item)
+
+    def get_favorite_items(self) -> Dict[str, Optional[str]]:
+        """
+        Get favorite items across all categories.
+
+        Returns:
+            Dictionary with favorite items
+        """
+        favorites = {}
+        favorites['toy'] = self.preferences.get_favorite('toy')
+        favorites['food'] = self.preferences.get_favorite('food')
+        favorites['activity'] = self.preferences.get_favorite('activity')
+        favorites['least_favorite_toy'] = self.preferences.get_least_favorite('toy')
+        return favorites
+
+    def get_bond_level_name(self) -> str:
+        """Get the name of current bond level."""
+        return self.bonding.get_bond_level().value
+
+    def get_bonding_stats(self) -> Dict[str, Any]:
+        """Get detailed bonding statistics."""
+        stats = {
+            'bond': self.bonding.bond,
+            'bond_level': self.bonding.get_bond_level().value,
+            'bond_description': self.bonding.get_bond_description(),
+            'trust': self.trust.trust,
+            'trust_description': self.trust.get_trust_level_description(),
+            'emotional_states': self.emotional_states.get_current_states(),
+            'favorite_items': self.get_favorite_items(),
+            'name_calling_stats': self.name_calling.get_stats()
+        }
+        return stats
+
     def to_dict(self) -> Dict[str, Any]:
-        """Convert creature to dictionary for saving (with Phases 2-4)."""
+        """Convert creature to dictionary for saving (with Phases 2-5)."""
         return {
             'creature_type': self.creature_type,
             'personality': self.personality.value,
@@ -713,13 +990,11 @@ class Creature:
             'hunger': self.hunger,
             'happiness': self.happiness,
             'energy': self.energy,
-            'bond': self.bond,  # Phase 4
-            'total_interactions': self.total_interactions,  # Phase 4
+            'total_interactions': self.total_interactions,
             'birth_time': self.birth_time,
             'last_fed_time': self.last_fed_time,
             'last_interaction_time': self.last_interaction_time,
             'position': self.position,
-            'preference_scores': self.preference_scores,
             'interaction_history': self.interaction_history,
             # Phase 2: Memory and Training
             'memory_system': self.memory.to_dict(),
@@ -727,12 +1002,18 @@ class Creature:
             # Phase 4: Evolution, Element, Variant
             'evolution_system': self.evolution.to_dict(),
             'element_system': self.element.to_dict(),
-            'variant_system': self.variant.to_dict()
+            'variant_system': self.variant.to_dict(),
+            # Phase 5: Advanced Bonding Systems
+            'bonding_system': self.bonding.to_dict(),
+            'trust_system': self.trust.to_dict(),
+            'emotional_states': self.emotional_states.to_dict(),
+            'preference_system': self.preferences.to_dict(),
+            'name_calling_system': self.name_calling.to_dict()
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Creature':
-        """Create a creature from a dictionary (with Phases 2-4)."""
+        """Create a creature from a dictionary (with Phases 2-5)."""
         personality = PersonalityType(data['personality'])
         creature = cls(
             creature_type=data['creature_type'],
@@ -744,13 +1025,11 @@ class Creature:
         creature.hunger = data['hunger']
         creature.happiness = data['happiness']
         creature.energy = data['energy']
-        creature.bond = data.get('bond', 0.0)  # Phase 4
-        creature.total_interactions = data.get('total_interactions', 0)  # Phase 4
+        creature.total_interactions = data.get('total_interactions', 0)
         creature.birth_time = data['birth_time']
         creature.last_fed_time = data['last_fed_time']
         creature.last_interaction_time = data['last_interaction_time']
         creature.position = data['position']
-        creature.preference_scores = data['preference_scores']
         creature.interaction_history = data['interaction_history']
 
         # Phase 2: Restore memory and training if present
@@ -769,6 +1048,22 @@ class Creature:
 
         if 'variant_system' in data:
             creature.variant = VariantSystem.from_dict(data['variant_system'])
+
+        # Phase 5: Restore bonding systems if present
+        if 'bonding_system' in data:
+            creature.bonding = BondingSystem.from_dict(data['bonding_system'])
+
+        if 'trust_system' in data:
+            creature.trust = TrustSystem.from_dict(data['trust_system'])
+
+        if 'emotional_states' in data:
+            creature.emotional_states = EmotionalStateManager.from_dict(data['emotional_states'])
+
+        if 'preference_system' in data:
+            creature.preferences = PreferenceSystem.from_dict(data['preference_system'])
+
+        if 'name_calling_system' in data:
+            creature.name_calling = NameCallingSystem.from_dict(data['name_calling_system'])
 
         return creature
 
