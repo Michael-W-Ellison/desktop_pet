@@ -8,6 +8,12 @@ Allows the pet to:
 4. Show personality in learning (stubborn, eager, etc.)
 5. Require practice to master tricks
 6. Forget tricks if not practiced
+
+Phase 6 Enhancements:
+7. 25+ commands (expanded from 12)
+8. Positive and negative reinforcement
+9. Advanced stubbornness based on mood, trust, bond, hunger, energy
+10. Detailed training progress tracking
 """
 import numpy as np
 import time
@@ -170,8 +176,9 @@ class CommandRecognition:
 
     def __init__(self):
         """Initialize command recognition."""
-        # Command aliases - different ways to say the same thing
+        # Phase 6: Expanded command aliases (25 commands)
         self.command_aliases = {
+            # Original 12
             'sit': ['sit', 'sit down', 'take a seat', 'park it'],
             'stay': ['stay', 'stay there', 'wait', 'hold'],
             'come': ['come', 'come here', 'here', 'to me'],
@@ -184,6 +191,25 @@ class CommandRecognition:
             'wave': ['wave', 'say hi', 'hello', 'greet'],
             'shake': ['shake', 'paw', 'shake hands'],
             'roll_over': ['roll over', 'roll', 'barrel roll'],
+
+            # Phase 6: New commands (13 more)
+            'speak': ['speak', 'bark', 'talk', 'say something'],
+            'quiet': ['quiet', 'shh', 'silence', 'hush'],
+            'heel': ['heel', 'walk with me', 'follow', 'stay close'],
+            'drop_it': ['drop it', 'drop', 'let go', 'release'],
+            'leave_it': ['leave it', 'ignore', 'don\'t touch', 'no'],
+            'high_five': ['high five', 'give me five', 'slap hands'],
+            'crawl': ['crawl', 'belly crawl', 'commando', 'low'],
+            'back_up': ['back up', 'backwards', 'reverse', 'back'],
+            'circle': ['circle', 'go around', 'orbit', 'loop'],
+            'kiss': ['kiss', 'give kiss', 'smooch', 'lick'],
+            'hug': ['hug', 'cuddle', 'embrace', 'snuggle'],
+            'find_it': ['find it', 'search', 'seek', 'look for'],
+            'go_to_bed': ['go to bed', 'bedtime', 'sleep', 'rest'],
+
+            # Expert-level
+            'balance': ['balance', 'hold it', 'nose balance'],
+            'weave': ['weave', 'between legs', 'figure eight'],
         }
 
         # Learned custom commands
@@ -359,8 +385,9 @@ class TrainingSystem:
     - Practice schedules and skill decay
     """
 
-    # Predefined tricks
+    # Phase 6: Expanded tricks library (25 total)
     STANDARD_TRICKS = {
+        # Original 12
         'sit': Trick('sit', TrickDifficulty.EASY, TrickCategory.BASIC,
                     "Pet sits down and stays still"),
         'stay': Trick('stay', TrickDifficulty.MEDIUM, TrickCategory.BASIC,
@@ -385,6 +412,40 @@ class TrainingSystem:
                       "Pet offers paw for handshake"),
         'roll_over': Trick('roll_over', TrickDifficulty.HARD, TrickCategory.MOVEMENT,
                           "Pet rolls over completely"),
+
+        # Phase 6: New commands (13 more = 25 total)
+        'speak': Trick('speak', TrickDifficulty.EASY, TrickCategory.EXPRESSIVE,
+                      "Pet makes a sound on command"),
+        'quiet': Trick('quiet', TrickDifficulty.MEDIUM, TrickCategory.BASIC,
+                      "Pet stops making noise"),
+        'heel': Trick('heel', TrickDifficulty.HARD, TrickCategory.BASIC,
+                     "Pet walks closely at your side"),
+        'drop_it': Trick('drop_it', TrickDifficulty.MEDIUM, TrickCategory.INTERACTIVE,
+                        "Pet drops what's in its mouth"),
+        'leave_it': Trick('leave_it', TrickDifficulty.HARD, TrickCategory.BASIC,
+                         "Pet ignores items or distractions"),
+        'high_five': Trick('high_five', TrickDifficulty.EASY, TrickCategory.INTERACTIVE,
+                          "Pet gives a high five"),
+        'crawl': Trick('crawl', TrickDifficulty.HARD, TrickCategory.MOVEMENT,
+                      "Pet crawls on belly"),
+        'back_up': Trick('back_up', TrickDifficulty.MEDIUM, TrickCategory.MOVEMENT,
+                        "Pet walks backwards"),
+        'circle': Trick('circle', TrickDifficulty.MEDIUM, TrickCategory.MOVEMENT,
+                       "Pet walks in a circle around you"),
+        'kiss': Trick('kiss', TrickDifficulty.EASY, TrickCategory.EXPRESSIVE,
+                     "Pet gives affectionate kiss"),
+        'hug': Trick('hug', TrickDifficulty.MEDIUM, TrickCategory.EXPRESSIVE,
+                    "Pet gives a hug"),
+        'find_it': Trick('find_it', TrickDifficulty.HARD, TrickCategory.INTERACTIVE,
+                        "Pet searches for hidden items"),
+        'go_to_bed': Trick('go_to_bed', TrickDifficulty.MEDIUM, TrickCategory.BASIC,
+                          "Pet goes to designated rest area"),
+
+        # Expert-level tricks
+        'balance': Trick('balance', TrickDifficulty.EXPERT, TrickCategory.ADVANCED,
+                        "Pet balances object on nose"),
+        'weave': Trick('weave', TrickDifficulty.EXPERT, TrickCategory.ADVANCED,
+                      "Pet weaves through your legs while walking"),
     }
 
     def __init__(self, creature_name: str, personality: PersonalityType):
@@ -402,6 +463,22 @@ class TrainingSystem:
 
         # Personality-based learning modifiers
         self.learning_modifiers = self._get_personality_modifiers()
+
+        # Phase 6: Enhanced training systems
+        try:
+            from .enhanced_training import (
+                ReinforcementSystem, StubbornessCalculator, TrainingProgressTracker
+            )
+            self.reinforcement = ReinforcementSystem()
+            self.stubbornness_calc = StubbornessCalculator()
+            self.progress_tracker = TrainingProgressTracker()
+            self.phase6_enabled = True
+        except ImportError:
+            # Phase 6 not available
+            self.reinforcement = None
+            self.stubbornness_calc = None
+            self.progress_tracker = None
+            self.phase6_enabled = False
 
     def _get_personality_modifiers(self) -> Dict[str, float]:
         """
@@ -602,12 +679,22 @@ class TrainingSystem:
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize training system."""
-        return {
+        data = {
             'personality': self.personality.value,
             'learned_tricks': {name: trick.to_dict() for name, trick in self.learned_tricks.items()},
             'command_recognition': self.command_recognition.to_dict(),
-            'name_recognition': self.name_recognition.to_dict()
+            'name_recognition': self.name_recognition.to_dict(),
+            'phase6_enabled': self.phase6_enabled
         }
+
+        # Phase 6: Save enhanced training systems
+        if self.phase6_enabled:
+            if self.reinforcement:
+                data['reinforcement'] = self.reinforcement.to_dict()
+            if self.progress_tracker:
+                data['progress_tracker'] = self.progress_tracker.to_dict()
+
+        return data
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'TrainingSystem':
@@ -624,5 +711,15 @@ class TrainingSystem:
         # Restore command and name recognition
         system.command_recognition = CommandRecognition.from_dict(data['command_recognition'])
         system.name_recognition = NameRecognition.from_dict(data['name_recognition'])
+
+        # Phase 6: Restore enhanced training systems
+        if data.get('phase6_enabled', False) and system.phase6_enabled:
+            if 'reinforcement' in data:
+                from .enhanced_training import ReinforcementSystem
+                system.reinforcement = ReinforcementSystem.from_dict(data['reinforcement'])
+
+            if 'progress_tracker' in data:
+                from .enhanced_training import TrainingProgressTracker
+                system.progress_tracker = TrainingProgressTracker.from_dict(data['progress_tracker'])
 
         return system
