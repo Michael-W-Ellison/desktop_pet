@@ -691,3 +691,123 @@ SAVE_INTERVAL = 300  # Auto-save every 5 minutes
 ICON_MOVE_PROBABILITY = 0.05  # 5% chance per behavior update
 HIDE_AND_SEEK_DURATION = 30  # seconds
 MOUSE_CHASE_DISTANCE = 200  # pixels - how close to chase mouse
+
+# ============================================================================
+# PHASE 8: LIVING CREATURE BEHAVIORS
+# ============================================================================
+
+# Bathroom needs
+BLADDER_FILL_RATE = 8.0                  # Points per hour (~12.5 hours to fill)
+BOWEL_FILL_RATE = 4.0                    # Points per hour (~25 hours to fill)
+BATHROOM_ACCIDENT_UNHAPPINESS = 10.0     # Happiness loss from accident
+BATHROOM_RELIEF_HAPPINESS = 5.0          # Happiness from using bathroom
+HOUSE_TRAINING_THRESHOLD = 0.9           # Training level for house-trained status
+BLADDER_CONTROL_BABY = 0.3               # Bladder control for babies
+BLADDER_CONTROL_YOUNG = 0.5              # Bladder control for young pets
+BLADDER_CONTROL_ADULT = 1.0              # Bladder control for adults
+BLADDER_CONTROL_SENIOR = 0.8             # Bladder control for seniors
+ACCIDENT_RISK_URGENT_THRESHOLD = 0.7     # Bladder/bowel level for accident risk
+ACCIDENT_RISK_DESPERATE_THRESHOLD = 0.85 # Level for high accident risk
+
+# Grooming and cleanliness
+DIRT_ACCUMULATION_RATE = 1.0             # Cleanliness points lost per hour
+BATH_CLEANLINESS_RESTORE = 100.0         # Bath fully restores cleanliness
+BRUSHING_CLEANLINESS_GAIN = 30.0         # Brushing adds cleanliness
+BATH_HAPPINESS_LIKE = 5.0                # Happiness if likes baths
+BATH_HAPPINESS_DISLIKE = -3.0            # Happiness if dislikes baths
+BRUSHING_HAPPINESS = 8.0                 # Happiness from brushing
+BRUSHING_BOND_GAIN = 0.5                 # Bond increase from brushing
+DIRTY_THRESHOLD = 30.0                   # Cleanliness level considered "dirty"
+FILTHY_THRESHOLD = 10.0                  # Cleanliness level considered "filthy"
+GROOMING_NEEDED_THRESHOLD = 50.0         # When grooming becomes needed
+
+# Health and illness
+HEALTH_REGENERATION_RATE = 2.0           # Health points per hour when healthy
+ILLNESS_CHANCE_PER_HOUR = 0.001          # Base chance of getting sick per hour
+IMMUNITY_BASE = 50.0                     # Starting immunity level
+IMMUNITY_MAX = 100.0                     # Maximum immunity
+IMMUNITY_MIN = 0.0                       # Minimum immunity
+STRESS_ILLNESS_MULTIPLIER = 1.5          # Illness risk multiplier when stressed (>70)
+HYGIENE_ILLNESS_MULTIPLIER = 2.0         # Illness risk multiplier when dirty (<30)
+VET_RECOVERY_BOOST = 0.3                 # 30% recovery progress from vet visit
+VET_DAMAGE_REDUCTION = 0.5               # 50% reduction in illness damage after vet
+VET_BASE_COST = 50                       # Base cost for vet visit
+VET_PER_ILLNESS_COST = 25                # Additional cost per illness
+MEDICINE_DURATION_HOURS = 24.0           # How long medicine lasts
+ILLNESS_NATURAL_RECOVERY_RATE = 0.05     # 5% recovery per day without treatment
+
+# Illness damage per hour by severity
+ILLNESS_DAMAGE_MILD = 1.0
+ILLNESS_DAMAGE_MODERATE = 2.0
+ILLNESS_DAMAGE_SEVERE = 4.0
+ILLNESS_DAMAGE_CRITICAL = 8.0
+
+# Aging and lifespan
+DEFAULT_LIFESPAN_DAYS = 3650             # 10 years default lifespan
+AGING_RATE_NORMAL = 1.0                  # Normal aging speed
+AGE_EGG_DAYS = 3                         # Days in egg stage
+AGE_BABY_DAYS = 30                       # Days in baby stage (up to 1 month)
+AGE_CHILD_DAYS = 90                      # Days in child stage (up to 3 months)
+AGE_TEEN_DAYS = 180                      # Days in teen stage (up to 6 months)
+AGE_ADULT_DAYS = 2555                    # Days in adult stage (up to ~7 years)
+AGE_SENIOR_DAYS = 3650                   # Days in senior stage (up to 10 years)
+# Elder is anything beyond senior
+
+# Age modifiers for different life stages
+BABY_ENERGY_MAX_MODIFIER = 0.6
+BABY_HUNGER_RATE_MODIFIER = 1.5
+BABY_LEARNING_RATE_MODIFIER = 1.2
+CHILD_ACTIVITY_MODIFIER = 1.2
+TEEN_ACTIVITY_MODIFIER = 1.3
+SENIOR_ENERGY_MAX_MODIFIER = 0.8
+SENIOR_ACTIVITY_MODIFIER = 0.7
+ELDER_ENERGY_MAX_MODIFIER = 0.6
+ELDER_ACTIVITY_MODIFIER = 0.5
+
+# Natural death
+DEATH_CHANCE_START_AGE = 1.0             # Start checking for natural death at lifespan
+DEATH_CHANCE_PER_YEAR_OVER = 1.0         # Each year over lifespan = 100% added chance
+
+# Breeding and genetics
+BREEDING_BASE_SUCCESS_CHANCE = 0.7       # 70% base breeding success
+PREGNANCY_DURATION_DAYS = 7.0            # Pregnancy lasts 1 week
+LITTER_SIZE_MIN = 1
+LITTER_SIZE_MAX = 3
+MUTATION_CHANCE = 0.1                    # 10% chance of genetic mutation
+BREEDING_ADULT_AGE_REQUIRED = True       # Must be adult to breed
+GENETIC_TRAIT_BLEND_VARIATION = 10.0     # +/- variation when blending numerical traits
+
+# Genetics
+GENETIC_SIZES = ['small', 'medium', 'large']
+GENETIC_COLORS = ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'silver', 'gold']
+GENETIC_PATTERNS = ['solid', 'striped', 'spotted', 'mixed', 'swirled']
+GENETIC_EYE_COLORS = ['brown', 'blue', 'green', 'amber']
+
+# Circadian rhythm
+SLEEP_DRIVE_INCREASE_RATE = 5.0          # Points per hour awake
+SLEEP_DRIVE_DECREASE_RATE = 15.0         # Points per hour asleep
+SLEEP_DRIVE_EXHAUSTED_THRESHOLD = 90.0   # Will definitely sleep
+SLEEP_DRIVE_TIRED_THRESHOLD = 60.0       # Likely to sleep at bedtime
+SLEEP_DEBT_CRITICAL_HOURS = 8.0          # Hours of sleep debt that forces sleep
+SLEEP_CYCLE_DURATION_MINUTES = 90.0      # Length of one sleep cycle (light -> deep -> REM)
+NAP_DURATION_THRESHOLD = 2.0             # Hours - anything less is a nap
+
+# Species-specific sleep needs (hours per day)
+CAT_DAILY_SLEEP_NEED = 16.0
+DOG_DAILY_SLEEP_NEED = 14.0
+BIRD_DAILY_SLEEP_NEED = 12.0
+HAMSTER_DAILY_SLEEP_NEED = 14.0
+RABBIT_DAILY_SLEEP_NEED = 8.0
+
+# Preferred sleep times (hour of day, 0-23)
+CAT_PREFERRED_SLEEP_TIME = 22
+DOG_PREFERRED_SLEEP_TIME = 21
+BIRD_PREFERRED_SLEEP_TIME = 19
+HAMSTER_PREFERRED_SLEEP_TIME = 8        # Nocturnal - sleeps during day
+RABBIT_PREFERRED_SLEEP_TIME = 20
+
+# Sleep quality factors
+SLEEP_QUALITY_NATURAL_WAKE = 1.0
+SLEEP_QUALITY_FORCED_WAKE = 0.6
+SLEEP_QUALITY_IDEAL_DURATION_HOURS = 6.0
+SLEEP_QUALITY_MIN_DURATION_HOURS = 1.0
