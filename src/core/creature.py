@@ -666,7 +666,7 @@ class Creature:
         return {
             'age_hours': self.age / 3600.0,  # Convert seconds to hours
             'happiness': self.happiness,
-            'bond': self.bond,
+            'bond': self.bonding.bond,  # Phase 5: Use bonding system
             'total_interactions': self.total_interactions,
             'tricks_learned': len(self.get_known_tricks())
         }
@@ -699,7 +699,7 @@ class Creature:
                     'old_stage': self.evolution.evolution_history[-1]['from_stage'].value,
                     'new_stage': new_stage.value,
                     'age_hours': stats['age_hours'],
-                    'bond': self.bond
+                    'bond': self.bonding.bond  # Phase 5: Use bonding system
                 },
                 important=True,
                 emotional_intensity=1.0
@@ -729,7 +729,11 @@ class Creature:
         bond_change = result.get('bond_change', 0)
 
         self.happiness = max(0, min(100, self.happiness + happiness_change))
-        self.bond = max(0, min(100, self.bond + bond_change))
+        # Phase 5: Use bonding system for bond changes
+        if bond_change > 0:
+            self.bonding.add_bond(bond_change, 'elemental_interaction')
+        elif bond_change < 0:
+            self.bonding.reduce_bond(abs(bond_change), 'elemental_interaction')
 
         # Record in memory if significant
         if abs(happiness_change) > 5 or bond_change > 3:
@@ -769,7 +773,7 @@ class Creature:
                 'hunger': self.hunger,
                 'happiness': self.happiness,
                 'energy': self.energy,
-                'bond': self.bond
+                'bond': self.bonding.bond  # Phase 5: Use bonding system
             },
             'known_tricks': len(self.get_known_tricks()),
             'total_interactions': self.total_interactions
@@ -805,7 +809,7 @@ class Creature:
             Dictionary with response details (responded, animation, message, bond_change)
         """
         # Get name recognition proficiency from training system
-        name_recognition = self.training.name_recognition.proficiency
+        name_recognition = self.training.name_recognition.recognition_proficiency
 
         # Get current mood (basic version using happiness)
         current_mood = None
@@ -955,11 +959,17 @@ class Creature:
         Returns:
             Dictionary with favorite items
         """
-        favorites = {}
-        favorites['toy'] = self.preferences.get_favorite('toy')
-        favorites['food'] = self.preferences.get_favorite('food')
-        favorites['activity'] = self.preferences.get_favorite('activity')
-        favorites['least_favorite_toy'] = self.preferences.get_least_favorite('toy')
+        favorites = self.preferences.get_favorites()
+
+        # Also add top preference from each category
+        top_toys = self.preferences.get_top_preferences('toy', 1)
+        top_foods = self.preferences.get_top_preferences('food', 1)
+        top_activities = self.preferences.get_top_preferences('activity', 1)
+
+        favorites['top_toy'] = top_toys[0][0] if top_toys else None
+        favorites['top_food'] = top_foods[0][0] if top_foods else None
+        favorites['top_activity'] = top_activities[0][0] if top_activities else None
+
         return favorites
 
     def get_bond_level_name(self) -> str:
