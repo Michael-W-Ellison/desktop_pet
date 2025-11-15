@@ -1175,3 +1175,73 @@ TRADING_REQUIRE_MUTUAL = False               # Both must offer something
 TRADING_EXPIRY_DURATION = 3600               # Trade expires after 1 hour (seconds)
 TRADING_HISTORY_LIMIT = 50                   # Max trade history records
 TRADING_ITEM_ESTIMATE_VALUE = 20             # Estimated value per item
+
+# ============================================================================
+# PHASE 14: CUSTOMIZATION & DECORATION SYSTEM
+# ============================================================================
+
+# Pet customization
+PET_DEFAULT_PRIMARY_COLOR = "150,100,50"     # Default primary body color (RGB)
+PET_DEFAULT_SECONDARY_COLOR = "200,150,100"  # Default secondary color
+PET_DEFAULT_ACCENT_COLOR = "255,200,150"     # Default accent color
+PET_DEFAULT_EYE_COLOR = "50,100,200"         # Default eye color
+PET_DEFAULT_PATTERN = "solid"                # Default fur/coat pattern
+PET_DEFAULT_BODY_SIZE = 1.0                  # Default body size scale
+PET_MIN_BODY_SIZE = 0.5                      # Minimum body size
+PET_MAX_BODY_SIZE = 2.0                      # Maximum body size
+PET_MAX_ACCESSORIES = 7                      # Max accessory slots
+PET_TOTAL_ACCESSORIES = 17                   # Total available accessories
+
+# Color palettes
+PALETTE_NATURAL = "natural"                  # Natural animal colors
+PALETTE_PASTEL = "pastel"                    # Soft pastel colors
+PALETTE_VIBRANT = "vibrant"                  # Bright vivid colors
+PALETTE_MONOCHROME = "monochrome"            # Black/white/gray
+PALETTE_RAINBOW = "rainbow"                  # Rainbow colors
+PALETTE_NEON = "neon"                        # Neon/glowing colors
+PALETTE_EARTH = "earth"                      # Earth tones
+PALETTE_OCEAN = "ocean"                      # Blue/aqua tones
+PALETTE_SUNSET = "sunset"                    # Orange/pink/purple
+PALETTE_GALAXY = "galaxy"                    # Purple/blue/stars
+
+# Room decoration
+ROOM_DEFAULT_WALLPAPER = "plain"             # Default wallpaper style
+ROOM_DEFAULT_FLOOR = "wood"                  # Default floor style
+ROOM_DEFAULT_THEME = "cozy_home"             # Default room theme
+ROOM_DEFAULT_LIGHT_COLOR = "255,255,255"     # Default ambient light (white)
+ROOM_DEFAULT_LIGHT_INTENSITY = 1.0           # Default light intensity
+ROOM_DEFAULT_SHADOW_INTENSITY = 0.5          # Default shadow intensity
+ROOM_TOTAL_WALLPAPERS = 10                   # Total available wallpapers
+ROOM_TOTAL_FLOORS = 9                        # Total available floors
+ROOM_TOTAL_THEMES = 11                       # Total room themes
+
+# Furniture placement
+FURNITURE_ROOM_WIDTH = 20                    # Room width in grid units
+FURNITURE_ROOM_HEIGHT = 15                   # Room height in grid units
+FURNITURE_GRID_SIZE = 32                     # Pixels per grid unit
+FURNITURE_SNAP_TO_GRID = True                # Enable grid snapping
+FURNITURE_MAX_ITEMS = 50                     # Max furniture items in room
+FURNITURE_ROTATION_STEP = 90                 # Rotation step in degrees
+
+# Furniture categories
+FURNITURE_CATEGORY_BED = "bed"               # Pet beds
+FURNITURE_CATEGORY_BOWL = "food_bowl"        # Food/water bowls
+FURNITURE_CATEGORY_TOY_BOX = "toy_box"       # Toy storage
+FURNITURE_CATEGORY_SCRATCHING = "scratching" # Scratching posts
+FURNITURE_CATEGORY_DECORATION = "decoration" # Decorative items
+FURNITURE_CATEGORY_PLANT = "plant"           # Plants
+FURNITURE_CATEGORY_LIGHTING = "lighting"     # Lamps, lights
+FURNITURE_CATEGORY_SEATING = "seating"       # Cushions, chairs
+
+# Customization presets
+PRESET_MAX_COUNT = 50                        # Max saved presets
+PRESET_MAX_RECENT = 10                       # Max recent presets tracked
+PRESET_TYPE_OUTFIT = "outfit"                # Pet outfit preset
+PRESET_TYPE_ROOM = "room"                    # Room layout preset
+PRESET_TYPE_COMPLETE = "complete"            # Complete look preset
+
+# Visual effects
+EFFECT_SPARKLE = False                       # Sparkle effect enabled
+EFFECT_GLOW = False                          # Glow effect enabled
+EFFECT_SHADOW = True                         # Shadow effect enabled
+EFFECT_PARTICLES_ENABLED = True              # Particle effects enabled
