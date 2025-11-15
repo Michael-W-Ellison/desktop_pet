@@ -981,3 +981,48 @@ SHADOW_OPACITY = 0.3                         # Shadow transparency
 SHADOW_BLUR_RADIUS = 10                      # Shadow blur (pixels)
 HIGHLIGHT_OPACITY = 0.2                      # Hover highlight transparency
 OUTLINE_WIDTH = 2                            # Selection outline width (pixels)
+
+# =============================================================================
+# PHASE 11: JOURNAL & MEMORY CAPTURE CONSTANTS
+# =============================================================================
+
+# Journal system
+JOURNAL_AUTO_TAG_ENABLED = True              # Auto-generate tags from content
+JOURNAL_AUTO_LINK_PHOTOS = True              # Auto-link related photos
+JOURNAL_DAILY_REMINDER = True                # Remind user to write daily
+JOURNAL_MAX_TITLE_LENGTH = 100               # Max characters in title
+JOURNAL_MAX_CONTENT_LENGTH = 10000           # Max characters in entry
+JOURNAL_STREAK_BONUS_DAYS = 7                # Days for streak bonus
+JOURNAL_FAVORITE_LIMIT = 100                 # Max favorite entries
+
+# Screenshot system
+SCREENSHOT_DEFAULT_WIDTH = 800               # Default screenshot width
+SCREENSHOT_DEFAULT_HEIGHT = 600              # Default screenshot height
+SCREENSHOT_COOLDOWN_SECONDS = 1.0            # Min time between captures
+SCREENSHOT_AUTO_CAPTURE_ENABLED = True       # Auto-capture special moments
+SCREENSHOT_AUTO_THUMBNAIL = True             # Auto-generate thumbnails
+SCREENSHOT_THUMBNAIL_WIDTH = 200             # Thumbnail width
+SCREENSHOT_THUMBNAIL_HEIGHT = 200            # Thumbnail height
+SCREENSHOT_MAX_FILE_SIZE_MB = 5.0            # Max file size per screenshot
+SCREENSHOT_JPEG_QUALITY = 90                 # JPEG compression quality (0-100)
+SCREENSHOT_PNG_COMPRESSION = 6               # PNG compression level (0-9)
+
+# Photo album system
+ALBUM_AUTO_CREATE_MONTHLY = True             # Auto-create monthly albums
+ALBUM_AUTO_CREATE_EVENT = True               # Auto-create event albums
+ALBUM_DEFAULT_SORT = "date_newest"           # Default photo sort order
+ALBUM_SLIDESHOW_DELAY = 3.0                  # Seconds per photo in slideshow
+ALBUM_MAX_PHOTOS_PER_ALBUM = 500             # Max photos per album
+ALBUM_SMART_ALBUMS_ENABLED = True            # Enable smart albums
+
+# Memory book system
+MEMORY_AUTO_MILESTONE_DETECT = True          # Auto-detect milestones
+MEMORY_AUTO_CELEBRATION = True               # Auto-celebrate milestones
+MEMORY_SCRAPBOOK_PAGE_LIMIT = 100            # Max scrapbook pages
+MEMORY_TIMELINE_MAX_ENTRIES = 1000           # Max timeline entries
+
+# Export settings
+EXPORT_JOURNAL_INCLUDE_METADATA = True       # Include metadata in exports
+EXPORT_PHOTOS_INCLUDE_ORIGINAL = True        # Include original quality photos
+EXPORT_MEMORY_BOOK_FORMAT = "pdf"            # Default export format (pdf/html/json)
+EXPORT_MAX_FILE_SIZE_MB = 100.0              # Max export file size
