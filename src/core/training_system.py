@@ -291,8 +291,9 @@ class NameRecognition:
             if np.random.random() < 0.5:
                 return 'ignore'
 
-        # Personality-based responses
+        # Personality-based responses (Phase 3: All 25 types)
         responses = {
+            # Original 8
             PersonalityType.PLAYFUL: ['jump', 'spin', 'excited'],
             PersonalityType.SHY: ['peek', 'slow_approach', 'timid'],
             PersonalityType.ENERGETIC: ['run_over', 'bounce', 'hyperactive'],
@@ -300,7 +301,26 @@ class NameRecognition:
             PersonalityType.CURIOUS: ['tilt_head', 'investigate', 'interested'],
             PersonalityType.INDEPENDENT: ['acknowledge', 'brief_look', 'casual'],
             PersonalityType.AFFECTIONATE: ['rush_over', 'devoted', 'immediate'],
-            PersonalityType.MISCHIEVOUS: ['playful_ignore', 'tease', 'game']
+            PersonalityType.MISCHIEVOUS: ['playful_ignore', 'tease', 'game'],
+
+            # Phase 3: New personalities
+            PersonalityType.CRANKY: ['grunt', 'reluctant_look', 'annoyed'],
+            PersonalityType.STUBBORN: ['stand_ground', 'defiant_stare', 'resistant'],
+            PersonalityType.SKITTISH: ['flinch', 'nervous_peek', 'startled'],
+            PersonalityType.BRAVE: ['confident_stride', 'bold_approach', 'fearless'],
+            PersonalityType.GENTLE: ['soft_approach', 'tender_look', 'calm_response'],
+            PersonalityType.FIERCE: ['aggressive_stance', 'territorial', 'intense_stare'],
+            PersonalityType.CLEVER: ['knowing_look', 'calculated_approach', 'smart_response'],
+            PersonalityType.SILLY: ['goofy_dance', 'clumsy_rush', 'derpy_wiggle'],
+            PersonalityType.SERIOUS: ['formal_acknowledgment', 'composed_look', 'dignified'],
+            PersonalityType.PATIENT: ['wait_calmly', 'peaceful_approach', 'serene'],
+            PersonalityType.IMPATIENT: ['dash_over', 'hurried_response', 'restless'],
+            PersonalityType.TRUSTING: ['immediate_trust', 'open_approach', 'welcoming'],
+            PersonalityType.SUSPICIOUS: ['wary_glance', 'cautious_peek', 'distrustful'],
+            PersonalityType.CALM: ['peaceful_turn', 'relaxed_acknowledgment', 'tranquil'],
+            PersonalityType.ANXIOUS: ['worried_look', 'nervous_response', 'tense'],
+            PersonalityType.LOYAL: ['devoted_rush', 'faithful_approach', 'dedicated'],
+            PersonalityType.SELFISH: ['dismissive_glance', 'self_focused', 'aloof']
         }
 
         if personality in responses:
@@ -385,12 +405,13 @@ class TrainingSystem:
 
     def _get_personality_modifiers(self) -> Dict[str, float]:
         """
-        Get learning rate modifiers based on personality.
+        Get learning rate modifiers based on personality (Phase 3: All 25 types).
 
         Returns:
             Dictionary of modifiers
         """
         modifiers = {
+            # Original 8 personalities
             PersonalityType.PLAYFUL: {'learning_rate': 1.2, 'stubbornness': 0.3},
             PersonalityType.SHY: {'learning_rate': 0.8, 'stubbornness': 0.5},
             PersonalityType.ENERGETIC: {'learning_rate': 1.3, 'stubbornness': 0.2},
@@ -399,6 +420,25 @@ class TrainingSystem:
             PersonalityType.INDEPENDENT: {'learning_rate': 0.9, 'stubbornness': 0.7},
             PersonalityType.AFFECTIONATE: {'learning_rate': 1.1, 'stubbornness': 0.2},
             PersonalityType.MISCHIEVOUS: {'learning_rate': 1.0, 'stubbornness': 0.8},
+
+            # Phase 3: New personalities
+            PersonalityType.CRANKY: {'learning_rate': 0.6, 'stubbornness': 0.9},
+            PersonalityType.STUBBORN: {'learning_rate': 0.5, 'stubbornness': 0.95},
+            PersonalityType.SKITTISH: {'learning_rate': 0.7, 'stubbornness': 0.6},
+            PersonalityType.BRAVE: {'learning_rate': 1.2, 'stubbornness': 0.3},
+            PersonalityType.GENTLE: {'learning_rate': 1.1, 'stubbornness': 0.2},
+            PersonalityType.FIERCE: {'learning_rate': 0.9, 'stubbornness': 0.8},
+            PersonalityType.CLEVER: {'learning_rate': 1.7, 'stubbornness': 0.2},
+            PersonalityType.SILLY: {'learning_rate': 0.8, 'stubbornness': 0.5},
+            PersonalityType.SERIOUS: {'learning_rate': 1.3, 'stubbornness': 0.3},
+            PersonalityType.PATIENT: {'learning_rate': 1.4, 'stubbornness': 0.1},
+            PersonalityType.IMPATIENT: {'learning_rate': 0.9, 'stubbornness': 0.7},
+            PersonalityType.TRUSTING: {'learning_rate': 1.4, 'stubbornness': 0.1},
+            PersonalityType.SUSPICIOUS: {'learning_rate': 0.8, 'stubbornness': 0.8},
+            PersonalityType.CALM: {'learning_rate': 1.2, 'stubbornness': 0.2},
+            PersonalityType.ANXIOUS: {'learning_rate': 0.6, 'stubbornness': 0.7},
+            PersonalityType.LOYAL: {'learning_rate': 1.5, 'stubbornness': 0.05},
+            PersonalityType.SELFISH: {'learning_rate': 0.7, 'stubbornness': 0.85},
         }
 
         return modifiers.get(self.personality, {'learning_rate': 1.0, 'stubbornness': 0.5})

@@ -53,8 +53,9 @@ class AIComplexity(Enum):
 
 DEFAULT_AI_COMPLEXITY = AIComplexity.MEDIUM
 
-# Personality types
+# Personality types (Phase 3: Expanded to 20+ types)
 class PersonalityType(Enum):
+    # Original 8
     PLAYFUL = "playful"
     SHY = "shy"
     CURIOUS = "curious"
@@ -63,6 +64,25 @@ class PersonalityType(Enum):
     MISCHIEVOUS = "mischievous"
     AFFECTIONATE = "affectionate"
     INDEPENDENT = "independent"
+
+    # Phase 3: New personalities (12 more = 20 total)
+    CRANKY = "cranky"
+    STUBBORN = "stubborn"
+    SKITTISH = "skittish"
+    BRAVE = "brave"
+    GENTLE = "gentle"
+    FIERCE = "fierce"
+    CLEVER = "clever"
+    SILLY = "silly"
+    SERIOUS = "serious"
+    PATIENT = "patient"
+    IMPATIENT = "impatient"
+    TRUSTING = "trusting"
+    SUSPICIOUS = "suspicious"
+    CALM = "calm"
+    ANXIOUS = "anxious"
+    LOYAL = "loyal"
+    SELFISH = "selfish"
 
 # Creature types (Pokemon-style animals)
 CREATURE_TYPES = [
@@ -102,6 +122,7 @@ COLOR_PALETTES = [
 
 # Personality trait modifiers (how personality affects behavior)
 PERSONALITY_TRAITS = {
+    # Original 8 personalities
     PersonalityType.PLAYFUL: {
         "play_frequency": 1.5,
         "energy_consumption": 1.2,
@@ -141,6 +162,110 @@ PERSONALITY_TRAITS = {
         "interaction_desire": 0.6,
         "self_play_frequency": 1.4,
         "exploration_frequency": 1.3
+    },
+
+    # Phase 3: New personalities
+    PersonalityType.CRANKY: {
+        "irritability": 1.8,
+        "happiness_decay": 1.3,
+        "interaction_desire": 0.5,
+        "negative_reaction_chance": 0.4
+    },
+    PersonalityType.STUBBORN: {
+        "training_difficulty": 1.6,
+        "command_refusal_rate": 0.6,
+        "persistence": 1.4,
+        "pattern_breaking": 0.3
+    },
+    PersonalityType.SKITTISH: {
+        "hiding_frequency": 1.9,
+        "fear_threshold": 0.3,
+        "interaction_desire": 0.4,
+        "movement_speed": 1.5
+    },
+    PersonalityType.BRAVE: {
+        "exploration_frequency": 1.6,
+        "fear_threshold": 1.8,
+        "interaction_desire": 1.2,
+        "boldness": 1.7
+    },
+    PersonalityType.GENTLE: {
+        "interaction_desire": 1.3,
+        "aggression": 0.2,
+        "patience": 1.6,
+        "happiness_gain": 1.2
+    },
+    PersonalityType.FIERCE: {
+        "aggression": 1.8,
+        "boldness": 1.9,
+        "energy_consumption": 1.4,
+        "territoriality": 1.7
+    },
+    PersonalityType.CLEVER: {
+        "learning_speed": 1.7,
+        "problem_solving": 1.8,
+        "attention_span": 1.4,
+        "trick_proficiency_gain": 1.3
+    },
+    PersonalityType.SILLY: {
+        "random_behavior": 1.9,
+        "play_frequency": 1.6,
+        "attention_span": 0.5,
+        "unpredictability": 1.8
+    },
+    PersonalityType.SERIOUS: {
+        "play_frequency": 0.5,
+        "focus": 1.7,
+        "routine_preference": 1.6,
+        "predictability": 1.8
+    },
+    PersonalityType.PATIENT: {
+        "wait_tolerance": 1.9,
+        "irritability": 0.3,
+        "training_ease": 1.4,
+        "calm_behavior": 1.6
+    },
+    PersonalityType.IMPATIENT: {
+        "wait_tolerance": 0.3,
+        "irritability": 1.6,
+        "movement_speed": 1.3,
+        "attention_span": 0.6
+    },
+    PersonalityType.TRUSTING: {
+        "interaction_desire": 1.7,
+        "fear_threshold": 1.5,
+        "bonding_speed": 1.6,
+        "command_compliance": 1.4
+    },
+    PersonalityType.SUSPICIOUS: {
+        "interaction_desire": 0.5,
+        "fear_threshold": 0.6,
+        "trust_building": 0.4,
+        "hiding_frequency": 1.5
+    },
+    PersonalityType.CALM: {
+        "stress_resistance": 1.8,
+        "panic_threshold": 1.9,
+        "energy_consumption": 0.8,
+        "emotional_stability": 1.7
+    },
+    PersonalityType.ANXIOUS: {
+        "stress_sensitivity": 1.9,
+        "panic_threshold": 0.4,
+        "hiding_frequency": 1.6,
+        "energy_consumption": 1.3
+    },
+    PersonalityType.LOYAL: {
+        "bonding_strength": 1.9,
+        "separation_anxiety": 1.7,
+        "command_compliance": 1.6,
+        "owner_focus": 1.8
+    },
+    PersonalityType.SELFISH: {
+        "resource_guarding": 1.7,
+        "sharing_willingness": 0.3,
+        "self_focus": 1.8,
+        "independence": 1.5
     }
 }
 
