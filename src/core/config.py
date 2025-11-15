@@ -1245,3 +1245,78 @@ EFFECT_SPARKLE = False                       # Sparkle effect enabled
 EFFECT_GLOW = False                          # Glow effect enabled
 EFFECT_SHADOW = True                         # Shadow effect enabled
 EFFECT_PARTICLES_ENABLED = True              # Particle effects enabled
+
+# ============================================================================
+# PHASE 15: FURNITURE INTERACTION SYSTEM
+# ============================================================================
+
+# Interaction system
+INTERACTION_RANGE = 1.5                      # Grid units to interact with furniture
+INTERACTION_COOLDOWN_DEFAULT = 10.0          # Default cooldown (seconds)
+INTERACTION_SLEEP_DURATION = 30.0            # Sleep interaction duration
+INTERACTION_EAT_DURATION = 5.0               # Eat interaction duration
+INTERACTION_DRINK_DURATION = 3.0             # Drink interaction duration
+INTERACTION_PLAY_DURATION = 15.0             # Play interaction duration
+INTERACTION_SCRATCH_DURATION = 8.0           # Scratch interaction duration
+INTERACTION_CLIMB_DURATION = 6.0             # Climb interaction duration
+INTERACTION_SIT_DURATION = 20.0              # Sit interaction duration
+INTERACTION_EXPLORE_DURATION = 10.0          # Explore interaction duration
+INTERACTION_GROOM_DURATION = 12.0            # Groom interaction duration
+INTERACTION_WATCH_DURATION = 25.0            # Watch interaction duration
+
+# Interaction effects
+EFFECT_SLEEP_ENERGY = 30                     # Energy restored from sleep
+EFFECT_SLEEP_HAPPINESS = 5                   # Happiness from sleep
+EFFECT_EAT_HUNGER = -40                      # Hunger reduced from eating
+EFFECT_EAT_HAPPINESS = 10                    # Happiness from eating
+EFFECT_DRINK_HUNGER = -10                    # Thirst/hunger from drinking
+EFFECT_DRINK_HAPPINESS = 5                   # Happiness from drinking
+EFFECT_PLAY_ENERGY = -10                     # Energy cost of playing
+EFFECT_PLAY_HAPPINESS = 20                   # Happiness from playing
+EFFECT_PLAY_BOREDOM = -30                    # Boredom reduced from playing
+EFFECT_SCRATCH_STRESS = -15                  # Stress relief from scratching
+EFFECT_SCRATCH_HAPPINESS = 10                # Happiness from scratching
+EFFECT_CLIMB_ENERGY = -5                     # Energy cost of climbing
+EFFECT_CLIMB_HAPPINESS = 15                  # Happiness from climbing
+EFFECT_SIT_ENERGY = 10                       # Energy from sitting/resting
+EFFECT_SIT_STRESS = -10                      # Stress relief from sitting
+
+# Autonomous behavior
+AUTO_BEHAVIOR_ENABLED = True                 # Enable autonomous behavior
+AUTO_DECISION_INTERVAL = 5.0                 # Seconds between decisions
+AUTO_THRESHOLD_CRITICAL = 20                 # Critical need level (0-100)
+AUTO_THRESHOLD_HIGH = 40                     # High priority threshold
+AUTO_THRESHOLD_MEDIUM = 60                   # Medium priority threshold
+AUTO_THRESHOLD_LOW = 80                      # Low priority threshold
+AUTO_RANDOMNESS = 0.3                        # Behavior randomness (0-1)
+AUTO_MOTIVATION_THRESHOLD = 30               # Minimum motivation to act
+
+# Need weights (how much each need influences behavior)
+NEED_WEIGHT_HUNGER = 1.5                     # Hunger priority weight
+NEED_WEIGHT_ENERGY = 1.2                     # Energy priority weight
+NEED_WEIGHT_HAPPINESS = 1.0                  # Happiness priority weight
+NEED_WEIGHT_BOREDOM = 0.8                    # Boredom priority weight
+NEED_WEIGHT_STRESS = 1.1                     # Stress priority weight
+NEED_WEIGHT_CLEANLINESS = 0.7                # Cleanliness priority weight
+
+# Furniture quality
+FURNITURE_QUALITY_BASIC_MULTIPLIER = 1.0     # Basic quality multiplier
+FURNITURE_QUALITY_STANDARD_MULTIPLIER = 1.2  # Standard quality multiplier
+FURNITURE_QUALITY_PREMIUM_MULTIPLIER = 1.5   # Premium quality multiplier
+FURNITURE_QUALITY_LUXURY_MULTIPLIER = 2.0    # Luxury quality multiplier
+FURNITURE_QUALITY_LEGENDARY_MULTIPLIER = 3.0 # Legendary quality multiplier
+
+# Furniture durability
+FURNITURE_MAX_DURABILITY = 100               # Maximum durability
+FURNITURE_DURABILITY_LOSS_PER_USE = 2        # Durability lost per use
+FURNITURE_REPAIR_AMOUNT_DEFAULT = 50         # Default repair amount
+FURNITURE_BROKEN_THRESHOLD = 20              # Broken below this durability
+FURNITURE_REPAIR_THRESHOLD = 50              # Needs repair below this %
+
+# Animation settings
+ANIMATION_FRAME_RATE_DEFAULT = 12            # Default animation FPS
+ANIMATION_TRANSITION_DURATION = 0.3          # Transition time (seconds)
+ANIMATION_WALK_FRAMES = 8                    # Walk animation frames
+ANIMATION_SLEEP_FRAMES = 4                   # Sleep animation frames
+ANIMATION_EAT_FRAMES = 6                     # Eat animation frames
+ANIMATION_PLAY_FRAMES = 8                    # Play animation frames
