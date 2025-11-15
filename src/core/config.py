@@ -691,3 +691,632 @@ SAVE_INTERVAL = 300  # Auto-save every 5 minutes
 ICON_MOVE_PROBABILITY = 0.05  # 5% chance per behavior update
 HIDE_AND_SEEK_DURATION = 30  # seconds
 MOUSE_CHASE_DISTANCE = 200  # pixels - how close to chase mouse
+
+# ============================================================================
+# PHASE 8: LIVING CREATURE BEHAVIORS
+# ============================================================================
+
+# Bathroom needs
+BLADDER_FILL_RATE = 8.0                  # Points per hour (~12.5 hours to fill)
+BOWEL_FILL_RATE = 4.0                    # Points per hour (~25 hours to fill)
+BATHROOM_ACCIDENT_UNHAPPINESS = 10.0     # Happiness loss from accident
+BATHROOM_RELIEF_HAPPINESS = 5.0          # Happiness from using bathroom
+HOUSE_TRAINING_THRESHOLD = 0.9           # Training level for house-trained status
+BLADDER_CONTROL_BABY = 0.3               # Bladder control for babies
+BLADDER_CONTROL_YOUNG = 0.5              # Bladder control for young pets
+BLADDER_CONTROL_ADULT = 1.0              # Bladder control for adults
+BLADDER_CONTROL_SENIOR = 0.8             # Bladder control for seniors
+ACCIDENT_RISK_URGENT_THRESHOLD = 0.7     # Bladder/bowel level for accident risk
+ACCIDENT_RISK_DESPERATE_THRESHOLD = 0.85 # Level for high accident risk
+
+# Grooming and cleanliness
+DIRT_ACCUMULATION_RATE = 1.0             # Cleanliness points lost per hour
+BATH_CLEANLINESS_RESTORE = 100.0         # Bath fully restores cleanliness
+BRUSHING_CLEANLINESS_GAIN = 30.0         # Brushing adds cleanliness
+BATH_HAPPINESS_LIKE = 5.0                # Happiness if likes baths
+BATH_HAPPINESS_DISLIKE = -3.0            # Happiness if dislikes baths
+BRUSHING_HAPPINESS = 8.0                 # Happiness from brushing
+BRUSHING_BOND_GAIN = 0.5                 # Bond increase from brushing
+DIRTY_THRESHOLD = 30.0                   # Cleanliness level considered "dirty"
+FILTHY_THRESHOLD = 10.0                  # Cleanliness level considered "filthy"
+GROOMING_NEEDED_THRESHOLD = 50.0         # When grooming becomes needed
+
+# Health and illness
+HEALTH_REGENERATION_RATE = 2.0           # Health points per hour when healthy
+ILLNESS_CHANCE_PER_HOUR = 0.001          # Base chance of getting sick per hour
+IMMUNITY_BASE = 50.0                     # Starting immunity level
+IMMUNITY_MAX = 100.0                     # Maximum immunity
+IMMUNITY_MIN = 0.0                       # Minimum immunity
+STRESS_ILLNESS_MULTIPLIER = 1.5          # Illness risk multiplier when stressed (>70)
+HYGIENE_ILLNESS_MULTIPLIER = 2.0         # Illness risk multiplier when dirty (<30)
+VET_RECOVERY_BOOST = 0.3                 # 30% recovery progress from vet visit
+VET_DAMAGE_REDUCTION = 0.5               # 50% reduction in illness damage after vet
+VET_BASE_COST = 50                       # Base cost for vet visit
+VET_PER_ILLNESS_COST = 25                # Additional cost per illness
+MEDICINE_DURATION_HOURS = 24.0           # How long medicine lasts
+ILLNESS_NATURAL_RECOVERY_RATE = 0.05     # 5% recovery per day without treatment
+
+# Illness damage per hour by severity
+ILLNESS_DAMAGE_MILD = 1.0
+ILLNESS_DAMAGE_MODERATE = 2.0
+ILLNESS_DAMAGE_SEVERE = 4.0
+ILLNESS_DAMAGE_CRITICAL = 8.0
+
+# Aging and lifespan
+DEFAULT_LIFESPAN_DAYS = 3650             # 10 years default lifespan
+AGING_RATE_NORMAL = 1.0                  # Normal aging speed
+AGE_EGG_DAYS = 3                         # Days in egg stage
+AGE_BABY_DAYS = 30                       # Days in baby stage (up to 1 month)
+AGE_CHILD_DAYS = 90                      # Days in child stage (up to 3 months)
+AGE_TEEN_DAYS = 180                      # Days in teen stage (up to 6 months)
+AGE_ADULT_DAYS = 2555                    # Days in adult stage (up to ~7 years)
+AGE_SENIOR_DAYS = 3650                   # Days in senior stage (up to 10 years)
+# Elder is anything beyond senior
+
+# Age modifiers for different life stages
+BABY_ENERGY_MAX_MODIFIER = 0.6
+BABY_HUNGER_RATE_MODIFIER = 1.5
+BABY_LEARNING_RATE_MODIFIER = 1.2
+CHILD_ACTIVITY_MODIFIER = 1.2
+TEEN_ACTIVITY_MODIFIER = 1.3
+SENIOR_ENERGY_MAX_MODIFIER = 0.8
+SENIOR_ACTIVITY_MODIFIER = 0.7
+ELDER_ENERGY_MAX_MODIFIER = 0.6
+ELDER_ACTIVITY_MODIFIER = 0.5
+
+# Natural death
+DEATH_CHANCE_START_AGE = 1.0             # Start checking for natural death at lifespan
+DEATH_CHANCE_PER_YEAR_OVER = 1.0         # Each year over lifespan = 100% added chance
+
+# Breeding and genetics
+BREEDING_BASE_SUCCESS_CHANCE = 0.7       # 70% base breeding success
+PREGNANCY_DURATION_DAYS = 7.0            # Pregnancy lasts 1 week
+LITTER_SIZE_MIN = 1
+LITTER_SIZE_MAX = 3
+MUTATION_CHANCE = 0.1                    # 10% chance of genetic mutation
+BREEDING_ADULT_AGE_REQUIRED = True       # Must be adult to breed
+GENETIC_TRAIT_BLEND_VARIATION = 10.0     # +/- variation when blending numerical traits
+
+# Genetics
+GENETIC_SIZES = ['small', 'medium', 'large']
+GENETIC_COLORS = ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'silver', 'gold']
+GENETIC_PATTERNS = ['solid', 'striped', 'spotted', 'mixed', 'swirled']
+GENETIC_EYE_COLORS = ['brown', 'blue', 'green', 'amber']
+
+# Circadian rhythm
+SLEEP_DRIVE_INCREASE_RATE = 5.0          # Points per hour awake
+SLEEP_DRIVE_DECREASE_RATE = 15.0         # Points per hour asleep
+SLEEP_DRIVE_EXHAUSTED_THRESHOLD = 90.0   # Will definitely sleep
+SLEEP_DRIVE_TIRED_THRESHOLD = 60.0       # Likely to sleep at bedtime
+SLEEP_DEBT_CRITICAL_HOURS = 8.0          # Hours of sleep debt that forces sleep
+SLEEP_CYCLE_DURATION_MINUTES = 90.0      # Length of one sleep cycle (light -> deep -> REM)
+NAP_DURATION_THRESHOLD = 2.0             # Hours - anything less is a nap
+
+# Species-specific sleep needs (hours per day)
+CAT_DAILY_SLEEP_NEED = 16.0
+DOG_DAILY_SLEEP_NEED = 14.0
+BIRD_DAILY_SLEEP_NEED = 12.0
+HAMSTER_DAILY_SLEEP_NEED = 14.0
+RABBIT_DAILY_SLEEP_NEED = 8.0
+
+# Preferred sleep times (hour of day, 0-23)
+CAT_PREFERRED_SLEEP_TIME = 22
+DOG_PREFERRED_SLEEP_TIME = 21
+BIRD_PREFERRED_SLEEP_TIME = 19
+HAMSTER_PREFERRED_SLEEP_TIME = 8        # Nocturnal - sleeps during day
+RABBIT_PREFERRED_SLEEP_TIME = 20
+
+# Sleep quality factors
+SLEEP_QUALITY_NATURAL_WAKE = 1.0
+SLEEP_QUALITY_FORCED_WAKE = 0.6
+SLEEP_QUALITY_IDEAL_DURATION_HOURS = 6.0
+SLEEP_QUALITY_MIN_DURATION_HOURS = 1.0
+
+# ============================================================================
+# PHASE 9: SOCIAL & MULTI-PET SYSTEMS
+# ============================================================================
+
+# Social relationships
+INITIAL_IMPRESSION_MIN = -20.0               # Minimum initial impression
+INITIAL_IMPRESSION_MAX = 40.0                # Maximum initial impression
+FRIENDSHIP_BEST_FRIEND_THRESHOLD = 80.0      # Friendship level for best friends
+FRIENDSHIP_FRIEND_THRESHOLD = 40.0           # Friendship level for friends
+FRIENDSHIP_RIVAL_THRESHOLD = -20.0           # Friendship level for rivals (below this)
+FRIENDSHIP_ENEMY_THRESHOLD = -40.0           # Friendship level for enemies (below this)
+SOCIAL_ENERGY_LONELY_THRESHOLD = 30.0        # Social energy below which pet is lonely
+SOCIAL_ENERGY_RESTORATION_RATE = 5.0         # Points restored per positive interaction
+
+# Pet-to-pet interactions (friendship changes)
+INTERACTION_PLAY_TOGETHER_SUCCESS = 10.0     # Friendship gain from successful play
+INTERACTION_PLAY_TOGETHER_FAIL = -2.0        # Friendship loss from failed play
+INTERACTION_GROOM_EACH_OTHER = 8.0           # Friendship gain from grooming
+INTERACTION_SHARE_FOOD_SUCCESS = 12.0        # Friendship gain from sharing food
+INTERACTION_SHARE_FOOD_REFUSE = -5.0         # Friendship loss if refused
+INTERACTION_FIGHT = -15.0                    # Friendship loss from fighting
+INTERACTION_ARGUE = -8.0                     # Friendship loss from arguing
+INTERACTION_CUDDLE = 12.0                    # Friendship gain from cuddling
+INTERACTION_COMFORT = 10.0                   # Friendship gain from comforting
+INTERACTION_IGNORE = -2.0                    # Friendship loss from ignoring
+
+# Pack hierarchy
+DOMINANCE_SCORE_AGE_MAX = 25.0               # Max points from age
+DOMINANCE_SCORE_SIZE_MAX = 20.0              # Max points from size
+DOMINANCE_SCORE_CONFIDENCE_MAX = 25.0        # Max points from confidence
+DOMINANCE_SCORE_WINS_MAX = 20.0              # Max points from win/loss record
+DOMINANCE_SCORE_SENIORITY_MAX = 10.0         # Max points from time in pack
+DOMINANCE_CHALLENGE_SCORE_DIFF_THRESHOLD = 30.0  # Score difference for easy win
+DOMINANCE_CHALLENGE_WIN_BONUS = 5.0          # Dominance increase for winning challenge
+DOMINANCE_CHALLENGE_LOSE_PENALTY = 3.0       # Dominance decrease for losing challenge
+PACK_STABILITY_DECAY_PER_CHALLENGE = 0.1     # Stability loss per challenge
+PACK_STABILITY_RECOVERY_RATE = 0.1           # Stability gain per peaceful day
+
+# Hierarchy ranks
+RANK_ALPHA = "alpha"
+RANK_BETA = "beta"
+RANK_MID_RANK = "mid_rank"
+RANK_OMEGA = "omega"
+
+# Jealousy and competition
+JEALOUSY_BASE_INCREASE = 10.0                # Base jealousy per minute of attention to other
+JEALOUSY_FOOD_MULTIPLIER = 1.5               # Multiplier for food-related jealousy
+JEALOUSY_PLAY_MULTIPLIER = 1.3               # Multiplier for play-related jealousy
+JEALOUSY_DECAY_RATE = 2.0                    # Points of jealousy decay per hour
+JEALOUSY_ATTENTION_REDUCTION = 15.0          # Jealousy reduced per minute of attention received
+JEALOUSY_MILD_THRESHOLD = 20.0               # Threshold for mild jealousy
+JEALOUSY_MODERATE_THRESHOLD = 40.0           # Threshold for moderate jealousy
+JEALOUSY_HIGH_THRESHOLD = 60.0               # Threshold for high jealousy
+JEALOUSY_EXTREME_THRESHOLD = 80.0            # Threshold for extreme jealousy
+RIVALRY_LOSS_THRESHOLD = 3                   # Losses to same pet to become rivals
+COMPETITION_BASE_PROBABILITY = 0.5           # Base 50/50 chance in competition
+COMPETITION_POSSESSIVENESS_BONUS = 0.2       # Max bonus from possessiveness
+COMPETITION_JEALOUSY_BONUS = 0.3             # Max bonus from jealousy
+
+# Peer teaching
+PEER_TEACHING_BASE_SUCCESS = 0.6             # 60% base teaching success
+PEER_TEACHING_PROFICIENCY_REQUIREMENT = 0.8  # Must be 80% proficient to teach
+PEER_TEACHING_PROFICIENCY_GAIN = 0.15        # 15% proficiency gain (vs 8% solo)
+PEER_TEACHING_SKILL_IMPROVEMENT = 0.02       # Teaching skill gain per session
+PEER_TEACHING_FRIENDSHIP_BONUS_MAX = 0.2     # Max bonus from high friendship
+PEER_TEACHING_RANK_BONUS = 0.1               # Bonus if teacher outranks student
+PEER_TEACHING_BONDING_GAIN = 3.0             # Bond increase from teaching
+OBSERVATION_LEARNING_CHANCE = 0.05           # 5% chance to learn per observation
+OBSERVATION_LEARNING_GAIN = 0.05             # 5% proficiency gain from observation
+OBSERVATION_MAX_CHANCE = 0.3                 # Max 30% chance even with many observations
+
+# Multi-pet system
+MAX_PETS_ON_DESKTOP = 10                     # Maximum pets allowed simultaneously
+PET_SPACING_MIN_PIXELS = 100                 # Minimum spacing between pets
+INTERACTION_PROXIMITY_PIXELS = 150           # Distance for interaction to occur
+AUTO_INTERACTION_CHANCE = 0.1                # 10% chance per update for auto-interaction
+PACK_FORMATION_MIN_PETS = 2                  # Minimum pets to form a pack
+
+# =============================================================================
+# PHASE 10: ADVANCED VISUAL & AUDIO CONSTANTS
+# =============================================================================
+
+# Animation system
+ANIMATION_FPS = 30                           # Target animation frames per second
+ANIMATION_TRANSITION_DURATION = 0.2          # Seconds for smooth transitions
+IDLE_ANIMATION_BOB_DISTANCE = 2              # Pixels for idle bobbing
+WALK_ANIMATION_FRAMES = 4                    # Frames in walk cycle
+JUMP_ANIMATION_DURATION = 0.6                # Seconds for jump animation
+EATING_ANIMATION_CHOMP_SPEED = 0.2           # Seconds per chomp
+SLEEP_ANIMATION_BREATHE_SPEED = 0.8          # Seconds per breath cycle
+HAPPY_ANIMATION_BOUNCE_HEIGHT = 8            # Pixels for happy bounce
+ANIMATION_SPEED_MIN = 0.1                    # Minimum animation speed multiplier
+ANIMATION_SPEED_MAX = 5.0                    # Maximum animation speed multiplier
+
+# Emotion particles
+PARTICLE_EMISSION_RATE_HEARTS = 3.0          # Hearts per second at full intensity
+PARTICLE_EMISSION_RATE_STARS = 5.0           # Stars per second
+PARTICLE_EMISSION_RATE_SPARKLES = 10.0       # Sparkles per second
+PARTICLE_EMISSION_RATE_SWEAT = 2.0           # Sweat drops per second
+PARTICLE_EMISSION_RATE_TEARS = 4.0           # Tears per second
+PARTICLE_LIFETIME_DEFAULT = 2.0              # Default particle lifetime (seconds)
+PARTICLE_LIFETIME_MIN = 0.5                  # Minimum particle lifetime
+PARTICLE_LIFETIME_MAX = 3.0                  # Maximum particle lifetime
+PARTICLE_GRAVITY = 100                       # Gravity for falling particles (pixels/sec²)
+PARTICLE_VELOCITY_MIN = 10                   # Minimum particle velocity
+PARTICLE_VELOCITY_MAX = 100                  # Maximum particle velocity
+PARTICLE_SIZE_MIN = 0.4                      # Minimum particle size multiplier
+PARTICLE_SIZE_MAX = 1.8                      # Maximum particle size multiplier
+PARTICLE_ROTATION_SPEED_MAX = 180            # Max rotation speed (degrees/sec)
+PARTICLE_FADE_THRESHOLD = 0.3                # Start fading when 30% life remains
+MAX_PARTICLES_PER_TYPE = 50                  # Maximum particles per emotion type
+
+# Sound system
+SOUND_MASTER_VOLUME_DEFAULT = 1.0            # Default master volume
+SOUND_CATEGORY_VOLUME_DEFAULT = 1.0          # Default category volume
+SOUND_MIN_COOLDOWN = 0.1                     # Minimum seconds between same sounds
+SOUND_MAX_CONCURRENT = 8                     # Maximum sounds playing simultaneously
+SOUND_PITCH_VARIANCE_DEFAULT = 0.1           # Default pitch variation (0-1)
+SOUND_DISTANCE_ATTENUATION = 0.5             # Volume reduction per 100 pixels
+SOUND_VOICE_VOLUME_CAT = 0.6                 # Cat voice volume
+SOUND_VOICE_VOLUME_DOG = 0.7                 # Dog voice volume
+SOUND_VOICE_VOLUME_BIRD = 0.6                # Bird voice volume
+SOUND_VOICE_VOLUME_DRAGON = 1.0              # Dragon voice volume
+SOUND_FOOTSTEP_VOLUME = 0.3                  # Footstep sound volume
+SOUND_EATING_VOLUME = 0.6                    # Eating sound volume
+SOUND_SPECIAL_VOLUME = 0.8                   # Special effect volume
+
+# Music system
+MUSIC_VOLUME_DEFAULT = 0.7                   # Default music volume
+MUSIC_CROSSFADE_DURATION = 3.0               # Seconds for track crossfade
+MUSIC_MOOD_CHANGE_COOLDOWN = 30.0            # Min seconds between mood changes
+MUSIC_DUCKING_AMOUNT = 0.5                   # Volume reduction when sounds play
+MUSIC_DUCKING_DURATION = 0.5                 # Seconds for duck/restore
+MUSIC_TRACK_DURATION_MIN = 60.0              # Minimum track length (seconds)
+MUSIC_TRACK_DURATION_MAX = 300.0             # Maximum track length (seconds)
+MUSIC_BPM_CALM = 75                          # BPM for calm music
+MUSIC_BPM_HAPPY = 140                        # BPM for happy music
+MUSIC_BPM_ENERGETIC = 180                    # BPM for energetic music
+MUSIC_BPM_SLEEPY = 50                        # BPM for sleepy music
+MUSIC_INTENSITY_LOW = 0.3                    # Low intensity threshold
+MUSIC_INTENSITY_HIGH = 0.8                   # High intensity threshold
+
+# Speech system (gibberish language)
+SPEECH_RATE_DEFAULT = 1.0                    # Default speech rate multiplier
+SPEECH_VERBOSITY_DEFAULT = 0.7               # How often pet talks (0-1)
+SPEECH_EXPRESSIVENESS_DEFAULT = 0.8          # How expressive speech is (0-1)
+SPEECH_CHARS_PER_SECOND = 4.0                # Characters spoken per second
+SPEECH_SYLLABLES_MIN = 1                     # Minimum syllables per word
+SPEECH_SYLLABLES_MAX = 3                     # Maximum syllables per word
+SPEECH_EMPHASIS_INTENSITY_LOW = 1            # Emphasis chars for low intensity
+SPEECH_EMPHASIS_INTENSITY_HIGH = 3           # Emphasis chars for high intensity
+SPEECH_VOCABULARY_SIZE = 30                  # Number of consistent vocabulary words
+SPEECH_PITCH_VARIANCE_CAT = 0.15             # Cat speech pitch variance
+SPEECH_PITCH_VARIANCE_DOG = 0.2              # Dog speech pitch variance
+SPEECH_PITCH_VARIANCE_BIRD = 0.3             # Bird speech pitch variance
+SPEECH_DURATION_MIN = 0.5                    # Minimum speech duration (seconds)
+SPEECH_DURATION_MAX = 5.0                    # Maximum speech duration (seconds)
+
+# Sprite and visual effects
+SPRITE_SIZE_DEFAULT = 128                    # Default sprite size (pixels)
+SPRITE_SCALE_BABY = 0.6                      # Baby size multiplier
+SPRITE_SCALE_JUVENILE = 0.8                  # Juvenile size multiplier
+SPRITE_SCALE_ADULT = 1.0                     # Adult size multiplier
+SPRITE_SCALE_ELDER = 1.2                     # Elder size multiplier
+SPRITE_FLIP_TRANSITION = 0.1                 # Seconds to flip sprite direction
+SHADOW_OPACITY = 0.3                         # Shadow transparency
+SHADOW_BLUR_RADIUS = 10                      # Shadow blur (pixels)
+HIGHLIGHT_OPACITY = 0.2                      # Hover highlight transparency
+OUTLINE_WIDTH = 2                            # Selection outline width (pixels)
+
+# =============================================================================
+# PHASE 11: JOURNAL & MEMORY CAPTURE CONSTANTS
+# =============================================================================
+
+# Journal system
+JOURNAL_AUTO_TAG_ENABLED = True              # Auto-generate tags from content
+JOURNAL_AUTO_LINK_PHOTOS = True              # Auto-link related photos
+JOURNAL_DAILY_REMINDER = True                # Remind user to write daily
+JOURNAL_MAX_TITLE_LENGTH = 100               # Max characters in title
+JOURNAL_MAX_CONTENT_LENGTH = 10000           # Max characters in entry
+JOURNAL_STREAK_BONUS_DAYS = 7                # Days for streak bonus
+JOURNAL_FAVORITE_LIMIT = 100                 # Max favorite entries
+
+# Screenshot system
+SCREENSHOT_DEFAULT_WIDTH = 800               # Default screenshot width
+SCREENSHOT_DEFAULT_HEIGHT = 600              # Default screenshot height
+SCREENSHOT_COOLDOWN_SECONDS = 1.0            # Min time between captures
+SCREENSHOT_AUTO_CAPTURE_ENABLED = True       # Auto-capture special moments
+SCREENSHOT_AUTO_THUMBNAIL = True             # Auto-generate thumbnails
+SCREENSHOT_THUMBNAIL_WIDTH = 200             # Thumbnail width
+SCREENSHOT_THUMBNAIL_HEIGHT = 200            # Thumbnail height
+SCREENSHOT_MAX_FILE_SIZE_MB = 5.0            # Max file size per screenshot
+SCREENSHOT_JPEG_QUALITY = 90                 # JPEG compression quality (0-100)
+SCREENSHOT_PNG_COMPRESSION = 6               # PNG compression level (0-9)
+
+# Photo album system
+ALBUM_AUTO_CREATE_MONTHLY = True             # Auto-create monthly albums
+ALBUM_AUTO_CREATE_EVENT = True               # Auto-create event albums
+ALBUM_DEFAULT_SORT = "date_newest"           # Default photo sort order
+ALBUM_SLIDESHOW_DELAY = 3.0                  # Seconds per photo in slideshow
+ALBUM_MAX_PHOTOS_PER_ALBUM = 500             # Max photos per album
+ALBUM_SMART_ALBUMS_ENABLED = True            # Enable smart albums
+
+# Memory book system
+MEMORY_AUTO_MILESTONE_DETECT = True          # Auto-detect milestones
+MEMORY_AUTO_CELEBRATION = True               # Auto-celebrate milestones
+MEMORY_SCRAPBOOK_PAGE_LIMIT = 100            # Max scrapbook pages
+MEMORY_TIMELINE_MAX_ENTRIES = 1000           # Max timeline entries
+
+# Export settings
+EXPORT_JOURNAL_INCLUDE_METADATA = True       # Include metadata in exports
+EXPORT_PHOTOS_INCLUDE_ORIGINAL = True        # Include original quality photos
+EXPORT_MEMORY_BOOK_FORMAT = "pdf"            # Default export format (pdf/html/json)
+EXPORT_MAX_FILE_SIZE_MB = 100.0              # Max export file size
+
+# =============================================================================
+# PHASE 12: MINI-GAMES & ACTIVITIES CONSTANTS
+# =============================================================================
+
+# Game base
+GAME_DEFAULT_DIFFICULTY = "medium"           # Default game difficulty
+GAME_MAX_HISTORY_LENGTH = 100                # Max game results to store
+GAME_REWARD_EXPERIENCE_BASE = 10             # Base experience per game
+GAME_REWARD_COINS_BASE = 5                   # Base coins per game
+GAME_REWARD_BONDING_BASE = 1.0               # Base bonding per game
+
+# Fetch game
+FETCH_TARGET_CATCHES_EASY = 5                # Catches needed (easy)
+FETCH_TARGET_CATCHES_MEDIUM = 10             # Catches needed (medium)
+FETCH_TARGET_CATCHES_HARD = 15               # Catches needed (hard)
+FETCH_TIME_LIMIT_EASY = 90.0                 # Time limit in seconds (easy)
+FETCH_TIME_LIMIT_MEDIUM = 60.0               # Time limit in seconds (medium)
+FETCH_TIME_LIMIT_HARD = 45.0                 # Time limit in seconds (hard)
+FETCH_CATCH_POINTS = 10                      # Points per catch
+FETCH_PERFECT_CATCH_BONUS = 5                # Bonus for perfect catch
+
+# Trick show game
+TRICK_SHOW_ROUNDS_EASY = 3                   # Number of tricks (easy)
+TRICK_SHOW_ROUNDS_MEDIUM = 5                 # Number of tricks (medium)
+TRICK_SHOW_ROUNDS_HARD = 7                   # Number of tricks (hard)
+TRICK_SHOW_TIME_PER_ROUND = 15.0             # Seconds per trick
+TRICK_SHOW_VARIETY_BONUS = 50                # Bonus for using all tricks
+TRICK_SHOW_EXECUTION_WEIGHT = 0.4            # Weight for execution score
+TRICK_SHOW_STYLE_WEIGHT = 0.25               # Weight for style score
+TRICK_SHOW_DIFFICULTY_WEIGHT = 0.2           # Weight for difficulty score
+TRICK_SHOW_ENTHUSIASM_WEIGHT = 0.15          # Weight for enthusiasm score
+
+# Memory match game
+MEMORY_GRID_SIZE_EASY = 3                    # Grid size (3x3 = 9 cards)
+MEMORY_GRID_SIZE_MEDIUM = 4                  # Grid size (4x4 = 16 cards)
+MEMORY_GRID_SIZE_HARD = 5                    # Grid size (5x5 = 25 cards)
+MEMORY_TIME_LIMIT_EASY = 180.0               # Time limit in seconds (easy)
+MEMORY_TIME_LIMIT_MEDIUM = 120.0             # Time limit in seconds (medium)
+MEMORY_TIME_LIMIT_HARD = 90.0                # Time limit in seconds (hard)
+MEMORY_MATCH_POINTS = 20                     # Points per match
+MEMORY_HINT_LIMIT_EASY = 5                   # Max hints (easy)
+MEMORY_HINT_LIMIT_MEDIUM = 3                 # Max hints (medium)
+MEMORY_HINT_LIMIT_HARD = 2                   # Max hints (hard)
+
+# Obstacle course game
+OBSTACLE_COUNT_EASY = 4                      # Number of obstacles (easy)
+OBSTACLE_COUNT_MEDIUM = 6                    # Number of obstacles (medium)
+OBSTACLE_COUNT_HARD = 8                      # Number of obstacles (hard)
+OBSTACLE_TIME_LIMIT_EASY = 120.0             # Time limit in seconds (easy)
+OBSTACLE_TIME_LIMIT_MEDIUM = 90.0            # Time limit in seconds (medium)
+OBSTACLE_TIME_LIMIT_HARD = 60.0              # Time limit in seconds (hard)
+OBSTACLE_COMPLETION_POINTS = 20              # Points per obstacle
+OBSTACLE_PENALTY_POINTS = 5                  # Points lost per penalty
+OBSTACLE_BASE_TIME = 3.0                     # Base seconds per obstacle
+
+# Game rewards and achievements
+ACHIEVEMENT_EXPERIENCE_REWARD = 50           # Experience for achievement
+ACHIEVEMENT_COINS_REWARD = 25                # Coins for achievement
+LEVEL_UP_EXPERIENCE_BASE = 100               # Experience needed for level 2
+LEVEL_UP_MULTIPLIER = 1.5                    # Multiplier per level
+PERFECT_GAME_EXPERIENCE_BONUS = 25           # Bonus for perfect game
+PERFECT_GAME_COINS_BONUS = 15                # Coins bonus for perfect game
+
+# ============================================================================
+# PHASE 13: ECONOMY & SHOP SYSTEM
+# ============================================================================
+
+# Currency system
+STARTING_BALANCE = 100                       # Starting coins for new players
+DAILY_ALLOWANCE_AMOUNT = 50                  # Daily free coins
+DAILY_SPENDING_LIMIT = 500                   # Max coins to spend per day
+SPENDING_LIMIT_ENABLED = True                # Enable spending limits (for kids)
+TRANSACTION_HISTORY_LIMIT = 100              # Max transaction records to keep
+LOW_BALANCE_THRESHOLD = 20                   # Warning threshold for low coins
+
+# Shop system
+SHOP_MAX_CAPACITY = 50                       # Max unique items in shop
+SHOP_LEVEL_START = 1                         # Starting shop level
+SHOP_DAILY_REFRESH_ENABLED = True            # Auto refresh shop daily
+SHOP_SALE_MIN = 2                            # Min items on sale per refresh
+SHOP_SALE_MAX = 5                            # Max items on sale per refresh
+SHOP_FEATURED_ITEMS = 3                      # Featured items per refresh
+SHOP_RESTOCK_MIN = 5                         # Min stock added on refresh
+SHOP_RESTOCK_MAX = 20                        # Max stock added on refresh
+
+# Shop item prices
+ITEM_KIBBLE_PRICE = 5                        # Basic food
+ITEM_PREMIUM_FOOD_PRICE = 15                 # Quality food
+ITEM_GOURMET_MEAL_PRICE = 30                 # Gourmet food
+ITEM_BONE_TREAT_PRICE = 10                   # Bone treat
+ITEM_COOKIE_PRICE = 8                        # Cookie treat
+ITEM_SPECIAL_TREAT_PRICE = 25                # Special treat
+ITEM_BALL_PRICE = 15                         # Ball toy
+ITEM_ROPE_TOY_PRICE = 20                     # Rope toy
+ITEM_SQUEAKY_TOY_PRICE = 25                  # Squeaky toy
+ITEM_PUZZLE_TOY_PRICE = 40                   # Puzzle toy
+ITEM_COLLAR_BASIC_PRICE = 30                 # Basic collar
+ITEM_COLLAR_FANCY_PRICE = 60                 # Fancy collar
+ITEM_BOW_TIE_PRICE = 45                      # Bow tie
+ITEM_BANDANA_PRICE = 35                      # Bandana
+ITEM_BED_BASIC_PRICE = 50                    # Basic bed
+ITEM_BED_LUXURY_PRICE = 120                  # Luxury bed
+ITEM_SCRATCHING_POST_PRICE = 40              # Scratching post
+ITEM_BRUSH_PRICE = 20                        # Grooming brush
+ITEM_SHAMPOO_PRICE = 15                      # Pet shampoo
+ITEM_HEALTH_POTION_PRICE = 50                # Health potion
+ITEM_ENERGY_DRINK_PRICE = 35                 # Energy drink
+
+# Shop sales discounts
+SHOP_SALE_DISCOUNT_10 = 10                   # 10% off
+SHOP_SALE_DISCOUNT_15 = 15                   # 15% off
+SHOP_SALE_DISCOUNT_20 = 20                   # 20% off
+SHOP_SALE_DISCOUNT_25 = 25                   # 25% off
+SHOP_SALE_DISCOUNT_30 = 30                   # 30% off
+
+# Inventory system
+INVENTORY_MAX_CAPACITY = 100                 # Max unique item types
+INVENTORY_AUTO_STACK = True                  # Auto-stack consumables
+INVENTORY_MAX_ACTIVE_TOYS = 3                # Max toys active at once
+INVENTORY_DURABILITY_MAX = 100               # Max item durability
+INVENTORY_DURABILITY_USE_COST = 5            # Durability lost per use
+INVENTORY_LOW_QUANTITY_THRESHOLD = 3         # Low stock warning
+INVENTORY_DAMAGED_THRESHOLD = 30             # Damaged item warning (%)
+
+# Item effects
+EFFECT_HUNGER_RESTORE_BASIC = 20             # Hunger restored (basic food)
+EFFECT_HUNGER_RESTORE_PREMIUM = 50           # Hunger restored (premium)
+EFFECT_HUNGER_RESTORE_GOURMET = 80           # Hunger restored (gourmet)
+EFFECT_HAPPINESS_BOOST_SMALL = 8             # Small happiness boost
+EFFECT_HAPPINESS_BOOST_MEDIUM = 15           # Medium happiness boost
+EFFECT_HAPPINESS_BOOST_LARGE = 25            # Large happiness boost
+EFFECT_ENERGY_RESTORE_BASIC = 10             # Energy restored (basic)
+EFFECT_ENERGY_RESTORE_MEDIUM = 25            # Energy restored (medium)
+EFFECT_ENERGY_RESTORE_LARGE = 40             # Energy restored (large)
+EFFECT_HEALTH_RESTORE = 30                   # Health restored
+EFFECT_CLEANLINESS_BOOST_SMALL = 20          # Cleanliness boost (small)
+EFFECT_CLEANLINESS_BOOST_LARGE = 40          # Cleanliness boost (large)
+EFFECT_INTELLIGENCE_BOOST = 5                # Intelligence boost
+EFFECT_BONDING_BOOST = 5                     # Bonding boost
+
+# Trading system
+TRADING_ENABLED = True                       # Enable trading
+TRADING_FAIRNESS_CHECK = True                # Check trade fairness
+TRADING_FAIRNESS_TOLERANCE = 0.3             # Max value difference (30%)
+TRADING_REQUIRE_MUTUAL = False               # Both must offer something
+TRADING_EXPIRY_DURATION = 3600               # Trade expires after 1 hour (seconds)
+TRADING_HISTORY_LIMIT = 50                   # Max trade history records
+TRADING_ITEM_ESTIMATE_VALUE = 20             # Estimated value per item
+
+# ============================================================================
+# PHASE 14: CUSTOMIZATION & DECORATION SYSTEM
+# ============================================================================
+
+# Pet customization
+PET_DEFAULT_PRIMARY_COLOR = "150,100,50"     # Default primary body color (RGB)
+PET_DEFAULT_SECONDARY_COLOR = "200,150,100"  # Default secondary color
+PET_DEFAULT_ACCENT_COLOR = "255,200,150"     # Default accent color
+PET_DEFAULT_EYE_COLOR = "50,100,200"         # Default eye color
+PET_DEFAULT_PATTERN = "solid"                # Default fur/coat pattern
+PET_DEFAULT_BODY_SIZE = 1.0                  # Default body size scale
+PET_MIN_BODY_SIZE = 0.5                      # Minimum body size
+PET_MAX_BODY_SIZE = 2.0                      # Maximum body size
+PET_MAX_ACCESSORIES = 7                      # Max accessory slots
+PET_TOTAL_ACCESSORIES = 17                   # Total available accessories
+
+# Color palettes
+PALETTE_NATURAL = "natural"                  # Natural animal colors
+PALETTE_PASTEL = "pastel"                    # Soft pastel colors
+PALETTE_VIBRANT = "vibrant"                  # Bright vivid colors
+PALETTE_MONOCHROME = "monochrome"            # Black/white/gray
+PALETTE_RAINBOW = "rainbow"                  # Rainbow colors
+PALETTE_NEON = "neon"                        # Neon/glowing colors
+PALETTE_EARTH = "earth"                      # Earth tones
+PALETTE_OCEAN = "ocean"                      # Blue/aqua tones
+PALETTE_SUNSET = "sunset"                    # Orange/pink/purple
+PALETTE_GALAXY = "galaxy"                    # Purple/blue/stars
+
+# Room decoration
+ROOM_DEFAULT_WALLPAPER = "plain"             # Default wallpaper style
+ROOM_DEFAULT_FLOOR = "wood"                  # Default floor style
+ROOM_DEFAULT_THEME = "cozy_home"             # Default room theme
+ROOM_DEFAULT_LIGHT_COLOR = "255,255,255"     # Default ambient light (white)
+ROOM_DEFAULT_LIGHT_INTENSITY = 1.0           # Default light intensity
+ROOM_DEFAULT_SHADOW_INTENSITY = 0.5          # Default shadow intensity
+ROOM_TOTAL_WALLPAPERS = 10                   # Total available wallpapers
+ROOM_TOTAL_FLOORS = 9                        # Total available floors
+ROOM_TOTAL_THEMES = 11                       # Total room themes
+
+# Furniture placement
+FURNITURE_ROOM_WIDTH = 20                    # Room width in grid units
+FURNITURE_ROOM_HEIGHT = 15                   # Room height in grid units
+FURNITURE_GRID_SIZE = 32                     # Pixels per grid unit
+FURNITURE_SNAP_TO_GRID = True                # Enable grid snapping
+FURNITURE_MAX_ITEMS = 50                     # Max furniture items in room
+FURNITURE_ROTATION_STEP = 90                 # Rotation step in degrees
+
+# Furniture categories
+FURNITURE_CATEGORY_BED = "bed"               # Pet beds
+FURNITURE_CATEGORY_BOWL = "food_bowl"        # Food/water bowls
+FURNITURE_CATEGORY_TOY_BOX = "toy_box"       # Toy storage
+FURNITURE_CATEGORY_SCRATCHING = "scratching" # Scratching posts
+FURNITURE_CATEGORY_DECORATION = "decoration" # Decorative items
+FURNITURE_CATEGORY_PLANT = "plant"           # Plants
+FURNITURE_CATEGORY_LIGHTING = "lighting"     # Lamps, lights
+FURNITURE_CATEGORY_SEATING = "seating"       # Cushions, chairs
+
+# Customization presets
+PRESET_MAX_COUNT = 50                        # Max saved presets
+PRESET_MAX_RECENT = 10                       # Max recent presets tracked
+PRESET_TYPE_OUTFIT = "outfit"                # Pet outfit preset
+PRESET_TYPE_ROOM = "room"                    # Room layout preset
+PRESET_TYPE_COMPLETE = "complete"            # Complete look preset
+
+# Visual effects
+EFFECT_SPARKLE = False                       # Sparkle effect enabled
+EFFECT_GLOW = False                          # Glow effect enabled
+EFFECT_SHADOW = True                         # Shadow effect enabled
+EFFECT_PARTICLES_ENABLED = True              # Particle effects enabled
+
+# ============================================================================
+# PHASE 15: FURNITURE INTERACTION SYSTEM
+# ============================================================================
+
+# Interaction system
+INTERACTION_RANGE = 1.5                      # Grid units to interact with furniture
+INTERACTION_COOLDOWN_DEFAULT = 10.0          # Default cooldown (seconds)
+INTERACTION_SLEEP_DURATION = 30.0            # Sleep interaction duration
+INTERACTION_EAT_DURATION = 5.0               # Eat interaction duration
+INTERACTION_DRINK_DURATION = 3.0             # Drink interaction duration
+INTERACTION_PLAY_DURATION = 15.0             # Play interaction duration
+INTERACTION_SCRATCH_DURATION = 8.0           # Scratch interaction duration
+INTERACTION_CLIMB_DURATION = 6.0             # Climb interaction duration
+INTERACTION_SIT_DURATION = 20.0              # Sit interaction duration
+INTERACTION_EXPLORE_DURATION = 10.0          # Explore interaction duration
+INTERACTION_GROOM_DURATION = 12.0            # Groom interaction duration
+INTERACTION_WATCH_DURATION = 25.0            # Watch interaction duration
+
+# Interaction effects
+EFFECT_SLEEP_ENERGY = 30                     # Energy restored from sleep
+EFFECT_SLEEP_HAPPINESS = 5                   # Happiness from sleep
+EFFECT_EAT_HUNGER = -40                      # Hunger reduced from eating
+EFFECT_EAT_HAPPINESS = 10                    # Happiness from eating
+EFFECT_DRINK_HUNGER = -10                    # Thirst/hunger from drinking
+EFFECT_DRINK_HAPPINESS = 5                   # Happiness from drinking
+EFFECT_PLAY_ENERGY = -10                     # Energy cost of playing
+EFFECT_PLAY_HAPPINESS = 20                   # Happiness from playing
+EFFECT_PLAY_BOREDOM = -30                    # Boredom reduced from playing
+EFFECT_SCRATCH_STRESS = -15                  # Stress relief from scratching
+EFFECT_SCRATCH_HAPPINESS = 10                # Happiness from scratching
+EFFECT_CLIMB_ENERGY = -5                     # Energy cost of climbing
+EFFECT_CLIMB_HAPPINESS = 15                  # Happiness from climbing
+EFFECT_SIT_ENERGY = 10                       # Energy from sitting/resting
+EFFECT_SIT_STRESS = -10                      # Stress relief from sitting
+
+# Autonomous behavior
+AUTO_BEHAVIOR_ENABLED = True                 # Enable autonomous behavior
+AUTO_DECISION_INTERVAL = 5.0                 # Seconds between decisions
+AUTO_THRESHOLD_CRITICAL = 20                 # Critical need level (0-100)
+AUTO_THRESHOLD_HIGH = 40                     # High priority threshold
+AUTO_THRESHOLD_MEDIUM = 60                   # Medium priority threshold
+AUTO_THRESHOLD_LOW = 80                      # Low priority threshold
+AUTO_RANDOMNESS = 0.3                        # Behavior randomness (0-1)
+AUTO_MOTIVATION_THRESHOLD = 30               # Minimum motivation to act
+
+# Need weights (how much each need influences behavior)
+NEED_WEIGHT_HUNGER = 1.5                     # Hunger priority weight
+NEED_WEIGHT_ENERGY = 1.2                     # Energy priority weight
+NEED_WEIGHT_HAPPINESS = 1.0                  # Happiness priority weight
+NEED_WEIGHT_BOREDOM = 0.8                    # Boredom priority weight
+NEED_WEIGHT_STRESS = 1.1                     # Stress priority weight
+NEED_WEIGHT_CLEANLINESS = 0.7                # Cleanliness priority weight
+
+# Furniture quality
+FURNITURE_QUALITY_BASIC_MULTIPLIER = 1.0     # Basic quality multiplier
+FURNITURE_QUALITY_STANDARD_MULTIPLIER = 1.2  # Standard quality multiplier
+FURNITURE_QUALITY_PREMIUM_MULTIPLIER = 1.5   # Premium quality multiplier
+FURNITURE_QUALITY_LUXURY_MULTIPLIER = 2.0    # Luxury quality multiplier
+FURNITURE_QUALITY_LEGENDARY_MULTIPLIER = 3.0 # Legendary quality multiplier
+
+# Furniture durability
+FURNITURE_MAX_DURABILITY = 100               # Maximum durability
+FURNITURE_DURABILITY_LOSS_PER_USE = 2        # Durability lost per use
+FURNITURE_REPAIR_AMOUNT_DEFAULT = 50         # Default repair amount
+FURNITURE_BROKEN_THRESHOLD = 20              # Broken below this durability
+FURNITURE_REPAIR_THRESHOLD = 50              # Needs repair below this %
+
+# Animation settings
+ANIMATION_FRAME_RATE_DEFAULT = 12            # Default animation FPS
+ANIMATION_TRANSITION_DURATION = 0.3          # Transition time (seconds)
+ANIMATION_WALK_FRAMES = 8                    # Walk animation frames
+ANIMATION_SLEEP_FRAMES = 4                   # Sleep animation frames
+ANIMATION_EAT_FRAMES = 6                     # Eat animation frames
+ANIMATION_PLAY_FRAMES = 8                    # Play animation frames
