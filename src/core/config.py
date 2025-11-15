@@ -889,3 +889,95 @@ PET_SPACING_MIN_PIXELS = 100                 # Minimum spacing between pets
 INTERACTION_PROXIMITY_PIXELS = 150           # Distance for interaction to occur
 AUTO_INTERACTION_CHANCE = 0.1                # 10% chance per update for auto-interaction
 PACK_FORMATION_MIN_PETS = 2                  # Minimum pets to form a pack
+
+# =============================================================================
+# PHASE 10: ADVANCED VISUAL & AUDIO CONSTANTS
+# =============================================================================
+
+# Animation system
+ANIMATION_FPS = 30                           # Target animation frames per second
+ANIMATION_TRANSITION_DURATION = 0.2          # Seconds for smooth transitions
+IDLE_ANIMATION_BOB_DISTANCE = 2              # Pixels for idle bobbing
+WALK_ANIMATION_FRAMES = 4                    # Frames in walk cycle
+JUMP_ANIMATION_DURATION = 0.6                # Seconds for jump animation
+EATING_ANIMATION_CHOMP_SPEED = 0.2           # Seconds per chomp
+SLEEP_ANIMATION_BREATHE_SPEED = 0.8          # Seconds per breath cycle
+HAPPY_ANIMATION_BOUNCE_HEIGHT = 8            # Pixels for happy bounce
+ANIMATION_SPEED_MIN = 0.1                    # Minimum animation speed multiplier
+ANIMATION_SPEED_MAX = 5.0                    # Maximum animation speed multiplier
+
+# Emotion particles
+PARTICLE_EMISSION_RATE_HEARTS = 3.0          # Hearts per second at full intensity
+PARTICLE_EMISSION_RATE_STARS = 5.0           # Stars per second
+PARTICLE_EMISSION_RATE_SPARKLES = 10.0       # Sparkles per second
+PARTICLE_EMISSION_RATE_SWEAT = 2.0           # Sweat drops per second
+PARTICLE_EMISSION_RATE_TEARS = 4.0           # Tears per second
+PARTICLE_LIFETIME_DEFAULT = 2.0              # Default particle lifetime (seconds)
+PARTICLE_LIFETIME_MIN = 0.5                  # Minimum particle lifetime
+PARTICLE_LIFETIME_MAX = 3.0                  # Maximum particle lifetime
+PARTICLE_GRAVITY = 100                       # Gravity for falling particles (pixels/sec²)
+PARTICLE_VELOCITY_MIN = 10                   # Minimum particle velocity
+PARTICLE_VELOCITY_MAX = 100                  # Maximum particle velocity
+PARTICLE_SIZE_MIN = 0.4                      # Minimum particle size multiplier
+PARTICLE_SIZE_MAX = 1.8                      # Maximum particle size multiplier
+PARTICLE_ROTATION_SPEED_MAX = 180            # Max rotation speed (degrees/sec)
+PARTICLE_FADE_THRESHOLD = 0.3                # Start fading when 30% life remains
+MAX_PARTICLES_PER_TYPE = 50                  # Maximum particles per emotion type
+
+# Sound system
+SOUND_MASTER_VOLUME_DEFAULT = 1.0            # Default master volume
+SOUND_CATEGORY_VOLUME_DEFAULT = 1.0          # Default category volume
+SOUND_MIN_COOLDOWN = 0.1                     # Minimum seconds between same sounds
+SOUND_MAX_CONCURRENT = 8                     # Maximum sounds playing simultaneously
+SOUND_PITCH_VARIANCE_DEFAULT = 0.1           # Default pitch variation (0-1)
+SOUND_DISTANCE_ATTENUATION = 0.5             # Volume reduction per 100 pixels
+SOUND_VOICE_VOLUME_CAT = 0.6                 # Cat voice volume
+SOUND_VOICE_VOLUME_DOG = 0.7                 # Dog voice volume
+SOUND_VOICE_VOLUME_BIRD = 0.6                # Bird voice volume
+SOUND_VOICE_VOLUME_DRAGON = 1.0              # Dragon voice volume
+SOUND_FOOTSTEP_VOLUME = 0.3                  # Footstep sound volume
+SOUND_EATING_VOLUME = 0.6                    # Eating sound volume
+SOUND_SPECIAL_VOLUME = 0.8                   # Special effect volume
+
+# Music system
+MUSIC_VOLUME_DEFAULT = 0.7                   # Default music volume
+MUSIC_CROSSFADE_DURATION = 3.0               # Seconds for track crossfade
+MUSIC_MOOD_CHANGE_COOLDOWN = 30.0            # Min seconds between mood changes
+MUSIC_DUCKING_AMOUNT = 0.5                   # Volume reduction when sounds play
+MUSIC_DUCKING_DURATION = 0.5                 # Seconds for duck/restore
+MUSIC_TRACK_DURATION_MIN = 60.0              # Minimum track length (seconds)
+MUSIC_TRACK_DURATION_MAX = 300.0             # Maximum track length (seconds)
+MUSIC_BPM_CALM = 75                          # BPM for calm music
+MUSIC_BPM_HAPPY = 140                        # BPM for happy music
+MUSIC_BPM_ENERGETIC = 180                    # BPM for energetic music
+MUSIC_BPM_SLEEPY = 50                        # BPM for sleepy music
+MUSIC_INTENSITY_LOW = 0.3                    # Low intensity threshold
+MUSIC_INTENSITY_HIGH = 0.8                   # High intensity threshold
+
+# Speech system (gibberish language)
+SPEECH_RATE_DEFAULT = 1.0                    # Default speech rate multiplier
+SPEECH_VERBOSITY_DEFAULT = 0.7               # How often pet talks (0-1)
+SPEECH_EXPRESSIVENESS_DEFAULT = 0.8          # How expressive speech is (0-1)
+SPEECH_CHARS_PER_SECOND = 4.0                # Characters spoken per second
+SPEECH_SYLLABLES_MIN = 1                     # Minimum syllables per word
+SPEECH_SYLLABLES_MAX = 3                     # Maximum syllables per word
+SPEECH_EMPHASIS_INTENSITY_LOW = 1            # Emphasis chars for low intensity
+SPEECH_EMPHASIS_INTENSITY_HIGH = 3           # Emphasis chars for high intensity
+SPEECH_VOCABULARY_SIZE = 30                  # Number of consistent vocabulary words
+SPEECH_PITCH_VARIANCE_CAT = 0.15             # Cat speech pitch variance
+SPEECH_PITCH_VARIANCE_DOG = 0.2              # Dog speech pitch variance
+SPEECH_PITCH_VARIANCE_BIRD = 0.3             # Bird speech pitch variance
+SPEECH_DURATION_MIN = 0.5                    # Minimum speech duration (seconds)
+SPEECH_DURATION_MAX = 5.0                    # Maximum speech duration (seconds)
+
+# Sprite and visual effects
+SPRITE_SIZE_DEFAULT = 128                    # Default sprite size (pixels)
+SPRITE_SCALE_BABY = 0.6                      # Baby size multiplier
+SPRITE_SCALE_JUVENILE = 0.8                  # Juvenile size multiplier
+SPRITE_SCALE_ADULT = 1.0                     # Adult size multiplier
+SPRITE_SCALE_ELDER = 1.2                     # Elder size multiplier
+SPRITE_FLIP_TRANSITION = 0.1                 # Seconds to flip sprite direction
+SHADOW_OPACITY = 0.3                         # Shadow transparency
+SHADOW_BLUR_RADIUS = 10                      # Shadow blur (pixels)
+HIGHLIGHT_OPACITY = 0.2                      # Hover highlight transparency
+OUTLINE_WIDTH = 2                            # Selection outline width (pixels)
