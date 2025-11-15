@@ -615,6 +615,72 @@ SUCCESS_RATE_FAIR = 0.5        # 50-70% success rate
 SUCCESS_RATE_POOR = 0.3        # 30-50% success rate
 # < 30% = needs more practice
 
+# ============================================================================
+# PHASE 7: ENHANCED MEMORY SYSTEMS
+# ============================================================================
+
+# Autobiographical memory settings
+AUTOBIOGRAPHICAL_FIRST_TIME_THRESHOLD = 1  # Must be truly first occurrence
+AUTOBIOGRAPHICAL_MEMORY_STRENGTH = 1.0      # First times never fade
+AUTOBIOGRAPHICAL_EMOTION_THRESHOLD = 0.3    # Minimum emotional intensity to record
+
+# Favorite memory settings
+MAX_FAVORITE_MEMORIES = 20                  # Maximum favorite memories to keep
+FAVORITE_MEMORY_HAPPINESS_WEIGHT = 0.6      # Weight of happiness in scoring
+FAVORITE_MEMORY_EMOTION_WEIGHT = 0.4        # Weight of emotional intensity
+FAVORITE_MEMORY_MIN_SCORE = 0.5             # Minimum score to be considered favorite
+FAVORITE_MEMORY_HAPPINESS_THRESHOLD = 70.0  # Minimum happiness to create favorite
+
+# Trauma memory settings
+TRAUMA_SEVERITY_LIGHT = 0.3                 # Light trauma (e.g., loud noise)
+TRAUMA_SEVERITY_MODERATE = 0.6              # Moderate trauma (e.g., rough handling)
+TRAUMA_SEVERITY_SEVERE = 0.9                # Severe trauma (e.g., abandonment)
+TRAUMA_TRUST_IMPACT_MULTIPLIER = 10.0       # Severity * 10 = trust loss
+TRAUMA_BOND_IMPACT_MULTIPLIER = 5.0         # Severity * 5 = bond loss
+TRAUMA_DECAY_RATE = 0.02                    # Decay per day (heals slowly)
+TRAUMA_MIN_DECAY_STRENGTH = 0.1             # Trauma strength floor (always some memory)
+TRAUMA_HEALING_AMOUNT = 0.05                # Healing from positive experiences
+FEAR_TRIGGER_THRESHOLD = 0.3                # Minimum trauma strength to trigger fear
+
+# Associative memory settings
+ASSOCIATION_MIN_OCCURRENCES = 3             # Need 3+ occurrences to form pattern
+ASSOCIATION_STRENGTH_INCREMENT = 0.15       # Strength gain per occurrence
+ASSOCIATION_MAX_STRENGTH = 1.0              # Maximum association strength
+ASSOCIATION_DECAY_RATE = 0.01               # Decay per day without reinforcement
+ASSOCIATION_CONFIDENCE_THRESHOLD = 0.5      # Minimum strength for prediction
+ASSOCIATION_CONTEXT_TYPES = ['location', 'time', 'object', 'weather', 'activity']
+
+# Dream system settings
+DREAM_MIN_INTERVAL_HOURS = 2.0              # Minimum hours between dreams
+DREAM_MAX_INTERVAL_HOURS = 4.0              # Maximum hours between dreams
+DREAM_BASE_PROBABILITY = 0.3                # 30% base chance per sleep check
+DREAM_MIN_MEMORIES_FOR_DREAM = 3            # Need at least 3 memories to dream
+DREAM_MEMORY_SAMPLE_SIZE = 5                # Number of memories to include in dream
+DREAM_EMOTION_BIAS = 0.7                    # Prefer emotional memories (70% weight)
+DREAM_CONSOLIDATION_BOOST = 0.1             # Memory strength boost from dreaming
+DREAM_NIGHTMARE_THRESHOLD = -0.5            # Emotional valence < -0.5 = nightmare
+DREAM_VIVID_THRESHOLD = 0.8                 # Emotional intensity > 0.8 = vivid dream
+DREAM_REM_SLEEP_HOURS = 2.0                 # Hours of sleep needed for REM/dreaming
+
+# Memory importance and retention
+MEMORY_IMPORTANCE_CRUCIAL = 0.95            # Crucial memories (never fade)
+MEMORY_IMPORTANCE_VERY_HIGH = 0.8           # Very important (slow fade)
+MEMORY_IMPORTANCE_HIGH = 0.6                # Important (moderate fade)
+MEMORY_IMPORTANCE_MEDIUM = 0.4              # Medium importance (normal fade)
+MEMORY_IMPORTANCE_LOW = 0.2                 # Low importance (fast fade)
+MEMORY_RETENTION_IMPORTANCE_WEIGHT = 0.6    # Weight of importance in retention
+MEMORY_RETENTION_AGE_WEIGHT = 0.3           # Weight of age in retention
+MEMORY_RETENTION_RECALL_WEIGHT = 0.1        # Weight of recall frequency
+MEMORY_AGE_DECAY_RATE = 0.05                # Decay rate per day of age
+MEMORY_RECALL_BOOST_PER_RECALL = 0.05       # Boost per recall (max 0.3)
+MEMORY_RECALL_BOOST_MAX = 0.3               # Maximum boost from recalls
+MEMORY_MIN_RETENTION_PROBABILITY = 0.1      # Minimum 10% retention for all memories
+
+# Memory consolidation during sleep
+CONSOLIDATION_SLEEP_HOURS_REQUIRED = 1.0    # Hours of sleep needed for consolidation
+CONSOLIDATION_MEMORY_BOOST = 0.15           # Strength boost during consolidation
+CONSOLIDATION_PRIORITY_THRESHOLD = 0.5      # Importance threshold for priority consolidation
+
 # Time settings (in seconds)
 HUNGER_CHECK_INTERVAL = 60  # Check hunger every minute
 BEHAVIOR_UPDATE_INTERVAL = 5  # Update behavior every 5 seconds

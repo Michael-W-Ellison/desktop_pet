@@ -108,6 +108,29 @@ class Creature:
         self.preferences = PreferenceSystem(personality_type=self.personality.value)
         self.name_calling = NameCallingSystem()
 
+        # Phase 7: Enhanced Memory Systems
+        try:
+            from .enhanced_memory import (
+                AutobiographicalMemory, FavoriteMemories, TraumaMemory,
+                AssociativeMemory, DreamSystem, MemoryImportanceManager
+            )
+            self.autobiographical = AutobiographicalMemory()
+            self.favorite_memories = FavoriteMemories(max_favorites=20)
+            self.trauma_memory = TraumaMemory()
+            self.associative_memory = AssociativeMemory()
+            self.dream_system = DreamSystem()
+            self.memory_manager = MemoryImportanceManager()
+            self.phase7_enabled = True
+        except ImportError:
+            # Phase 7 not available
+            self.autobiographical = None
+            self.favorite_memories = None
+            self.trauma_memory = None
+            self.associative_memory = None
+            self.dream_system = None
+            self.memory_manager = None
+            self.phase7_enabled = False
+
         # Record birth as first episodic memory
         birth_details = {
             'creature_type': self.creature_type,
@@ -122,6 +145,10 @@ class Creature:
             important=True,
             emotional_intensity=1.0
         )
+
+        # Phase 7: Record birth as first time (autobiographical memory)
+        if self.phase7_enabled and self.autobiographical:
+            self.autobiographical.record_first_time('birth', birth_details, emotional_intensity=1.0)
 
         # Show special message for rare variants
         if self.variant.is_rare():
@@ -1124,9 +1151,213 @@ class Creature:
 
         return stats
 
+    # ============ Phase 7: Enhanced Memory Methods ============
+
+    def process_sleep_cycle(self, sleep_duration_hours: float):
+        """
+        Process dreaming during sleep (Phase 7).
+
+        Args:
+            sleep_duration_hours: How long the pet has been sleeping
+        """
+        if not self.phase7_enabled or not self.dream_system:
+            return
+
+        # Check if should dream
+        hours_since_dream = 999  # Default to trigger first dream
+        if self.dream_system.last_dream_time:
+            hours_since_dream = (time.time() - self.dream_system.last_dream_time) / 3600
+
+        if self.dream_system.should_dream(True, hours_since_dream):
+            # Get recent memories for dream processing
+            recent_memories = self.interaction_history[-20:] if self.interaction_history else []
+
+            # Process dream
+            emotional_state = self.happiness / 100.0
+            dream = self.dream_system.process_dream(recent_memories, emotional_state)
+
+            # Record dream in memory
+            self.memory.record_interaction(
+                'dreamed',
+                {
+                    'dream_type': dream['dream_type'],
+                    'themes': dream['memory_themes'],
+                    'memories_processed': dream['memories_processed']
+                },
+                important=False,
+                emotional_intensity=0.4
+            )
+
+    def record_first_time_experience(self, event_type: str, details: Dict[str, Any]) -> bool:
+        """
+        Record a first-time experience (Phase 7).
+
+        Args:
+            event_type: Type of first time event
+            details: Event details
+
+        Returns:
+            True if this was actually a first time
+        """
+        if not self.phase7_enabled or not self.autobiographical:
+            return False
+
+        emotional_intensity = min(1.0, self.happiness / 100.0 + 0.3)
+        was_first_time = self.autobiographical.record_first_time(
+            event_type, details, emotional_intensity
+        )
+
+        return was_first_time
+
+    def consider_as_favorite_memory(self, event_type: str, details: Dict[str, Any]):
+        """
+        Consider adding current experience as a favorite memory (Phase 7).
+
+        Args:
+            event_type: Type of event
+            details: Event details
+        """
+        if not self.phase7_enabled or not self.favorite_memories:
+            return
+
+        happiness_level = self.happiness / 100.0
+        emotional_intensity = 0.5  # Base level
+
+        # High happiness + high energy = more emotionally intense
+        if self.happiness > 80 and self.energy > 60:
+            emotional_intensity = 0.9
+
+        self.favorite_memories.consider_as_favorite(
+            event_type, details, happiness_level, emotional_intensity
+        )
+
+    def record_trauma(self, event_type: str, details: Dict[str, Any],
+                     severity: float, trigger: Optional[str] = None):
+        """
+        Record a traumatic experience (Phase 7).
+
+        Args:
+            event_type: Type of trauma
+            details: Event details
+            severity: How traumatic (0-1)
+            trigger: Optional fear trigger
+        """
+        if not self.phase7_enabled or not self.trauma_memory:
+            return
+
+        self.trauma_memory.record_trauma(event_type, details, severity, trigger)
+
+        # Traumatic experiences affect trust and bond
+        self.trust.reduce_trust(severity * 10, 'traumatic_experience')
+        self.bonding.reduce_bond(severity * 5, 'traumatic_experience')
+
+    def check_fear_trigger(self, trigger: str) -> Tuple[bool, float]:
+        """
+        Check if something triggers a fear response (Phase 7).
+
+        Args:
+            trigger: Potential fear trigger
+
+        Returns:
+            Tuple of (is_triggered, fear_intensity)
+        """
+        if not self.phase7_enabled or not self.trauma_memory:
+            return False, 0.0
+
+        return self.trauma_memory.check_trigger(trigger)
+
+    def learn_association(self, context_type: str, context_value: str,
+                         event_type: str, was_positive: bool):
+        """
+        Learn an association between context and outcome (Phase 7).
+
+        Args:
+            context_type: 'location', 'time', or 'object'
+            context_value: Specific context value
+            event_type: What happened
+            was_positive: Whether outcome was positive
+        """
+        if not self.phase7_enabled or not self.associative_memory:
+            return
+
+        outcome_valence = 0.7 if was_positive else -0.7
+        self.associative_memory.record_association(
+            context_type, context_value, event_type, outcome_valence
+        )
+
+    def predict_from_context(self, context_type: str, context_value: str) -> Optional[str]:
+        """
+        Predict what might happen based on learned associations (Phase 7).
+
+        Args:
+            context_type: Type of context
+            context_value: Specific context
+
+        Returns:
+            Predicted event or None
+        """
+        if not self.phase7_enabled or not self.associative_memory:
+            return None
+
+        return self.associative_memory.get_pattern_prediction(context_type, context_value)
+
+    def get_favorite_memories(self, limit: int = 5) -> List[Dict[str, Any]]:
+        """
+        Get pet's favorite memories (Phase 7).
+
+        Args:
+            limit: Number of favorites to return
+
+        Returns:
+            List of favorite memory dictionaries
+        """
+        if not self.phase7_enabled or not self.favorite_memories:
+            return []
+
+        return self.favorite_memories.get_favorites(limit)
+
+    def recall_first_time(self, event_type: str) -> Optional[Dict[str, Any]]:
+        """
+        Recall a first-time experience (Phase 7).
+
+        Args:
+            event_type: Type of event to recall
+
+        Returns:
+            First time memory or None
+        """
+        if not self.phase7_enabled or not self.autobiographical:
+            return None
+
+        return self.autobiographical.recall_first_time(event_type)
+
+    def get_life_story(self, max_events: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get summary of pet's life story (Phase 7).
+
+        Args:
+            max_events: Maximum events to return
+
+        Returns:
+            List of significant life events
+        """
+        if not self.phase7_enabled or not self.autobiographical:
+            return []
+
+        return self.autobiographical.get_life_summary(max_events)
+
+    def get_dream_statistics(self) -> Dict[str, Any]:
+        """Get statistics about dreams (Phase 7)."""
+        if not self.phase7_enabled or not self.dream_system:
+            return {'total_dreams': 0, 'phase7_enabled': False}
+
+        stats = self.dream_system.get_dream_statistics()
+        stats['phase7_enabled'] = True
+        return stats
+
     def to_dict(self) -> Dict[str, Any]:
-        """Convert creature to dictionary for saving (with Phases 2-6)."""
-        return {
+        """Convert creature to dictionary for saving (with Phases 2-7)."""
+        data = {
             'creature_type': self.creature_type,
             'personality': self.personality.value,
             'color_palette': self.color_palette,
@@ -1152,8 +1383,25 @@ class Creature:
             'trust_system': self.trust.to_dict(),
             'emotional_states': self.emotional_states.to_dict(),
             'preference_system': self.preferences.to_dict(),
-            'name_calling_system': self.name_calling.to_dict()
+            'name_calling_system': self.name_calling.to_dict(),
+            # Phase 7: Enhanced Memory Systems
+            'phase7_enabled': self.phase7_enabled
         }
+
+        # Phase 7: Save enhanced memory systems
+        if self.phase7_enabled:
+            if self.autobiographical:
+                data['autobiographical_memory'] = self.autobiographical.to_dict()
+            if self.favorite_memories:
+                data['favorite_memories'] = self.favorite_memories.to_dict()
+            if self.trauma_memory:
+                data['trauma_memory'] = self.trauma_memory.to_dict()
+            if self.associative_memory:
+                data['associative_memory'] = self.associative_memory.to_dict()
+            if self.dream_system:
+                data['dream_system'] = self.dream_system.to_dict()
+
+        return data
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Creature':
@@ -1208,6 +1456,28 @@ class Creature:
 
         if 'name_calling_system' in data:
             creature.name_calling = NameCallingSystem.from_dict(data['name_calling_system'])
+
+        # Phase 7: Restore enhanced memory systems if present
+        if data.get('phase7_enabled', False) and creature.phase7_enabled:
+            if 'autobiographical_memory' in data:
+                from .enhanced_memory import AutobiographicalMemory
+                creature.autobiographical = AutobiographicalMemory.from_dict(data['autobiographical_memory'])
+
+            if 'favorite_memories' in data:
+                from .enhanced_memory import FavoriteMemories
+                creature.favorite_memories = FavoriteMemories.from_dict(data['favorite_memories'])
+
+            if 'trauma_memory' in data:
+                from .enhanced_memory import TraumaMemory
+                creature.trauma_memory = TraumaMemory.from_dict(data['trauma_memory'])
+
+            if 'associative_memory' in data:
+                from .enhanced_memory import AssociativeMemory
+                creature.associative_memory = AssociativeMemory.from_dict(data['associative_memory'])
+
+            if 'dream_system' in data:
+                from .enhanced_memory import DreamSystem
+                creature.dream_system = DreamSystem.from_dict(data['dream_system'])
 
         return creature
 
