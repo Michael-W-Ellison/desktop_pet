@@ -1,14 +1,20 @@
 """
 Creature class representing the desktop pet with its attributes, personality, and state.
+
+Enhanced with:
+- Integrated Memory System (episodic, semantic, working memory)
+- Training System (trick learning, commands, name recognition)
 """
 import random
 import time
-from typing import Dict, Any
+from typing import Dict, Any, Optional, Tuple, List
 from datetime import datetime
 from .config import (
     PersonalityType, BehaviorState, CREATURE_TYPES, COLOR_PALETTES,
     PERSONALITY_TRAITS, MAX_HUNGER, HUNGER_DECAY_RATE, STARVATION_THRESHOLD
 )
+from .memory_system import IntegratedMemorySystem, MemoryImportance
+from .training_system import TrainingSystem
 
 
 class Creature:
@@ -59,6 +65,26 @@ class Creature:
         # Personality trait modifiers
         self.trait_modifiers = PERSONALITY_TRAITS[self.personality]
 
+        # Enhanced Memory System (Phase 2)
+        self.memory = IntegratedMemorySystem(
+            episodic_capacity=500,  # 500 memorable events
+            working_capacity=150    # 150 recent interactions (100+)
+        )
+
+        # Training System (Phase 2)
+        self.training = TrainingSystem(
+            creature_name=self.name,
+            personality=self.personality
+        )
+
+        # Record birth as first episodic memory
+        self.memory.record_interaction(
+            'birth',
+            {'creature_type': self.creature_type, 'personality': self.personality.value},
+            important=True,
+            emotional_intensity=1.0
+        )
+
     def _generate_name(self) -> str:
         """Generate a random name for the creature."""
         prefixes = ['Pip', 'Moo', 'Fluff', 'Spark', 'Dash', 'Glow', 'Puff', 'Zip']
@@ -105,6 +131,7 @@ class Creature:
 
     def feed(self, amount: float = 30):
         """Feed the creature, reducing hunger."""
+        old_hunger = self.hunger
         self.hunger = max(0, self.hunger - amount)
         self.last_fed_time = time.time()
         self.happiness = min(100, self.happiness + 5)
@@ -112,6 +139,25 @@ class Creature:
 
         # Update preference for being fed
         self.preference_scores['being_fed'] = min(1.0, self.preference_scores['being_fed'] + 0.05)
+
+        # Record in memory system (Phase 2)
+        # Check if this is first feeding
+        first_feeding = self.memory.recall_event('feed', first_only=True) is None
+        importance = MemoryImportance.CRUCIAL.value if first_feeding else MemoryImportance.NORMAL.value
+
+        self.memory.record_interaction(
+            'feed',
+            {
+                'hunger_before': old_hunger,
+                'hunger_after': self.hunger,
+                'amount': amount,
+                'first_feeding': first_feeding,
+                'positive': True,
+                'stats': {'hunger': self.hunger, 'happiness': self.happiness, 'energy': self.energy}
+            },
+            important=first_feeding,
+            emotional_intensity=0.7 if old_hunger > 70 else 0.5
+        )
 
     def interact(self, interaction_type: str, positive: bool = True):
         """
@@ -130,14 +176,15 @@ class Creature:
                 self.preference_scores[interaction_type] + change))
 
         # Record in history for neural network learning
-        self.interaction_history.append({
+        interaction_data = {
             'type': interaction_type,
             'positive': positive,
             'timestamp': time.time(),
             'hunger_level': self.hunger,
             'energy_level': self.energy,
             'happiness_level': self.happiness
-        })
+        }
+        self.interaction_history.append(interaction_data)
 
         # Keep only recent history (last 100 interactions)
         if len(self.interaction_history) > 100:
@@ -147,6 +194,23 @@ class Creature:
         happiness_change = 3 if positive else -1
         happiness_multiplier = self.trait_modifiers.get('happiness_gain', 1.0)
         self.happiness = max(0, min(100, self.happiness + happiness_change * happiness_multiplier))
+
+        # Record in memory system (Phase 2)
+        emotional_intensity = 0.7 if positive else 0.3
+        self.memory.record_interaction(
+            interaction_type,
+            {
+                'positive': positive,
+                'stats': {
+                    'hunger': self.hunger,
+                    'happiness': self.happiness,
+                    'energy': self.energy
+                },
+                'outcome': 'enjoyed' if positive else 'disliked'
+            },
+            important=False,
+            emotional_intensity=emotional_intensity
+        )
 
     def is_starving(self) -> bool:
         """Check if the creature is starving (will die)."""
@@ -356,8 +420,87 @@ class Creature:
             'edge_right': 0,
         }
 
+    # ============ Phase 2: Training & Memory Methods ============
+
+    def process_command(self, command_text: str) -> Tuple[bool, str, Optional[str]]:
+        """
+        Process a training command.
+
+        Args:
+            command_text: Text command from user
+
+        Returns:
+            Tuple of (success, message, action_to_perform)
+        """
+        mood = self.happiness / 100.0  # Convert happiness to 0-1 mood
+        return self.training.process_command(command_text, current_mood=mood)
+
+    def practice_trick(self, trick_name: str) -> Tuple[bool, str, float]:
+        """
+        Practice a specific trick.
+
+        Args:
+            trick_name: Name of the trick
+
+        Returns:
+            Tuple of (success, message, proficiency_gain)
+        """
+        mood = self.happiness / 100.0
+        success, message, gain = self.training.practice_trick(trick_name, mood=mood)
+
+        # Record in memory if learned trick
+        if success:
+            trick = self.training.learned_tricks.get(trick_name)
+            if trick and trick.can_perform() and gain > 0.1:  # Significant progress
+                self.memory.record_interaction(
+                    'learned_trick',
+                    {
+                        'trick_name': trick_name,
+                        'proficiency': trick.proficiency,
+                        'practice_count': trick.practice_count
+                    },
+                    important=True,
+                    emotional_intensity=0.8
+                )
+
+        return success, message, gain
+
+    def get_known_tricks(self) -> List[str]:
+        """Get list of tricks the pet knows how to perform."""
+        return self.training.get_known_tricks()
+
+    def get_learning_tricks(self) -> List[str]:
+        """Get list of tricks currently being learned."""
+        return self.training.get_learning_tricks()
+
+    def recall_memory(self, event_type: Optional[str] = None, first_only: bool = False) -> Optional[Dict[str, Any]]:
+        """
+        Recall a memory.
+
+        Args:
+            event_type: Type of event to recall (None = any)
+            first_only: Return only the first memory of this type
+
+        Returns:
+            Memory dict or None
+        """
+        return self.memory.recall_event(event_type, first_only=first_only)
+
+    def get_feeding_pattern(self) -> Optional[int]:
+        """Get the expected hour for feeding based on learned patterns."""
+        return self.memory.get_pattern_knowledge('feeding_time')
+
+    def consolidate_memories(self):
+        """Consolidate working memory into long-term storage."""
+        if self.memory.consolidation.should_consolidate():
+            self.memory.consolidation.consolidate()
+
+    def update_training(self):
+        """Update training system (handle skill decay, etc.)."""
+        self.training.update_skill_decay()
+
     def to_dict(self) -> Dict[str, Any]:
-        """Convert creature to dictionary for saving."""
+        """Convert creature to dictionary for saving (with Phase 2 memory & training)."""
         return {
             'creature_type': self.creature_type,
             'personality': self.personality.value,
@@ -371,7 +514,10 @@ class Creature:
             'last_interaction_time': self.last_interaction_time,
             'position': self.position,
             'preference_scores': self.preference_scores,
-            'interaction_history': self.interaction_history
+            'interaction_history': self.interaction_history,
+            # Phase 2: Memory and Training
+            'memory_system': self.memory.to_dict(),
+            'training_system': self.training.to_dict()
         }
 
     @classmethod
@@ -394,6 +540,13 @@ class Creature:
         creature.position = data['position']
         creature.preference_scores = data['preference_scores']
         creature.interaction_history = data['interaction_history']
+
+        # Phase 2: Restore memory and training if present
+        if 'memory_system' in data:
+            creature.memory = IntegratedMemorySystem.from_dict(data['memory_system'])
+
+        if 'training_system' in data:
+            creature.training = TrainingSystem.from_dict(data['training_system'])
 
         return creature
 
