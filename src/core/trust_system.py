@@ -323,6 +323,20 @@ class TrustSystem:
             'modifiers': self.get_trust_modifiers()
         }
 
+    def process_training_reinforcement(self, trust_change: float, was_positive: bool):
+        """
+        Process trust effects from training reinforcement (Phase 6).
+
+        Args:
+            trust_change: Amount to change trust
+            was_positive: Whether reinforcement was positive (True) or punishment (False)
+        """
+        if trust_change != 0:
+            if was_positive:
+                self.add_trust(abs(trust_change), 'positive_reinforcement')
+            else:
+                self.reduce_trust(abs(trust_change), 'punishment')
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialize trust system state."""
         return {

@@ -990,8 +990,142 @@ class Creature:
         }
         return stats
 
+    # ============ Phase 6: Enhanced Training Methods ============
+
+    def train_with_reinforcement(self, trick_name: str, reinforcement_type: str = 'verbal_praise') -> Dict[str, Any]:
+        """
+        Practice a trick with specific reinforcement.
+
+        Args:
+            trick_name: Name of trick to practice
+            reinforcement_type: Type of reinforcement (verbal_praise, treat, toy_reward, affection, punishment, ignore)
+
+        Returns:
+            Dictionary with training results and effects
+        """
+        # Practice the trick
+        success, message, gain = self.practice_trick(trick_name)
+
+        result = {
+            'success': success,
+            'message': message,
+            'proficiency_gain': gain,
+            'reinforcement_applied': False
+        }
+
+        # Apply reinforcement if Phase 6 is enabled
+        if self.training.phase6_enabled and self.training.reinforcement:
+            try:
+                from .enhanced_training import ReinforcementType
+                rtype = ReinforcementType(reinforcement_type)
+
+                effects = self.training.reinforcement.apply_reinforcement(
+                    rtype,
+                    trick_name,
+                    success,
+                    self.trait_modifiers
+                )
+
+                # Apply effects
+                self.bonding.add_bond(effects['bond_change'], 'training_reinforcement')
+                self.trust.process_training_reinforcement(
+                    trust_change=effects['trust_change'],
+                    was_positive=(effects['trust_change'] >= 0)
+                )
+                self.happiness = max(0, min(100, self.happiness + effects['happiness_change']))
+
+                result['reinforcement_applied'] = True
+                result['reinforcement_effects'] = effects
+                result['message'] += f" {effects['message']}"
+
+            except (ImportError, ValueError):
+                pass  # Phase 6 not available or invalid reinforcement type
+
+        return result
+
+    def check_command_compliance(self, command: str) -> Tuple[bool, str]:
+        """
+        Check if pet will comply with a command based on current state.
+
+        Uses Phase 6 advanced stubbornness calculator if available.
+
+        Args:
+            command: Command to check
+
+        Returns:
+            Tuple of (will_comply, refusal_reason)
+        """
+        # Count recent commands (last 5 minutes)
+        now = time.time()
+        recent_commands = sum(1 for h in self.interaction_history
+                            if now - h['timestamp'] < 300)
+
+        if self.training.phase6_enabled and self.training.stubbornness_calc:
+            # Phase 6: Advanced stubbornness calculation
+            refusal_chance, reason = self.training.stubbornness_calc.calculate_refusal_chance(
+                base_stubbornness=self.training.learning_modifiers.get('stubbornness', 0.5),
+                happiness=self.happiness,
+                trust=self.trust.trust,
+                bond=self.bonding.bond,
+                hunger=self.hunger,
+                energy=self.energy,
+                recent_commands=recent_commands
+            )
+
+            will_comply = self.training.stubbornness_calc.will_comply(refusal_chance)
+            return will_comply, reason if not will_comply else ""
+
+        else:
+            # Fallback to basic stubbornness (Phase 2 behavior)
+            base_stubbornness = self.training.learning_modifiers.get('stubbornness', 0.5)
+            will_comply = random.random() > base_stubbornness
+            return will_comply, "feeling stubborn" if not will_comply else ""
+
+    def start_training_session(self):
+        """Start a new training session (Phase 6)."""
+        if self.training.phase6_enabled and self.training.progress_tracker:
+            self.training.progress_tracker.start_session()
+
+    def end_training_session(self) -> Optional[Dict[str, Any]]:
+        """
+        End current training session and get statistics (Phase 6).
+
+        Returns:
+            Session statistics or None if Phase 6 not enabled
+        """
+        if self.training.phase6_enabled and self.training.progress_tracker:
+            return self.training.progress_tracker.end_session()
+        return None
+
+    def get_training_statistics(self) -> Dict[str, Any]:
+        """
+        Get comprehensive training statistics.
+
+        Returns:
+            Dictionary with training analytics
+        """
+        stats = {
+            'known_tricks': len(self.get_known_tricks()),
+            'learning_tricks': len(self.get_learning_tricks()),
+            'mastered_tricks': len(self.training.get_mastered_tricks()) if hasattr(self.training, 'get_mastered_tricks') else 0,
+            'phase6_enabled': self.training.phase6_enabled
+        }
+
+        # Add Phase 6 statistics if available
+        if self.training.phase6_enabled:
+            if self.training.progress_tracker:
+                stats.update(self.training.progress_tracker.get_training_stats())
+
+            if self.training.reinforcement:
+                stats['total_treats_given'] = self.training.reinforcement.total_treats_given
+                stats['total_praise_given'] = self.training.reinforcement.total_praise_given
+                stats['total_punishments'] = self.training.reinforcement.total_punishments
+                stats['most_effective_reinforcement'] = self.training.reinforcement.get_most_effective_reinforcement().value
+
+        return stats
+
     def to_dict(self) -> Dict[str, Any]:
-        """Convert creature to dictionary for saving (with Phases 2-5)."""
+        """Convert creature to dictionary for saving (with Phases 2-6)."""
         return {
             'creature_type': self.creature_type,
             'personality': self.personality.value,
