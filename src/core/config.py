@@ -1089,3 +1089,89 @@ LEVEL_UP_EXPERIENCE_BASE = 100               # Experience needed for level 2
 LEVEL_UP_MULTIPLIER = 1.5                    # Multiplier per level
 PERFECT_GAME_EXPERIENCE_BONUS = 25           # Bonus for perfect game
 PERFECT_GAME_COINS_BONUS = 15                # Coins bonus for perfect game
+
+# ============================================================================
+# PHASE 13: ECONOMY & SHOP SYSTEM
+# ============================================================================
+
+# Currency system
+STARTING_BALANCE = 100                       # Starting coins for new players
+DAILY_ALLOWANCE_AMOUNT = 50                  # Daily free coins
+DAILY_SPENDING_LIMIT = 500                   # Max coins to spend per day
+SPENDING_LIMIT_ENABLED = True                # Enable spending limits (for kids)
+TRANSACTION_HISTORY_LIMIT = 100              # Max transaction records to keep
+LOW_BALANCE_THRESHOLD = 20                   # Warning threshold for low coins
+
+# Shop system
+SHOP_MAX_CAPACITY = 50                       # Max unique items in shop
+SHOP_LEVEL_START = 1                         # Starting shop level
+SHOP_DAILY_REFRESH_ENABLED = True            # Auto refresh shop daily
+SHOP_SALE_MIN = 2                            # Min items on sale per refresh
+SHOP_SALE_MAX = 5                            # Max items on sale per refresh
+SHOP_FEATURED_ITEMS = 3                      # Featured items per refresh
+SHOP_RESTOCK_MIN = 5                         # Min stock added on refresh
+SHOP_RESTOCK_MAX = 20                        # Max stock added on refresh
+
+# Shop item prices
+ITEM_KIBBLE_PRICE = 5                        # Basic food
+ITEM_PREMIUM_FOOD_PRICE = 15                 # Quality food
+ITEM_GOURMET_MEAL_PRICE = 30                 # Gourmet food
+ITEM_BONE_TREAT_PRICE = 10                   # Bone treat
+ITEM_COOKIE_PRICE = 8                        # Cookie treat
+ITEM_SPECIAL_TREAT_PRICE = 25                # Special treat
+ITEM_BALL_PRICE = 15                         # Ball toy
+ITEM_ROPE_TOY_PRICE = 20                     # Rope toy
+ITEM_SQUEAKY_TOY_PRICE = 25                  # Squeaky toy
+ITEM_PUZZLE_TOY_PRICE = 40                   # Puzzle toy
+ITEM_COLLAR_BASIC_PRICE = 30                 # Basic collar
+ITEM_COLLAR_FANCY_PRICE = 60                 # Fancy collar
+ITEM_BOW_TIE_PRICE = 45                      # Bow tie
+ITEM_BANDANA_PRICE = 35                      # Bandana
+ITEM_BED_BASIC_PRICE = 50                    # Basic bed
+ITEM_BED_LUXURY_PRICE = 120                  # Luxury bed
+ITEM_SCRATCHING_POST_PRICE = 40              # Scratching post
+ITEM_BRUSH_PRICE = 20                        # Grooming brush
+ITEM_SHAMPOO_PRICE = 15                      # Pet shampoo
+ITEM_HEALTH_POTION_PRICE = 50                # Health potion
+ITEM_ENERGY_DRINK_PRICE = 35                 # Energy drink
+
+# Shop sales discounts
+SHOP_SALE_DISCOUNT_10 = 10                   # 10% off
+SHOP_SALE_DISCOUNT_15 = 15                   # 15% off
+SHOP_SALE_DISCOUNT_20 = 20                   # 20% off
+SHOP_SALE_DISCOUNT_25 = 25                   # 25% off
+SHOP_SALE_DISCOUNT_30 = 30                   # 30% off
+
+# Inventory system
+INVENTORY_MAX_CAPACITY = 100                 # Max unique item types
+INVENTORY_AUTO_STACK = True                  # Auto-stack consumables
+INVENTORY_MAX_ACTIVE_TOYS = 3                # Max toys active at once
+INVENTORY_DURABILITY_MAX = 100               # Max item durability
+INVENTORY_DURABILITY_USE_COST = 5            # Durability lost per use
+INVENTORY_LOW_QUANTITY_THRESHOLD = 3         # Low stock warning
+INVENTORY_DAMAGED_THRESHOLD = 30             # Damaged item warning (%)
+
+# Item effects
+EFFECT_HUNGER_RESTORE_BASIC = 20             # Hunger restored (basic food)
+EFFECT_HUNGER_RESTORE_PREMIUM = 50           # Hunger restored (premium)
+EFFECT_HUNGER_RESTORE_GOURMET = 80           # Hunger restored (gourmet)
+EFFECT_HAPPINESS_BOOST_SMALL = 8             # Small happiness boost
+EFFECT_HAPPINESS_BOOST_MEDIUM = 15           # Medium happiness boost
+EFFECT_HAPPINESS_BOOST_LARGE = 25            # Large happiness boost
+EFFECT_ENERGY_RESTORE_BASIC = 10             # Energy restored (basic)
+EFFECT_ENERGY_RESTORE_MEDIUM = 25            # Energy restored (medium)
+EFFECT_ENERGY_RESTORE_LARGE = 40             # Energy restored (large)
+EFFECT_HEALTH_RESTORE = 30                   # Health restored
+EFFECT_CLEANLINESS_BOOST_SMALL = 20          # Cleanliness boost (small)
+EFFECT_CLEANLINESS_BOOST_LARGE = 40          # Cleanliness boost (large)
+EFFECT_INTELLIGENCE_BOOST = 5                # Intelligence boost
+EFFECT_BONDING_BOOST = 5                     # Bonding boost
+
+# Trading system
+TRADING_ENABLED = True                       # Enable trading
+TRADING_FAIRNESS_CHECK = True                # Check trade fairness
+TRADING_FAIRNESS_TOLERANCE = 0.3             # Max value difference (30%)
+TRADING_REQUIRE_MUTUAL = False               # Both must offer something
+TRADING_EXPIRY_DURATION = 3600               # Trade expires after 1 hour (seconds)
+TRADING_HISTORY_LIMIT = 50                   # Max trade history records
+TRADING_ITEM_ESTIMATE_VALUE = 20             # Estimated value per item
