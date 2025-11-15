@@ -1026,3 +1026,66 @@ EXPORT_JOURNAL_INCLUDE_METADATA = True       # Include metadata in exports
 EXPORT_PHOTOS_INCLUDE_ORIGINAL = True        # Include original quality photos
 EXPORT_MEMORY_BOOK_FORMAT = "pdf"            # Default export format (pdf/html/json)
 EXPORT_MAX_FILE_SIZE_MB = 100.0              # Max export file size
+
+# =============================================================================
+# PHASE 12: MINI-GAMES & ACTIVITIES CONSTANTS
+# =============================================================================
+
+# Game base
+GAME_DEFAULT_DIFFICULTY = "medium"           # Default game difficulty
+GAME_MAX_HISTORY_LENGTH = 100                # Max game results to store
+GAME_REWARD_EXPERIENCE_BASE = 10             # Base experience per game
+GAME_REWARD_COINS_BASE = 5                   # Base coins per game
+GAME_REWARD_BONDING_BASE = 1.0               # Base bonding per game
+
+# Fetch game
+FETCH_TARGET_CATCHES_EASY = 5                # Catches needed (easy)
+FETCH_TARGET_CATCHES_MEDIUM = 10             # Catches needed (medium)
+FETCH_TARGET_CATCHES_HARD = 15               # Catches needed (hard)
+FETCH_TIME_LIMIT_EASY = 90.0                 # Time limit in seconds (easy)
+FETCH_TIME_LIMIT_MEDIUM = 60.0               # Time limit in seconds (medium)
+FETCH_TIME_LIMIT_HARD = 45.0                 # Time limit in seconds (hard)
+FETCH_CATCH_POINTS = 10                      # Points per catch
+FETCH_PERFECT_CATCH_BONUS = 5                # Bonus for perfect catch
+
+# Trick show game
+TRICK_SHOW_ROUNDS_EASY = 3                   # Number of tricks (easy)
+TRICK_SHOW_ROUNDS_MEDIUM = 5                 # Number of tricks (medium)
+TRICK_SHOW_ROUNDS_HARD = 7                   # Number of tricks (hard)
+TRICK_SHOW_TIME_PER_ROUND = 15.0             # Seconds per trick
+TRICK_SHOW_VARIETY_BONUS = 50                # Bonus for using all tricks
+TRICK_SHOW_EXECUTION_WEIGHT = 0.4            # Weight for execution score
+TRICK_SHOW_STYLE_WEIGHT = 0.25               # Weight for style score
+TRICK_SHOW_DIFFICULTY_WEIGHT = 0.2           # Weight for difficulty score
+TRICK_SHOW_ENTHUSIASM_WEIGHT = 0.15          # Weight for enthusiasm score
+
+# Memory match game
+MEMORY_GRID_SIZE_EASY = 3                    # Grid size (3x3 = 9 cards)
+MEMORY_GRID_SIZE_MEDIUM = 4                  # Grid size (4x4 = 16 cards)
+MEMORY_GRID_SIZE_HARD = 5                    # Grid size (5x5 = 25 cards)
+MEMORY_TIME_LIMIT_EASY = 180.0               # Time limit in seconds (easy)
+MEMORY_TIME_LIMIT_MEDIUM = 120.0             # Time limit in seconds (medium)
+MEMORY_TIME_LIMIT_HARD = 90.0                # Time limit in seconds (hard)
+MEMORY_MATCH_POINTS = 20                     # Points per match
+MEMORY_HINT_LIMIT_EASY = 5                   # Max hints (easy)
+MEMORY_HINT_LIMIT_MEDIUM = 3                 # Max hints (medium)
+MEMORY_HINT_LIMIT_HARD = 2                   # Max hints (hard)
+
+# Obstacle course game
+OBSTACLE_COUNT_EASY = 4                      # Number of obstacles (easy)
+OBSTACLE_COUNT_MEDIUM = 6                    # Number of obstacles (medium)
+OBSTACLE_COUNT_HARD = 8                      # Number of obstacles (hard)
+OBSTACLE_TIME_LIMIT_EASY = 120.0             # Time limit in seconds (easy)
+OBSTACLE_TIME_LIMIT_MEDIUM = 90.0            # Time limit in seconds (medium)
+OBSTACLE_TIME_LIMIT_HARD = 60.0              # Time limit in seconds (hard)
+OBSTACLE_COMPLETION_POINTS = 20              # Points per obstacle
+OBSTACLE_PENALTY_POINTS = 5                  # Points lost per penalty
+OBSTACLE_BASE_TIME = 3.0                     # Base seconds per obstacle
+
+# Game rewards and achievements
+ACHIEVEMENT_EXPERIENCE_REWARD = 50           # Experience for achievement
+ACHIEVEMENT_COINS_REWARD = 25                # Coins for achievement
+LEVEL_UP_EXPERIENCE_BASE = 100               # Experience needed for level 2
+LEVEL_UP_MULTIPLIER = 1.5                    # Multiplier per level
+PERFECT_GAME_EXPERIENCE_BONUS = 25           # Bonus for perfect game
+PERFECT_GAME_COINS_BONUS = 15                # Coins bonus for perfect game
