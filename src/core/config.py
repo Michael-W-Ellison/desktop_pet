@@ -531,6 +531,90 @@ PREFERENCE_REACTION_THRESHOLDS = {
     'refuse': 0          # 0-20: Refuse
 }
 
+# ============ Phase 6: Enhanced Training & Commands Constants ============
+
+# Reinforcement effects
+REINFORCEMENT_EFFECTS = {
+    'verbal_praise': {
+        'bond_change': 0.3,
+        'trust_change': 0.0,
+        'happiness_change': 2.0,
+        'learning_boost': 1.1
+    },
+    'treat': {
+        'bond_change': 0.5,
+        'trust_change': 0.2,
+        'happiness_change': 5.0,
+        'learning_boost': 1.3
+    },
+    'toy_reward': {
+        'bond_change': 0.4,
+        'trust_change': 0.0,
+        'happiness_change': 4.0,
+        'learning_boost': 1.2
+    },
+    'affection': {
+        'bond_change': 0.6,
+        'trust_change': 0.3,
+        'happiness_change': 3.0,
+        'learning_boost': 1.1
+    },
+    'punishment': {
+        'bond_change': -0.5,
+        'trust_change': -2.0,
+        'happiness_change': -5.0,
+        'learning_boost': 0.7
+    },
+    'ignore': {
+        'bond_change': 0.0,
+        'trust_change': 0.0,
+        'happiness_change': -1.0,
+        'learning_boost': 0.9
+    }
+}
+
+# Stubbornness modifiers
+STUBBORNNESS_MODIFIERS = {
+    'unhappy_minor': 0.2,       # Happiness 30-50
+    'unhappy_major': 0.4,       # Happiness < 30
+    'low_trust_minor': 0.3,     # Trust 20-40
+    'low_trust_major': 0.5,     # Trust < 20
+    'low_bond': 0.3,            # Bond < 30
+    'hungry_minor': 0.2,        # Hunger 50-70
+    'hungry_major': 0.4,        # Hunger > 70
+    'tired_minor': 0.3,         # Energy 20-40
+    'tired_major': 0.5,         # Energy < 20
+    'training_fatigue_minor': 0.2,   # 5-10 recent commands
+    'training_fatigue_major': 0.4    # > 10 recent commands
+}
+
+# Training progress thresholds
+TRAINING_PROFICIENCY_THRESHOLD = 0.7  # Needed to reliably perform trick
+TRAINING_MASTERY_THRESHOLD = 0.95     # Fully mastered
+TRAINING_FORGETTING_RATE = 0.01       # Proficiency loss per day without practice
+TRAINING_FORGETTING_DELAY = 1.0       # Days before skill starts degrading
+
+# Training session limits
+MAX_COMMANDS_PER_SESSION = 15         # Optimal training session length
+TRAINING_FATIGUE_THRESHOLD = 10       # Commands before fatigue sets in
+COMMAND_COOLDOWN_SECONDS = 2          # Minimum time between commands
+
+# Learning rate modifiers by difficulty
+LEARNING_RATES_BY_DIFFICULTY = {
+    'trivial': 0.33,    # 1/3 - learn in ~3 attempts
+    'easy': 0.14,       # 1/7 - learn in ~7 attempts
+    'medium': 0.08,     # 1/12 - learn in ~12 attempts
+    'hard': 0.04,       # 1/25 - learn in ~25 attempts
+    'expert': 0.02      # 1/50 - learn in ~50 attempts
+}
+
+# Success rate thresholds for training analytics
+SUCCESS_RATE_EXCELLENT = 0.9   # 90%+ success rate
+SUCCESS_RATE_GOOD = 0.7        # 70-90% success rate
+SUCCESS_RATE_FAIR = 0.5        # 50-70% success rate
+SUCCESS_RATE_POOR = 0.3        # 30-50% success rate
+# < 30% = needs more practice
+
 # Time settings (in seconds)
 HUNGER_CHECK_INTERVAL = 60  # Check hunger every minute
 BEHAVIOR_UPDATE_INTERVAL = 5  # Update behavior every 5 seconds
