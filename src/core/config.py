@@ -443,6 +443,94 @@ PERSONALITY_TRAITS = {
     }
 }
 
+# ============ Phase 5: Advanced Bonding Constants ============
+
+# Bonding system settings
+BOND_DECAY_RATE = 0.5  # Bond points lost per hour without interaction (after 1 hour)
+BOND_DECAY_DELAY = 1.0  # Hours before bond starts decaying
+MAX_BOND = 100.0
+MIN_BOND = 0.0
+
+# Bond level thresholds
+BOND_LEVEL_STRANGER = 20  # 0-20 = Stranger
+BOND_LEVEL_ACQUAINTANCE = 40  # 20-40 = Acquaintance
+BOND_LEVEL_FRIEND = 60  # 40-60 = Friend
+BOND_LEVEL_CLOSE_FRIEND = 80  # 60-80 = Close Friend
+BOND_LEVEL_BEST_FRIEND = 100  # 80-100 = Best Friend
+
+# Trust system settings
+TRUST_BUILD_RATE = 1.0  # Base trust gain from timely care
+TRUST_DECAY_RATE = 3.0  # Trust loss from ignoring distress
+MAX_TRUST = 100.0
+MIN_TRUST = 0.0
+CONSISTENCY_INITIAL = 50.0  # Initial consistency score
+RELIABILITY_INITIAL = 50.0  # Initial reliability score
+
+# Emotional state durations (in seconds)
+EMOTIONAL_STATE_DURATIONS = {
+    'jealousy_min': 300,        # 5 minutes minimum
+    'jealousy_max': 900,        # 15 minutes maximum
+    'separation_anxiety': 3600,  # 1 hour
+    'excited_return_min': 300,   # 5 minutes minimum
+    'excited_return_max': 900,   # 15 minutes maximum
+    'longing': 1800,            # 30 minutes
+    'possessive': 600,          # 10 minutes
+    'insecure': 900             # 15 minutes
+}
+
+# Separation anxiety thresholds (in hours)
+SEPARATION_ANXIETY_THRESHOLD_CLOSE_FRIEND = 2.0  # Close friends miss you after 2 hours
+SEPARATION_ANXIETY_THRESHOLD_BEST_FRIEND = 1.0   # Best friends miss you after 1 hour
+SEPARATION_ANXIETY_MIN_BOND = 60  # Need at least 60 bond for separation anxiety
+
+# Jealousy settings
+JEALOUSY_MIN_BOND = 30  # Need at least 30 bond to feel jealous
+JEALOUSY_BASE_CHANCE = {
+    'stranger': 0.0,         # Strangers don't get jealous
+    'acquaintance': 0.1,     # 10% base chance
+    'friend': 0.3,           # 30% base chance
+    'close_friend': 0.6,     # 60% base chance
+    'best_friend': 0.8       # 80% base chance
+}
+
+# Name calling settings
+NAME_RECOGNITION_BASE_RESPONSE = 0.7  # 70% max from just knowing name
+NAME_RECOGNITION_BOND_BONUS = 0.2    # Up to +20% from bond
+NAME_RECOGNITION_TRUST_BONUS = 0.1   # Up to +10% from trust
+NAME_RECOGNITION_MAX_CHANCE = 0.95   # 95% maximum response rate
+NAME_RECOGNITION_WRONG_NAME_CHANCE = 0.1  # 10% chance to respond to wrong name
+
+# Preference categories and items
+TOY_TYPES = [
+    'ball', 'rope', 'squeaky_toy', 'feather', 'mouse_toy',
+    'puzzle_toy', 'chew_toy', 'laser_pointer', 'plush_toy', 'frisbee'
+]
+
+FOOD_TYPES = [
+    'kibble', 'wet_food', 'treats', 'vegetables', 'fruit',
+    'fish', 'chicken', 'beef', 'cheese', 'peanut_butter'
+]
+
+ACTIVITY_TYPES = [
+    'playing', 'training', 'petting', 'grooming', 'talking',
+    'exploring', 'resting', 'chasing', 'hiding', 'swimming'
+]
+
+# Preference system settings
+PREFERENCE_INITIAL = 50.0  # Start neutral (0-100 scale)
+PREFERENCE_MIN = 0.0       # Absolutely hates it
+PREFERENCE_MAX = 100.0     # Absolutely loves it
+PREFERENCE_CHANGE_RATE = 10.0  # Base change per experience
+
+# Preference reaction thresholds
+PREFERENCE_REACTION_THRESHOLDS = {
+    'ecstatic': 80,      # 80-100: Ecstatic
+    'happy': 60,         # 60-80: Happy
+    'neutral': 40,       # 40-60: Neutral
+    'reluctant': 20,     # 20-40: Reluctant
+    'refuse': 0          # 0-20: Refuse
+}
+
 # Time settings (in seconds)
 HUNGER_CHECK_INTERVAL = 60  # Check hunger every minute
 BEHAVIOR_UPDATE_INTERVAL = 5  # Update behavior every 5 seconds
