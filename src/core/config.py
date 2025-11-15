@@ -84,8 +84,38 @@ class PersonalityType(Enum):
     LOYAL = "loyal"
     SELFISH = "selfish"
 
-# Creature types (Pokemon-style animals)
+# Phase 4: Evolution stages
+class EvolutionStage(Enum):
+    BABY = "baby"
+    JUVENILE = "juvenile"
+    ADULT = "adult"
+    ELDER = "elder"
+
+# Phase 4: Elemental types
+class ElementType(Enum):
+    FIRE = "fire"
+    WATER = "water"
+    EARTH = "earth"
+    AIR = "air"
+    LIGHT = "light"
+    DARK = "dark"
+    ELECTRIC = "electric"
+    ICE = "ice"
+    NATURE = "nature"
+    PSYCHIC = "psychic"
+    NEUTRAL = "neutral"
+
+# Phase 4: Creature variant types
+class VariantType(Enum):
+    NORMAL = "normal"
+    SHINY = "shiny"
+    MYSTIC = "mystic"
+    SHADOW = "shadow"
+    CRYSTAL = "crystal"
+
+# Creature types (Phase 4: Expanded to 25+ fantastical species)
 CREATURE_TYPES = [
+    # Original 10
     "dragon",
     "cat",
     "dog",
@@ -95,7 +125,24 @@ CREATURE_TYPES = [
     "hamster",
     "owl",
     "penguin",
-    "turtle"
+    "turtle",
+
+    # Phase 4: Fantastical creatures (15 more)
+    "phoenix",      # Majestic fire bird
+    "sprite",       # Magical fairy creature
+    "golem",        # Stone/earth guardian
+    "griffin",      # Lion-eagle hybrid
+    "unicorn",      # Magical horned horse
+    "chimera",      # Multi-headed beast
+    "wisp",         # Floating spirit orb
+    "kraken",       # Sea monster
+    "hydra",        # Multi-headed dragon
+    "basilisk",     # Serpent king
+    "manticore",    # Scorpion-tailed lion
+    "salamander",   # Fire elemental lizard
+    "sylph",        # Air spirit
+    "undine",       # Water spirit
+    "gnome"         # Earth spirit
 ]
 
 # Behavior states
@@ -119,6 +166,133 @@ COLOR_PALETTES = [
     ["#DDA15E", "#BC6C25", "#FEFAE0"],  # Brown-Tan-Cream
     ["#B8B8FF", "#FFB3BA", "#BAFFC9"],  # Lavender-Pink-Mint
 ]
+
+# Phase 4: Species element affinities (which elements each species naturally has)
+SPECIES_ELEMENTS = {
+    # Original creatures
+    "dragon": ElementType.FIRE,
+    "cat": ElementType.NEUTRAL,
+    "dog": ElementType.NEUTRAL,
+    "bunny": ElementType.NATURE,
+    "bird": ElementType.AIR,
+    "fox": ElementType.FIRE,
+    "hamster": ElementType.EARTH,
+    "owl": ElementType.PSYCHIC,
+    "penguin": ElementType.ICE,
+    "turtle": ElementType.WATER,
+
+    # Fantastical creatures
+    "phoenix": ElementType.FIRE,
+    "sprite": ElementType.LIGHT,
+    "golem": ElementType.EARTH,
+    "griffin": ElementType.AIR,
+    "unicorn": ElementType.LIGHT,
+    "chimera": ElementType.FIRE,
+    "wisp": ElementType.PSYCHIC,
+    "kraken": ElementType.WATER,
+    "hydra": ElementType.WATER,
+    "basilisk": ElementType.DARK,
+    "manticore": ElementType.DARK,
+    "salamander": ElementType.FIRE,
+    "sylph": ElementType.AIR,
+    "undine": ElementType.WATER,
+    "gnome": ElementType.EARTH
+}
+
+# Phase 4: Element type advantages (rock-paper-scissors style)
+ELEMENT_ADVANTAGES = {
+    ElementType.FIRE: [ElementType.NATURE, ElementType.ICE],
+    ElementType.WATER: [ElementType.FIRE, ElementType.EARTH],
+    ElementType.EARTH: [ElementType.ELECTRIC, ElementType.FIRE],
+    ElementType.AIR: [ElementType.EARTH, ElementType.NATURE],
+    ElementType.LIGHT: [ElementType.DARK, ElementType.PSYCHIC],
+    ElementType.DARK: [ElementType.LIGHT, ElementType.PSYCHIC],
+    ElementType.ELECTRIC: [ElementType.WATER, ElementType.AIR],
+    ElementType.ICE: [ElementType.NATURE, ElementType.WATER],
+    ElementType.NATURE: [ElementType.WATER, ElementType.EARTH],
+    ElementType.PSYCHIC: [ElementType.FIRE, ElementType.EARTH],
+    ElementType.NEUTRAL: []
+}
+
+# Phase 4: Evolution requirements for each stage
+EVOLUTION_REQUIREMENTS = {
+    EvolutionStage.BABY: {
+        "min_age_hours": 0,
+        "min_happiness": 0,
+        "min_bond": 0
+    },
+    EvolutionStage.JUVENILE: {
+        "min_age_hours": 2,
+        "min_happiness": 40,
+        "min_bond": 30
+    },
+    EvolutionStage.ADULT: {
+        "min_age_hours": 6,
+        "min_happiness": 60,
+        "min_bond": 60,
+        "min_interactions": 50
+    },
+    EvolutionStage.ELDER: {
+        "min_age_hours": 12,
+        "min_happiness": 70,
+        "min_bond": 80,
+        "min_interactions": 100,
+        "min_tricks_learned": 3
+    }
+}
+
+# Phase 4: Stage size multipliers (how big the creature is at each stage)
+STAGE_SIZE_MULTIPLIERS = {
+    EvolutionStage.BABY: 0.6,
+    EvolutionStage.JUVENILE: 0.8,
+    EvolutionStage.ADULT: 1.0,
+    EvolutionStage.ELDER: 1.2
+}
+
+# Phase 4: Variant rarity and effects
+VARIANT_RARITY = {
+    VariantType.NORMAL: 0.70,    # 70% chance
+    VariantType.SHINY: 0.15,     # 15% chance (shimmering colors)
+    VariantType.MYSTIC: 0.08,    # 8% chance (magical aura)
+    VariantType.SHADOW: 0.05,    # 5% chance (dark powers)
+    VariantType.CRYSTAL: 0.02    # 2% chance (very rare, crystalline)
+}
+
+# Phase 4: Variant stat modifiers
+VARIANT_MODIFIERS = {
+    VariantType.NORMAL: {
+        "learning_rate": 1.0,
+        "happiness_gain": 1.0,
+        "bond_gain": 1.0
+    },
+    VariantType.SHINY: {
+        "learning_rate": 1.2,
+        "happiness_gain": 1.3,
+        "bond_gain": 1.1,
+        "sparkle_effect": True
+    },
+    VariantType.MYSTIC: {
+        "learning_rate": 1.5,
+        "happiness_gain": 1.2,
+        "bond_gain": 1.3,
+        "aura_effect": True,
+        "trick_proficiency_bonus": 0.1
+    },
+    VariantType.SHADOW: {
+        "learning_rate": 1.3,
+        "happiness_gain": 0.8,
+        "bond_gain": 1.4,
+        "dark_aura": True,
+        "intimidation_bonus": 1.5
+    },
+    VariantType.CRYSTAL: {
+        "learning_rate": 1.8,
+        "happiness_gain": 1.5,
+        "bond_gain": 1.5,
+        "crystal_effect": True,
+        "legendary_status": True
+    }
+}
 
 # Personality trait modifiers (how personality affects behavior)
 PERSONALITY_TRAITS = {

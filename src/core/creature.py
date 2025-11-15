@@ -4,6 +4,9 @@ Creature class representing the desktop pet with its attributes, personality, an
 Enhanced with:
 - Integrated Memory System (episodic, semantic, working memory)
 - Training System (trick learning, commands, name recognition)
+- Evolution System (baby -> juvenile -> adult -> elder stages)
+- Element System (11 element types with interactions)
+- Variant System (shiny, mystic, shadow, crystal forms)
 """
 import random
 import time
@@ -11,10 +14,14 @@ from typing import Dict, Any, Optional, Tuple, List
 from datetime import datetime
 from .config import (
     PersonalityType, BehaviorState, CREATURE_TYPES, COLOR_PALETTES,
-    PERSONALITY_TRAITS, MAX_HUNGER, HUNGER_DECAY_RATE, STARVATION_THRESHOLD
+    PERSONALITY_TRAITS, MAX_HUNGER, HUNGER_DECAY_RATE, STARVATION_THRESHOLD,
+    EvolutionStage, ElementType, VariantType
 )
 from .memory_system import IntegratedMemorySystem, MemoryImportance
 from .training_system import TrainingSystem
+from .evolution_system import EvolutionSystem, EvolutionTrigger
+from .element_system import ElementSystem, create_element_system_for_species
+from .variant_system import VariantSystem, generate_random_variant
 
 
 class Creature:
@@ -40,10 +47,12 @@ class Creature:
         self.hunger = 0.0  # 0 = not hungry, 100 = starving
         self.happiness = 100.0  # 0-100
         self.energy = 100.0  # 0-100
+        self.bond = 0.0  # 0-100, bond strength with owner (Phase 4)
         self.age = 0  # in seconds
         self.birth_time = time.time()
         self.last_fed_time = time.time()
         self.last_interaction_time = time.time()
+        self.total_interactions = 0  # Track total interactions for evolution (Phase 4)
 
         # State
         self.current_state = BehaviorState.IDLE
@@ -65,25 +74,50 @@ class Creature:
         # Personality trait modifiers
         self.trait_modifiers = PERSONALITY_TRAITS[self.personality]
 
-        # Enhanced Memory System (Phase 2)
+        # Phase 2: Enhanced Memory System
         self.memory = IntegratedMemorySystem(
             episodic_capacity=500,  # 500 memorable events
             working_capacity=150    # 150 recent interactions (100+)
         )
 
-        # Training System (Phase 2)
+        # Phase 2: Training System
         self.training = TrainingSystem(
             creature_name=self.name,
             personality=self.personality
         )
 
+        # Phase 4: Evolution System
+        self.evolution = EvolutionSystem(current_stage=EvolutionStage.BABY)
+
+        # Phase 4: Element System
+        self.element = create_element_system_for_species(self.creature_type)
+
+        # Phase 4: Variant System
+        self.variant = generate_random_variant()
+
+        # Apply variant modifiers to initial stats
+        variant_mods = self.variant.get_variant_modifiers()
+        self.happiness *= variant_mods.get('happiness_gain', 1.0)
+
         # Record birth as first episodic memory
+        birth_details = {
+            'creature_type': self.creature_type,
+            'personality': self.personality.value,
+            'evolution_stage': self.evolution.current_stage.value,
+            'element': self.element.primary_element.value,
+            'variant': self.variant.variant.value
+        }
         self.memory.record_interaction(
             'birth',
-            {'creature_type': self.creature_type, 'personality': self.personality.value},
+            birth_details,
             important=True,
             emotional_intensity=1.0
         )
+
+        # Show special message for rare variants
+        if self.variant.is_rare():
+            rare_message = self.variant.get_encounter_message()
+            # This message will be shown by pet_manager when creature hatches
 
     def _generate_name(self) -> str:
         """Generate a random name for the creature."""
@@ -168,6 +202,12 @@ class Creature:
             positive: Whether the interaction was positive (enjoyed) or negative
         """
         self.last_interaction_time = time.time()
+        self.total_interactions += 1  # Phase 4: Track for evolution
+
+        # Phase 4: Build bond with positive interactions
+        if positive:
+            bond_gain = 0.5 * self.variant.get_bond_multiplier()
+            self.bond = min(100, self.bond + bond_gain)
 
         # Update preference scores based on interaction
         if interaction_type in self.preference_scores:
@@ -193,7 +233,11 @@ class Creature:
         # Update happiness
         happiness_change = 3 if positive else -1
         happiness_multiplier = self.trait_modifiers.get('happiness_gain', 1.0)
-        self.happiness = max(0, min(100, self.happiness + happiness_change * happiness_multiplier))
+        variant_multiplier = self.variant.get_happiness_multiplier()  # Phase 4
+        self.happiness = max(0, min(100, self.happiness + happiness_change * happiness_multiplier * variant_multiplier))
+
+        # Phase 4: Check for evolution after interaction
+        self._check_evolution(EvolutionTrigger.INTERACTION)
 
         # Record in memory system (Phase 2)
         emotional_intensity = 0.7 if positive else 0.3
@@ -499,8 +543,168 @@ class Creature:
         """Update training system (handle skill decay, etc.)."""
         self.training.update_skill_decay()
 
+    # ============ Phase 4: Evolution, Element, Variant Methods ============
+
+    def _check_evolution(self, trigger: EvolutionTrigger):
+        """
+        Internal method to check if evolution should occur.
+
+        Args:
+            trigger: What triggered this evolution check
+        """
+        stats = self.get_evolution_stats()
+        result = self.evolution.auto_check_evolution(stats, trigger)
+
+        if result and result.get('ready'):
+            # Record evolution readiness in memory
+            self.memory.record_interaction(
+                'evolution_ready',
+                {
+                    'next_stage': result['next_stage'].value,
+                    'current_stage': self.evolution.current_stage.value
+                },
+                important=True,
+                emotional_intensity=0.9
+            )
+
+    def get_evolution_stats(self) -> Dict[str, Any]:
+        """
+        Get current stats for evolution checking.
+
+        Returns:
+            Dictionary with evolution-relevant stats
+        """
+        return {
+            'age_hours': self.age / 3600.0,  # Convert seconds to hours
+            'happiness': self.happiness,
+            'bond': self.bond,
+            'total_interactions': self.total_interactions,
+            'tricks_learned': len(self.get_known_tricks())
+        }
+
+    def can_evolve(self) -> Tuple[bool, Optional[EvolutionStage], str]:
+        """
+        Check if creature can evolve.
+
+        Returns:
+            Tuple of (can_evolve, next_stage, reason)
+        """
+        stats = self.get_evolution_stats()
+        return self.evolution.check_evolution_eligibility(stats)
+
+    def evolve(self) -> Tuple[bool, str]:
+        """
+        Attempt to evolve the creature.
+
+        Returns:
+            Tuple of (success, message)
+        """
+        stats = self.get_evolution_stats()
+        success, new_stage, message = self.evolution.evolve(stats)
+
+        if success:
+            # Record evolution in memory as crucial event
+            self.memory.record_interaction(
+                'evolved',
+                {
+                    'old_stage': self.evolution.evolution_history[-1]['from_stage'].value,
+                    'new_stage': new_stage.value,
+                    'age_hours': stats['age_hours'],
+                    'bond': self.bond
+                },
+                important=True,
+                emotional_intensity=1.0
+            )
+
+        return success, message
+
+    def get_evolution_progress(self) -> Dict[str, Any]:
+        """Get detailed evolution progress information."""
+        stats = self.get_evolution_stats()
+        return self.evolution.get_evolution_progress(stats)
+
+    def interact_with_element(self, other_element: ElementType) -> Dict[str, Any]:
+        """
+        Interact with another element (e.g., elemental toy, another creature).
+
+        Args:
+            other_element: The other element involved
+
+        Returns:
+            Dictionary with interaction results
+        """
+        result = self.element.interact_with_element(other_element)
+
+        # Apply effects
+        happiness_change = result.get('happiness_change', 0)
+        bond_change = result.get('bond_change', 0)
+
+        self.happiness = max(0, min(100, self.happiness + happiness_change))
+        self.bond = max(0, min(100, self.bond + bond_change))
+
+        # Record in memory if significant
+        if abs(happiness_change) > 5 or bond_change > 3:
+            self.memory.record_interaction(
+                'elemental_interaction',
+                {
+                    'my_element': self.element.primary_element.value,
+                    'other_element': other_element.value,
+                    'interaction_type': result['interaction_type'],
+                    'multiplier': result['multiplier']
+                },
+                important=(result['interaction_type'] == 'super_effective'),
+                emotional_intensity=0.6
+            )
+
+        return result
+
+    def get_display_info(self) -> Dict[str, Any]:
+        """
+        Get information for UI display.
+
+        Returns:
+            Dictionary with display information
+        """
+        return {
+            'name': self.name,
+            'type': self.creature_type,
+            'personality': self.personality.value,
+            'stage': self.evolution.get_stage_name(),
+            'element': self.element.primary_element.value,
+            'variant': self.variant.variant.value,
+            'variant_emoji': self.variant.get_variant_emoji(),
+            'is_rare': self.variant.is_rare(),
+            'level': self.evolution.current_stage.value,
+            'age_hours': self.age / 3600.0,
+            'stats': {
+                'hunger': self.hunger,
+                'happiness': self.happiness,
+                'energy': self.energy,
+                'bond': self.bond
+            },
+            'known_tricks': len(self.get_known_tricks()),
+            'total_interactions': self.total_interactions
+        }
+
+    def get_particle_effects(self) -> List[str]:
+        """
+        Get list of particle effects to display.
+
+        Returns:
+            List of particle effect identifiers
+        """
+        effects = []
+
+        # Element-based particles
+        effects.append(self.element.get_particle_effect_type())
+
+        # Variant-based particles
+        effects.extend(self.variant.get_particle_effects())
+
+        return effects
+
     def to_dict(self) -> Dict[str, Any]:
-        """Convert creature to dictionary for saving (with Phase 2 memory & training)."""
+        """Convert creature to dictionary for saving (with Phases 2-4)."""
         return {
             'creature_type': self.creature_type,
             'personality': self.personality.value,
@@ -509,6 +713,8 @@ class Creature:
             'hunger': self.hunger,
             'happiness': self.happiness,
             'energy': self.energy,
+            'bond': self.bond,  # Phase 4
+            'total_interactions': self.total_interactions,  # Phase 4
             'birth_time': self.birth_time,
             'last_fed_time': self.last_fed_time,
             'last_interaction_time': self.last_interaction_time,
@@ -517,12 +723,16 @@ class Creature:
             'interaction_history': self.interaction_history,
             # Phase 2: Memory and Training
             'memory_system': self.memory.to_dict(),
-            'training_system': self.training.to_dict()
+            'training_system': self.training.to_dict(),
+            # Phase 4: Evolution, Element, Variant
+            'evolution_system': self.evolution.to_dict(),
+            'element_system': self.element.to_dict(),
+            'variant_system': self.variant.to_dict()
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Creature':
-        """Create a creature from a dictionary."""
+        """Create a creature from a dictionary (with Phases 2-4)."""
         personality = PersonalityType(data['personality'])
         creature = cls(
             creature_type=data['creature_type'],
@@ -534,6 +744,8 @@ class Creature:
         creature.hunger = data['hunger']
         creature.happiness = data['happiness']
         creature.energy = data['energy']
+        creature.bond = data.get('bond', 0.0)  # Phase 4
+        creature.total_interactions = data.get('total_interactions', 0)  # Phase 4
         creature.birth_time = data['birth_time']
         creature.last_fed_time = data['last_fed_time']
         creature.last_interaction_time = data['last_interaction_time']
@@ -547,6 +759,16 @@ class Creature:
 
         if 'training_system' in data:
             creature.training = TrainingSystem.from_dict(data['training_system'])
+
+        # Phase 4: Restore evolution, element, variant if present
+        if 'evolution_system' in data:
+            creature.evolution = EvolutionSystem.from_dict(data['evolution_system'])
+
+        if 'element_system' in data:
+            creature.element = ElementSystem.from_dict(data['element_system'])
+
+        if 'variant_system' in data:
+            creature.variant = VariantSystem.from_dict(data['variant_system'])
 
         return creature
 

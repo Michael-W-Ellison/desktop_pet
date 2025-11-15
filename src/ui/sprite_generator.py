@@ -1,9 +1,14 @@
 """
 Procedural sprite generation for creatures, eggs, and items.
+
+Phase 4 Enhanced:
+- Supports 25+ creature species
+- Evolution stage scaling (baby/juvenile/adult/elder)
+- Variant color modifications (shiny, mystic, shadow, crystal)
 """
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageEnhance
 import random
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 
 class SpriteGenerator:
@@ -12,54 +17,79 @@ class SpriteGenerator:
     @staticmethod
     def generate_creature_sprite(creature_type: str, color_palette: List[str],
                                    size: Tuple[int, int] = (128, 128),
-                                   facing_right: bool = True) -> Image.Image:
+                                   facing_right: bool = True,
+                                   stage_multiplier: float = 1.0,
+                                   variant_colors: Optional[List[str]] = None) -> Image.Image:
         """
-        Generate a procedural sprite for a creature.
+        Generate a procedural sprite for a creature (Phase 4 enhanced).
 
         Args:
-            creature_type: Type of creature (e.g., 'dragon', 'cat')
+            creature_type: Type of creature (e.g., 'dragon', 'phoenix', 'sprite')
             color_palette: List of color hex codes
             size: Size of the sprite (width, height)
             facing_right: Whether the creature is facing right
+            stage_multiplier: Size multiplier for evolution stage (0.6-1.2)
+            variant_colors: Optional color overrides for variants
 
         Returns:
             PIL Image of the creature
         """
-        img = Image.new('RGBA', size, (0, 0, 0, 0))
+        # Use variant colors if provided
+        colors = variant_colors if variant_colors else color_palette
+
+        # Scale size based on evolution stage
+        scaled_size = (int(size[0] * stage_multiplier), int(size[1] * stage_multiplier))
+
+        img = Image.new('RGBA', scaled_size, (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
-        center_x, center_y = size[0] // 2, size[1] // 2
-        primary_color = color_palette[0]
-        secondary_color = color_palette[1] if len(color_palette) > 1 else color_palette[0]
-        accent_color = color_palette[2] if len(color_palette) > 2 else primary_color
+        center_x, center_y = scaled_size[0] // 2, scaled_size[1] // 2
+        primary_color = colors[0]
+        secondary_color = colors[1] if len(colors) > 1 else colors[0]
+        accent_color = colors[2] if len(colors) > 2 else primary_color
 
-        # Generate different shapes based on creature type
-        if creature_type == 'dragon':
-            SpriteGenerator._draw_dragon(draw, center_x, center_y, primary_color,
-                                         secondary_color, accent_color, facing_right)
-        elif creature_type == 'cat':
-            SpriteGenerator._draw_cat(draw, center_x, center_y, primary_color,
-                                      secondary_color, accent_color, facing_right)
-        elif creature_type == 'dog':
-            SpriteGenerator._draw_dog(draw, center_x, center_y, primary_color,
-                                      secondary_color, accent_color, facing_right)
-        elif creature_type == 'bunny':
-            SpriteGenerator._draw_bunny(draw, center_x, center_y, primary_color,
-                                        secondary_color, accent_color, facing_right)
-        elif creature_type == 'bird':
-            SpriteGenerator._draw_bird(draw, center_x, center_y, primary_color,
-                                       secondary_color, accent_color, facing_right)
-        elif creature_type == 'fox':
-            SpriteGenerator._draw_fox(draw, center_x, center_y, primary_color,
-                                      secondary_color, accent_color, facing_right)
-        else:
-            # Default generic creature
-            SpriteGenerator._draw_generic(draw, center_x, center_y, primary_color,
-                                          secondary_color, accent_color, facing_right)
+        # Dictionary mapping creature types to drawing functions
+        creature_drawers = {
+            'dragon': SpriteGenerator._draw_dragon,
+            'cat': SpriteGenerator._draw_cat,
+            'dog': SpriteGenerator._draw_dog,
+            'bunny': SpriteGenerator._draw_bunny,
+            'bird': SpriteGenerator._draw_bird,
+            'fox': SpriteGenerator._draw_fox,
+            'hamster': SpriteGenerator._draw_generic,
+            'owl': SpriteGenerator._draw_bird,
+            'penguin': SpriteGenerator._draw_bird,
+            'turtle': SpriteGenerator._draw_generic,
+            # Phase 4: Fantastical creatures
+            'phoenix': SpriteGenerator._draw_phoenix,
+            'sprite': SpriteGenerator._draw_sprite,
+            'golem': SpriteGenerator._draw_golem,
+            'griffin': SpriteGenerator._draw_griffin,
+            'unicorn': SpriteGenerator._draw_unicorn,
+            'chimera': SpriteGenerator._draw_dragon,  # Similar to dragon
+            'wisp': SpriteGenerator._draw_wisp,
+            'kraken': SpriteGenerator._draw_generic,
+            'hydra': SpriteGenerator._draw_dragon,  # Similar to dragon
+            'basilisk': SpriteGenerator._draw_generic,
+            'manticore': SpriteGenerator._draw_generic,
+            'salamander': SpriteGenerator._draw_generic,
+            'sylph': SpriteGenerator._draw_sprite,  # Similar to sprite
+            'undine': SpriteGenerator._draw_sprite,  # Similar to sprite
+            'gnome': SpriteGenerator._draw_generic
+        }
+
+        # Get drawer function or default to generic
+        drawer = creature_drawers.get(creature_type, SpriteGenerator._draw_generic)
+        drawer(draw, center_x, center_y, primary_color, secondary_color, accent_color, facing_right)
 
         # Flip if facing left
         if not facing_right:
             img = img.transpose(Image.FLIP_LEFT_RIGHT)
+
+        # Resize back to target size if needed
+        if scaled_size != size:
+            # Resize with high-quality resampling
+            img = img.resize(size, Image.Resampling.LANCZOS)
 
         return img
 
@@ -198,6 +228,145 @@ class SpriteGenerator:
         # Little antenna or ears
         draw.ellipse([cx-15, cy-20, cx-10, cy-15], fill=secondary)
         draw.ellipse([cx+10, cy-20, cx+15, cy-15], fill=secondary)
+
+    # ========== Phase 4: Fantastical Creature Sprites ==========
+
+    @staticmethod
+    def _draw_phoenix(draw, cx, cy, primary, secondary, accent, facing_right):
+        """Draw a phoenix (majestic fire bird)."""
+        # Body (elegant bird shape)
+        draw.ellipse([cx-25, cy-15, cx+25, cy+20], fill=primary, outline=accent, width=2)
+        # Head with crest
+        draw.ellipse([cx+10, cy-25, cx+40, cy+5], fill=primary, outline=accent, width=2)
+        # Flame crest
+        draw.polygon([(cx+20, cy-25), (cx+18, cy-40), (cx+25, cy-30)], fill='#FF4500')
+        draw.polygon([(cx+25, cy-25), (cx+23, cy-42), (cx+32, cy-30)], fill='#FFD700')
+        draw.polygon([(cx+30, cy-25), (cx+28, cy-38), (cx+37, cy-30)], fill='#FF4500')
+        # Large wings
+        draw.ellipse([cx-35, cy-10, cx-5, cy+20], fill=secondary, outline=accent, width=2)
+        draw.ellipse([cx-45, cy-5, cx-25, cy+25], fill='#FFD700', outline=accent, width=1)
+        # Tail feathers (flame-like)
+        points = [(cx-25, cy+10), (cx-50, cy+5), (cx-55, cy+25), (cx-25, cy+18)]
+        draw.polygon(points, fill='#FF4500', outline=accent)
+        points = [(cx-25, cy+14), (cx-45, cy+18), (cx-50, cy+30), (cx-25, cy+20)]
+        draw.polygon(points, fill='#FFD700', outline=accent)
+        # Eyes (fierce)
+        draw.ellipse([cx+20, cy-15, cx+26, cy-9], fill='#FFD700')
+        draw.ellipse([cx+22, cy-13, cx+24, cy-11], fill='#FF4500')
+
+    @staticmethod
+    def _draw_sprite(draw, cx, cy, primary, secondary, accent, facing_right):
+        """Draw a magical sprite/fairy."""
+        # Small body
+        draw.ellipse([cx-15, cy-5, cx+15, cy+20], fill=primary, outline=accent, width=2)
+        # Head
+        draw.ellipse([cx-5, cy-20, cx+20, cy+5], fill=primary, outline=accent, width=2)
+        # Wings (butterfly-like)
+        draw.ellipse([cx-30, cy-10, cx-10, cy+10], fill=secondary, outline=accent, width=2)
+        draw.ellipse([cx-25, cy+5, cx-5, cy+22], fill=secondary, outline=accent, width=1)
+        # Wing patterns
+        draw.ellipse([cx-23, cy-5, cx-17, cy+1], fill='white')
+        draw.ellipse([cx-20, cy+10, cx-14, cy+16], fill='white')
+        # Antenna
+        draw.line([(cx+5, cy-20), (cx+2, cy-30)], fill=accent, width=2)
+        draw.ellipse([cx, cy-33, cx+4, cy-29], fill='#FFD700')
+        draw.line([(cx+12, cy-20), (cx+15, cy-30)], fill=accent, width=2)
+        draw.ellipse([cx+13, cy-33, cx+17, cy-29], fill='#FFD700')
+        # Eyes (large and magical)
+        draw.ellipse([cx+2, cy-10, cx+8, cy-4], fill='#E0BBE4')
+        draw.ellipse([cx+3, cy-9, cx+7, cy-5], fill='black')
+        draw.ellipse([cx+10, cy-10, cx+16, cy-4], fill='#E0BBE4')
+        draw.ellipse([cx+11, cy-9, cx+15, cy-5], fill='black')
+
+    @staticmethod
+    def _draw_golem(draw, cx, cy, primary, secondary, accent, facing_right):
+        """Draw a stone/earth golem."""
+        # Blocky body
+        draw.rectangle([cx-28, cy-8, cx+28, cy+25], fill=primary, outline=accent, width=3)
+        # Head (blocky)
+        draw.rectangle([cx-20, cy-28, cx+20, cy-8], fill=primary, outline=accent, width=3)
+        # Rock texture (cracks)
+        draw.line([(cx-15, cy-25), (cx-10, cy-15)], fill=accent, width=2)
+        draw.line([(cx+10, cy-20), (cx+15, cy-10)], fill=accent, width=2)
+        draw.line([(cx-20, cy), (cx-10, cy+10)], fill=accent, width=2)
+        draw.line([(cx+15, cy+5), (cx+25, cy+15)], fill=accent, width=2)
+        # Glowing eyes
+        draw.rectangle([cx-12, cy-20, cx-6, cy-14], fill='#FFD700')
+        draw.rectangle([cx+6, cy-20, cx+12, cy-14], fill='#FFD700')
+        # Arms (thick)
+        draw.rectangle([cx-35, cy, cx-28, cy+20], fill=secondary, outline=accent, width=2)
+        # Gem in chest
+        draw.polygon([(cx-5, cy+5), (cx, cy), (cx+5, cy+5), (cx, cy+10)], fill='#00BFFF')
+
+    @staticmethod
+    def _draw_griffin(draw, cx, cy, primary, secondary, accent, facing_right):
+        """Draw a griffin (lion-eagle hybrid)."""
+        # Lion body
+        draw.ellipse([cx-30, cy-5, cx+20, cy+20], fill=secondary, outline=accent, width=2)
+        # Eagle head
+        draw.ellipse([cx+8, cy-20, cx+38, cy+10], fill=primary, outline=accent, width=2)
+        # Beak
+        draw.polygon([(cx+38, cy-8), (cx+48, cy-5), (cx+38, cy-2)], fill='#FFD700')
+        # Eagle wings
+        draw.ellipse([cx-35, cy-8, cx-10, cy+15], fill=primary, outline=accent, width=2)
+        draw.polygon([(cx-35, cy), (cx-50, cy-10), (cx-45, cy+10)], fill=primary, outline=accent)
+        # Feathered tail
+        draw.polygon([(cx-30, cy+10), (cx-45, cy+8), (cx-40, cy+22)], fill=secondary, outline=accent)
+        # Eyes (fierce eagle eyes)
+        draw.ellipse([cx+18, cy-10, cx+24, cy-4], fill='#FFD700')
+        draw.ellipse([cx+20, cy-8, cx+22, cy-6], fill='black')
+        # Ears/feather tufts
+        draw.polygon([(cx+15, cy-20), (cx+12, cy-30), (cx+18, cy-22)], fill=primary, outline=accent)
+        draw.polygon([(cx+28, cy-20), (cx+25, cy-30), (cx+31, cy-22)], fill=primary, outline=accent)
+
+    @staticmethod
+    def _draw_unicorn(draw, cx, cy, primary, secondary, accent, facing_right):
+        """Draw a magical unicorn."""
+        # Horse body
+        draw.ellipse([cx-30, cy-8, cx+20, cy+20], fill=primary, outline=accent, width=2)
+        # Horse head/neck
+        draw.ellipse([cx+5, cy-20, cx+35, cy+10], fill=primary, outline=accent, width=2)
+        # Mane (flowing)
+        draw.ellipse([cx+8, cy-25, cx+20, cy-10], fill=secondary, outline=accent, width=1)
+        draw.ellipse([cx+5, cy-18, cx+15, cy-5], fill=secondary)
+        draw.ellipse([cx-5, cy-10, cx+5, cy+5], fill=secondary)
+        # Magical horn
+        draw.polygon([(cx+22, cy-20), (cx+20, cy-40), (cx+24, cy-20)], fill='#FFD700', outline=accent, width=2)
+        # Spiral on horn
+        draw.line([(cx+21, cy-35), (cx+23, cy-30)], fill='white', width=1)
+        draw.line([(cx+21, cy-30), (cx+23, cy-25)], fill='white', width=1)
+        # Ears
+        draw.polygon([(cx+20, cy-20), (cx+18, cy-27), (cx+23, cy-22)], fill=primary, outline=accent)
+        # Eyes (gentle)
+        draw.ellipse([cx+18, cy-10, cx+23, cy-5], fill='white')
+        draw.ellipse([cx+19, cy-9, cx+22, cy-6], fill='#8B008B')  # Purple eye
+        # Tail (flowing)
+        draw.arc([cx-40, cy, cx-15, cy+30], 180, 90, fill=secondary, width=6)
+        # Hooves
+        draw.rectangle([cx+10, cy+20, cx+15, cy+28], fill=accent)
+
+    @staticmethod
+    def _draw_wisp(draw, cx, cy, primary, secondary, accent, facing_right):
+        """Draw a floating wisp/spirit orb."""
+        # Main orb (glowing)
+        draw.ellipse([cx-25, cy-25, cx+25, cy+25], fill=primary, outline=accent, width=2)
+        # Inner glow
+        draw.ellipse([cx-18, cy-18, cx+18, cy+18], fill=secondary)
+        draw.ellipse([cx-10, cy-10, cx+10, cy+10], fill='white')
+        # Energy trails
+        trail1 = [(cx-15, cy+20), (cx-25, cy+35), (cx-20, cy+40)]
+        draw.line(trail1, fill=secondary, width=4)
+        trail2 = [(cx+15, cy+20), (cx+25, cy+35), (cx+20, cy+40)]
+        draw.line(trail2, fill=secondary, width=4)
+        trail3 = [(cx, cy+22), (cx-5, cy+38), (cx, cy+45)]
+        draw.line(trail3, fill=primary, width=3)
+        # Energy wisps around it
+        draw.ellipse([cx-35, cy-10, cx-28, cy-3], fill=secondary)
+        draw.ellipse([cx+28, cy-15, cx+35, cy-8], fill=secondary)
+        draw.ellipse([cx-5, cy-35, cx+2, cy-28], fill=primary)
+        # Simple face (optional, mystical eyes)
+        draw.ellipse([cx-8, cy-5, cx-3, cy], fill='#FFD700')
+        draw.ellipse([cx+3, cy-5, cx+8, cy], fill='#FFD700')
 
     @staticmethod
     def generate_egg_sprite(size: Tuple[int, int] = (128, 128)) -> Image.Image:
