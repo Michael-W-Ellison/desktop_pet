@@ -219,7 +219,7 @@ class BallWindow(QWidget):
         self.pet_manager = pet_manager
         self.velocity = initial_velocity
 
-        from ..core.config import TOY_SIZE, GRAVITY, BOUNCE_DAMPING, FRICTION
+        from core.config import TOY_SIZE, GRAVITY, BOUNCE_DAMPING, FRICTION
 
         self.size = TOY_SIZE
         self.gravity = GRAVITY
