@@ -1,5 +1,5 @@
 """
-Emotional States System for Desktop Pet
+Emotional States System for Desktop Pal
 
 Manages complex emotional states including jealousy, separation anxiety, and excitement.
 These emotional states are influenced by bonding level and recent experiences.

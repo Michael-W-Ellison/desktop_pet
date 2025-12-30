@@ -1,1 +1,1 @@
-"""UI modules for desktop pet."""
+"""UI modules for desktop pal."""

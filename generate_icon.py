@@ -1,5 +1,5 @@
 """
-Generate application icon for Desktop Pet.
+Generate application icon for Desktop Pal.
 
 This script creates an .ico file for the application using PIL/Pillow.
 Run this script before building the installer.
@@ -171,7 +171,7 @@ def generate_ico_file(output_path='assets/icon.ico'):
 
 def main():
     """Generate the application icons."""
-    print("Generating Desktop Pet icons...")
+    print("Generating Desktop Pal icons...")
     print()
 
     generate_ico_file('assets/icon.ico')

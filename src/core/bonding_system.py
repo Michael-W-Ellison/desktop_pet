@@ -1,5 +1,5 @@
 """
-Bonding System for Desktop Pet
+Bonding System for Desktop Pal
 
 Manages the emotional bond between owner and pet with progressive relationship levels.
 Bond strengthens through positive interactions and weakens with neglect.

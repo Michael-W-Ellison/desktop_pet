@@ -1,1 +1,1 @@
-"""Core modules for desktop pet."""
+"""Core modules for desktop pal."""

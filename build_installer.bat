@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo Desktop Pet - Build Installer
+echo Desktop Pal - Build Installer
 echo ========================================
 echo.
 

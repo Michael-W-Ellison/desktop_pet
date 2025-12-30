@@ -18,7 +18,7 @@ from .config import (
 
 
 class PetManager:
-    """Manages the desktop pet's behavior, state, and interactions with enhanced AI."""
+    """Manages the desktop pal's behavior, state, and interactions with enhanced AI."""
 
     def __init__(self, ai_complexity: AIComplexity = DEFAULT_AI_COMPLEXITY):
         """

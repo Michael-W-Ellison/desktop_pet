@@ -1,5 +1,5 @@
 """
-Variant System for Desktop Pet
+Variant System for Desktop Pal
 
 Handles rare creature variants (shiny, mystic, shadow, crystal).
 Similar to shiny Pokemon but with unique stat modifiers and visual effects.

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Desktop Pet - Interactive Virtual Pet Application
+Desktop Pal - Interactive Virtual Companion Application
 
-Launch the desktop pet application.
+Launch the desktop pal application.
 """
 import sys
 import os

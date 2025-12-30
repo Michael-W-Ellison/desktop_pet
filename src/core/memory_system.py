@@ -1,5 +1,5 @@
 """
-Enhanced Memory System for Desktop Pet
+Enhanced Memory System for Desktop Pal
 
 Provides three types of memory:
 1. Episodic Memory - Specific memorable events (first feeding, special moments)

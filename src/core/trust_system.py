@@ -1,5 +1,5 @@
 """
-Trust System for Desktop Pet
+Trust System for Desktop Pal
 
 Trust builds gradually through consistent positive interactions and care.
 Trust affects willingness to follow commands, try new things, and respond to owner.

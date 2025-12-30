@@ -1,5 +1,5 @@
 """
-Main entry point for the Desktop Pet application.
+Main entry point for the Desktop Pal application.
 """
 import sys
 from PyQt5.QtWidgets import (
@@ -24,7 +24,7 @@ class SettingsDialog(QDialog):
     def __init__(self, install_manager: InstallationManager, parent=None):
         super().__init__(parent)
         self.install_manager = install_manager
-        self.setWindowTitle("Desktop Pet Settings")
+        self.setWindowTitle("Desktop Pal Settings")
         self.setMinimumWidth(400)
         self.setup_ui()
 
@@ -128,7 +128,7 @@ class SettingsDialog(QDialog):
 
 
 class DesktopPetApp:
-    """Main application class for the desktop pet."""
+    """Main application class for the desktop pal."""
 
     def __init__(self):
         """Initialize the application."""

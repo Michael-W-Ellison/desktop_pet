@@ -1,5 +1,5 @@
 """
-Installation and shortcut management for Desktop Pet.
+Installation and shortcut management for Desktop Pal.
 
 Handles:
 - Desktop shortcut creation
@@ -22,7 +22,7 @@ class InstallationManager:
 
     def __init__(self):
         """Initialize the installation manager."""
-        self.app_name = "Desktop Pet"
+        self.app_name = "Desktop Pal"
         self.app_exe = self._get_executable_path()
         self.app_dir = os.path.dirname(self.app_exe)
         self.config_path = os.path.join(self.app_dir, self.CONFIG_FILE)
@@ -208,7 +208,7 @@ $Shortcut.Save()
         desktop_entry = f"""[Desktop Entry]
 Version=1.0
 Type=Application
-Name=Desktop Pet
+Name=Desktop Pal
 Comment={description}
 Exec=python3 "{target_path}"
 Icon={os.path.join(os.path.dirname(target_path), 'icon.png')}
@@ -292,7 +292,7 @@ Categories=Game;
         success = self.create_shortcut(
             shortcut_path=shortcut_path,
             target_path=self.app_exe,
-            description="Desktop Pet - Auto Start",
+            description="Desktop Pal - Auto Start",
             working_dir=self.app_dir
         )
 
@@ -330,7 +330,7 @@ Categories=Game;
 
         desktop_file = os.path.join(autostart_dir, "desktop-pet.desktop")
         return self._create_linux_shortcut(desktop_file, self.app_exe,
-                                           "Desktop Pet - Auto Start")
+                                           "Desktop Pal - Auto Start")
 
     def _disable_linux_autostart(self) -> bool:
         """Disable autostart on Linux."""

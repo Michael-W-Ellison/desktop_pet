@@ -1,9 +1,9 @@
-; Desktop Pet Installer Script for Inno Setup
+; Desktop Pal Installer Script for Inno Setup
 ; Download Inno Setup from: https://jrsoftware.org/isdl.php
 
-#define MyAppName "Desktop Pet"
+#define MyAppName "Desktop Pal"
 #define MyAppVersion "1.0.0"
-#define MyAppPublisher "Desktop Pet"
+#define MyAppPublisher "Desktop Pal"
 #define MyAppURL "https://github.com/desktop-pet"
 #define MyAppExeName "DesktopPet.exe"
 
@@ -40,7 +40,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce
 Name: "startmenuicon"; Description: "Create a Start Menu shortcut"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce
-Name: "autostart"; Description: "Start Desktop Pet when Windows starts"; GroupDescription: "Startup:"; Flags: unchecked
+Name: "autostart"; Description: "Start Desktop Pal when Windows starts"; GroupDescription: "Startup:"; Flags: unchecked
 
 [Files]
 ; Main executable (built with PyInstaller)

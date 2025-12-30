@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo Desktop Pet - Build Executable
+echo Desktop Pal - Build Executable
 echo ========================================
 echo.
 

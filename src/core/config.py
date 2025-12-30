@@ -1,11 +1,11 @@
 """
-Configuration and constants for the Desktop Pet application.
+Configuration and constants for the Desktop Pal application.
 """
 import os
 from enum import Enum
 
 # Application settings
-APP_NAME = "Desktop Pet"
+APP_NAME = "Desktop Pal"
 VERSION = "1.0.0"
 DATA_FILE = "pet_data.json"
 

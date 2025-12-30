@@ -1,5 +1,5 @@
 """
-Particle Effects System for Desktop Pet
+Particle Effects System for Desktop Pal
 
 Renders visual particle effects for elements (fire, water, etc.) and variants (shiny, mystic, etc.).
 Uses PIL to generate particle effects that can be composited onto the creature sprite.

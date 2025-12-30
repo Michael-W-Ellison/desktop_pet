@@ -1,5 +1,5 @@
 """
-First-run wizard for Desktop Pet.
+First-run wizard for Desktop Pal.
 
 Shows on first launch to help users configure their installation
 and learn about the application.
@@ -19,7 +19,7 @@ class WelcomePage(QWizardPage):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setTitle("Welcome to Desktop Pet!")
+        self.setTitle("Welcome to Desktop Pal!")
         self.setSubTitle("Your new virtual companion awaits")
 
         layout = QVBoxLayout()
@@ -27,14 +27,14 @@ class WelcomePage(QWizardPage):
 
         # Welcome message
         welcome_label = QLabel(
-            "Thank you for choosing Desktop Pet!\n\n"
+            "Thank you for choosing Desktop Pal!\n\n"
             "You're about to hatch your very own virtual companion that will "
             "live on your desktop. Your pet will:\n\n"
             "  - Learn from your interactions and develop a unique personality\n"
             "  - Play games and perform tricks\n"
             "  - Form memories and bonds with you\n"
             "  - Evolve and grow over time\n\n"
-            "This wizard will help you set up Desktop Pet for the best experience."
+            "This wizard will help you set up Desktop Pal for the best experience."
         )
         welcome_label.setWordWrap(True)
         welcome_label.setStyleSheet("font-size: 11pt;")
@@ -72,7 +72,7 @@ class ShortcutPage(QWizardPage):
         super().__init__(parent)
         self.install_manager = install_manager
         self.setTitle("Installation Options")
-        self.setSubTitle("Choose how you'd like to access Desktop Pet")
+        self.setSubTitle("Choose how you'd like to access Desktop Pal")
 
         layout = QVBoxLayout()
         layout.setSpacing(15)
@@ -95,7 +95,7 @@ class ShortcutPage(QWizardPage):
         self.start_menu_checkbox.setChecked(True)
         self.start_menu_checkbox.setStyleSheet("font-size: 11pt;")
         start_desc = QLabel(
-            "Adds Desktop Pet to your Start Menu programs"
+            "Adds Desktop Pal to your Start Menu programs"
         )
         start_desc.setStyleSheet("color: #666; margin-left: 25px; font-size: 10pt;")
         layout.addWidget(self.start_menu_checkbox)
@@ -108,7 +108,7 @@ class ShortcutPage(QWizardPage):
         self.startup_checkbox.setChecked(False)
         self.startup_checkbox.setStyleSheet("font-size: 11pt;")
         startup_desc = QLabel(
-            "Automatically launch Desktop Pet when you log in to Windows"
+            "Automatically launch Desktop Pal when you log in to Windows"
         )
         startup_desc.setStyleSheet("color: #666; margin-left: 25px; font-size: 10pt;")
         layout.addWidget(self.startup_checkbox)
@@ -203,7 +203,7 @@ class SetupProgressPage(QWizardPage):
         super().__init__(parent)
         self.install_manager = install_manager
         self.setTitle("Setting Up")
-        self.setSubTitle("Please wait while Desktop Pet is configured...")
+        self.setSubTitle("Please wait while Desktop Pal is configured...")
         self.setup_complete = False
 
         layout = QVBoxLayout()
@@ -315,13 +315,13 @@ class SetupProgressPage(QWizardPage):
 
 
 class FirstRunWizard(QWizard):
-    """First-run setup wizard for Desktop Pet."""
+    """First-run setup wizard for Desktop Pal."""
 
     def __init__(self, install_manager: InstallationManager = None, parent=None):
         super().__init__(parent)
         self.install_manager = install_manager or InstallationManager()
 
-        self.setWindowTitle("Desktop Pet Setup")
+        self.setWindowTitle("Desktop Pal Setup")
         self.setWizardStyle(QWizard.ModernStyle)
         self.setMinimumSize(550, 450)
 

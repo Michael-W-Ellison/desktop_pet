@@ -1,5 +1,5 @@
 """
-Creature class representing the desktop pet with its attributes, personality, and state.
+Creature class representing the desktop pal with its attributes, personality, and state.
 
 Enhanced with:
 - Integrated Memory System (episodic, semantic, working memory)
@@ -35,7 +35,7 @@ from .name_calling import NameCallingSystem
 
 
 class Creature:
-    """Represents a desktop pet creature with personality, stats, and learning capabilities."""
+    """Represents a desktop pal creature with personality, stats, and learning capabilities."""
 
     def __init__(self, creature_type: str = None, personality: PersonalityType = None,
                  color_palette: list = None, name: str = None):

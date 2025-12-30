@@ -1,7 +1,7 @@
 """
 Phase 11: Screenshot System
 
-Captures screenshots/photos of the desktop pet for the photo album.
+Captures screenshots/photos of the desktop pal for the photo album.
 """
 import time
 import os

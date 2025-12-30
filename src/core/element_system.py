@@ -1,8 +1,8 @@
 """
-Element System for Desktop Pet
+Element System for Desktop Pal
 
 Handles elemental types, type advantages/disadvantages, and elemental interactions.
-Similar to Pokemon type effectiveness but adapted for desktop pet interactions.
+Similar to Pokemon type effectiveness but adapted for desktop pal interactions.
 """
 from typing import Dict, Any, List, Optional, Tuple
 from enum import Enum

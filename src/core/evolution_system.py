@@ -1,5 +1,5 @@
 """
-Evolution System for Desktop Pet
+Evolution System for Desktop Pal
 
 Handles creature evolution through different life stages (baby -> juvenile -> adult -> elder).
 Evolution is based on age, care quality, bond strength, and interactions.

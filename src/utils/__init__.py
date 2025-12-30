@@ -1,1 +1,1 @@
-"""Utility modules for desktop pet."""
+"""Utility modules for desktop pal."""
