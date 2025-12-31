@@ -1,5 +1,5 @@
 """
-Preference System for Desktop Pet
+Preference System for Desktop Pal
 
 Each pet develops individual preferences for toys, foods, activities, and times of day.
 Preferences are learned through experience and influenced by personality.

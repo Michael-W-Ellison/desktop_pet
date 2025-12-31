@@ -1,5 +1,5 @@
 """
-Transparent overlay window for displaying the desktop pet.
+Transparent overlay window for displaying the desktop pal.
 """
 from PyQt5.QtWidgets import QWidget, QLabel, QMenu, QAction, QApplication
 from PyQt5.QtCore import Qt, QTimer, QPoint, QRect
@@ -11,7 +11,7 @@ from core.config import BehaviorState, PET_SIZE, FPS, ANIMATION_UPDATE_INTERVAL
 
 
 class PetWindow(QWidget):
-    """Transparent window that displays the desktop pet."""
+    """Transparent window that displays the desktop pal."""
 
     def __init__(self, pet_manager):
         """

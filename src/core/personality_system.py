@@ -1,5 +1,5 @@
 """
-Enhanced Personality System for Desktop Pet (Phase 3)
+Enhanced Personality System for Desktop Pal (Phase 3)
 
 Features:
 - 25 distinct personality types

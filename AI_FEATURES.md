@@ -1,8 +1,8 @@
-# Advanced AI Features - Desktop Pet
+# Advanced AI Features - Desktop Pal
 
 ## 🧠 Sophisticated Neural Network System
 
-Your desktop pet now features one of the most advanced AI systems for virtual pets, rivaling and exceeding the original "Creatures" game in sophistication!
+Your desktop pal now features one of the most advanced AI systems for virtual pets, rivaling and exceeding the original "Creatures" game in sophistication!
 
 ### AI Complexity Levels
 
@@ -425,7 +425,7 @@ With these enhancements, your daughter will experience:
 
 ## 🔬 Technical Achievements
 
-This desktop pet now features:
+This desktop pal now features:
 
 - **~5,000+** learnable neural network parameters
 - **4 specialized neural networks** working in concert
@@ -445,7 +445,7 @@ This desktop pet now features:
 - **Tamagotchi**: Simple state machine
 - **Petz (1995)**: Basic neural network (~100 neurons)
 - **Creatures (1996)**: Advanced for its time (~500 neurons + genetics)
-- **Desktop Pet (2025)**: **Modern deep learning architecture** (~5000+ parameters, 4 specialized networks, LSTM memory, RL)
+- **Desktop Pal (2025)**: **Modern deep learning architecture** (~5000+ parameters, 4 specialized networks, LSTM memory, RL)
 
 This is not just a toy - it's a sophisticated AI system that rivals modern research implementations!
 

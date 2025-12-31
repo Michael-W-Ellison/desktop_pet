@@ -1,5 +1,5 @@
 """
-Name Calling System for Desktop Pet
+Name Calling System for Desktop Pal
 
 Handles calling the pet by name with appropriate responses based on bond, trust, and personality.
 Integrates with existing NameRecognition from training_system.

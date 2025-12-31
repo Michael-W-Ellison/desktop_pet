@@ -1,5 +1,5 @@
 """
-Training and Trick Learning System for Desktop Pet
+Training and Trick Learning System for Desktop Pal
 
 Allows the pet to:
 1. Learn explicit commands (sit, stay, fetch, dance, etc.)
@@ -375,7 +375,7 @@ class NameRecognition:
 
 class TrainingSystem:
     """
-    Complete training system for desktop pet.
+    Complete training system for desktop pal.
 
     Manages:
     - Trick library and learning

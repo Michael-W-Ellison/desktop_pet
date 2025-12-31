@@ -12,7 +12,7 @@
    - Double-click `run.bat`
    - An egg will appear on your desktop!
 
-3. **Hatch your pet:**
+3. **Hatch your pal:**
    - Double-click the egg
    - Meet your new friend!
 

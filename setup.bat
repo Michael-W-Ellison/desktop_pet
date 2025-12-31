@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo Desktop Pet - Setup Script
+echo Desktop Pal - Setup Script
 echo ========================================
 echo.
 
@@ -29,7 +29,7 @@ echo ========================================
 echo Setup complete!
 echo ========================================
 echo.
-echo To run the Desktop Pet, execute:
+echo To run the Desktop Pal, execute:
 echo   python desktop_pet.py
 echo.
 echo Or double-click run.bat
