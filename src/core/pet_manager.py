@@ -441,7 +441,7 @@ class PetManager:
             return
 
         # Import here to avoid circular dependency
-        from ..ui.pet_window import BallWindow
+        from ui.pet_window import BallWindow
 
         # Create ball with random velocity
         velocity = [

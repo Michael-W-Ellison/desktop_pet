@@ -1,7 +1,7 @@
 """
 Transparent overlay window for displaying the desktop pal.
 """
-from PyQt5.QtWidgets import QWidget, QLabel, QMenu, QAction
+from PyQt5.QtWidgets import QWidget, QLabel, QMenu, QAction, QApplication
 from PyQt5.QtCore import Qt, QTimer, QPoint, QRect
 from PyQt5.QtGui import QPixmap, QCursor, QPainter, QImage
 from PIL import ImageQt
@@ -219,7 +219,7 @@ class BallWindow(QWidget):
         self.pet_manager = pet_manager
         self.velocity = initial_velocity
 
-        from ..core.config import TOY_SIZE, GRAVITY, BOUNCE_DAMPING, FRICTION
+        from core.config import TOY_SIZE, GRAVITY, BOUNCE_DAMPING, FRICTION
 
         self.size = TOY_SIZE
         self.gravity = GRAVITY
@@ -261,8 +261,6 @@ class BallWindow(QWidget):
 
     def update_physics(self):
         """Update ball physics."""
-        from PyQt5.QtWidgets import QApplication
-
         # Apply gravity
         self.velocity[1] += self.gravity
 
@@ -305,7 +303,3 @@ class BallWindow(QWidget):
                 # Pet caught the ball!
                 self.pet_manager.interact('ball_play', positive=True)
                 self.close()
-
-
-# Import QApplication
-from PyQt5.QtWidgets import QApplication

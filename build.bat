@@ -1,4 +1,8 @@
 @echo off
+REM Desktop Pet - Automated Build Script
+REM This script builds a standalone .exe with all dependencies included
+
+echo.
 echo ========================================
 echo Desktop Pal - Build Executable
 echo ========================================
@@ -17,6 +21,7 @@ if errorlevel 1 (
 echo Installing dependencies...
 pip install pyinstaller pillow pyqt5 numpy pywin32
 
+echo Running automated build script...
 echo.
 echo Building executable...
 
@@ -31,7 +36,7 @@ pyinstaller ^
 
 if errorlevel 1 (
     echo.
-    echo ERROR: Build failed
+    echo Build failed! Check the errors above.
     pause
     exit /b 1
 )
@@ -45,12 +50,8 @@ if exist "assets" (
 )
 
 echo.
-echo ========================================
-echo Build complete!
-echo ========================================
-echo.
-echo The executable can be found at:
-echo   dist\DesktopPet.exe
+echo Build completed successfully!
+echo Your executable is in the dist\ folder
 echo.
 echo To create an installer, run build_installer.bat
 echo (Requires Inno Setup to be installed)
