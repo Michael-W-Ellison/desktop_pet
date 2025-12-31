@@ -1,29 +1,37 @@
 @echo off
+REM Desktop Pet - Automated Build Script
+REM This script builds a standalone .exe with all dependencies included
+
+echo.
 echo ========================================
-echo Desktop Pet - Build Executable
+echo   Desktop Pet - Build Script
 echo ========================================
 echo.
 
-echo Installing PyInstaller...
-pip install pyinstaller
+REM Check if Python is available
+python --version >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Python is not installed or not in PATH
+    echo Please install Python 3.7+ from https://www.python.org/
+    pause
+    exit /b 1
+)
 
+echo Running automated build script...
 echo.
-echo Building executable...
-pyinstaller --name "DesktopPet" --windowed --onefile desktop_pet.py --add-data "src;src"
+
+REM Run the Python build script
+python build_exe.py
 
 if errorlevel 1 (
     echo.
-    echo ERROR: Build failed
+    echo Build failed! Check the errors above.
     pause
     exit /b 1
 )
 
 echo.
-echo ========================================
-echo Build complete!
-echo ========================================
-echo.
-echo The executable can be found at:
-echo   dist\DesktopPet.exe
+echo Build completed successfully!
+echo Your executable is in the dist\ folder
 echo.
 pause
