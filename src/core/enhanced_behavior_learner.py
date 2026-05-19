@@ -64,8 +64,9 @@ class EnhancedBehaviorLearner:
     def _init_medium(self):
         """Initialize medium AI (advanced network with LSTM)."""
         # Use advanced network with LSTM for activity prediction
+        # Input size: 4 basic stats + 25 personality types + 28 sensory inputs = 57
         self.activity_network = LSTMNetwork(
-            input_size=37,  # State + sensory inputs
+            input_size=57,  # State + personality + sensory inputs
             hidden_size=32,
             output_size=5,  # Activity probabilities
             num_layers=2,
