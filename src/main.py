@@ -13,6 +13,7 @@ from PIL import ImageQt
 
 from core.pet_manager import PetManager
 from core.installation import InstallationManager
+from core.config import TOY_SIZE
 from ui.pet_window import PetWindow
 from ui.sprite_generator import SpriteGenerator
 from ui.first_run_wizard import show_first_run_wizard
@@ -159,9 +160,9 @@ class DesktopPetApp:
         """Create system tray icon."""
         # Generate icon based on state
         if self.pet_manager.is_egg:
-            icon_sprite = SpriteGenerator.generate_egg_sprite((64, 64))
+            icon_sprite = SpriteGenerator.generate_egg_sprite(TOY_SIZE)
         else:
-            icon_sprite = SpriteGenerator.generate_shelter_sprite((64, 64))
+            icon_sprite = SpriteGenerator.generate_shelter_sprite(TOY_SIZE)
 
         # Convert to QIcon
         qimage = ImageQt.ImageQt(icon_sprite)
@@ -222,7 +223,7 @@ class DesktopPetApp:
     def show_settings(self):
         """Show the settings dialog."""
         dialog = SettingsDialog(self.install_manager)
-        dialog.exec_()
+        dialog.exec()
 
     def exit_app(self):
         """Exit the application."""
@@ -230,7 +231,7 @@ class DesktopPetApp:
 
     def run(self):
         """Run the application."""
-        return self.app.exec_()
+        return self.app.exec()
 
 
 def main():

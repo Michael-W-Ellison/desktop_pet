@@ -13,7 +13,7 @@ from .persistence import PetDataManager
 from .config import (
     BehaviorState, HUNGER_CHECK_INTERVAL, BEHAVIOR_UPDATE_INTERVAL,
     SAVE_INTERVAL, MOUSE_CHASE_DISTANCE, BALL_SPEED, FEED_AMOUNT,
-    DEFAULT_AI_COMPLEXITY, AIComplexity
+    DEFAULT_AI_COMPLEXITY, AIComplexity, PET_SIZE
 )
 
 
@@ -168,7 +168,7 @@ class PetManager:
                        f"Meet {self.creature.name}, a {self.creature.personality.value} "
                        f"{self.creature.creature_type}!\n\n"
                        f"Take good care of your new friend!{complexity_info}")
-            msg.exec_()
+            msg.exec()
 
     def show_death_message(self):
         """Show message when creature dies."""
@@ -178,7 +178,7 @@ class PetManager:
         msg.setText(f"Your creature has passed on due to starvation.\n\n"
                    f"They left behind an egg for you.\n\n"
                    f"Take better care of the next one!")
-        msg.exec_()
+        msg.exec()
 
     def start_timers(self):
         """Start all update timers."""
@@ -221,21 +221,29 @@ class PetManager:
         if self.sensory_update_timer:
             self.sensory_update_timer.stop()
 
-    def update_sensory_inputs(self):
-        """Update sensory system with current mouse position and environment."""
+    def update_sensory_inputs(self, mouse_x: int = None, mouse_y: int = None):
+        """Update sensory system with current mouse position and environment.
+
+        Args:
+            mouse_x: Mouse X coordinate (optional, fetched from cursor if not provided)
+            mouse_y: Mouse Y coordinate (optional, fetched from cursor if not provided)
+        """
         if not self.sensory_system or not self.pet_window:
             return
 
-        # Get current mouse position
-        cursor = QCursor()
-        mouse_pos = cursor.pos()
+        # Get current mouse position if not provided
+        if mouse_x is None or mouse_y is None:
+            cursor = QCursor()
+            mouse_pos = cursor.pos()
+            mouse_x = mouse_pos.x()
+            mouse_y = mouse_pos.y()
 
         # Update sensory system
-        self.sensory_system.update_mouse_position(mouse_pos.x(), mouse_pos.y())
+        self.sensory_system.update_mouse_position(mouse_x, mouse_y)
 
         # Update learner with sensory data
         if self.learner and hasattr(self.learner, 'update_sensory_inputs'):
-            self.learner.update_sensory_inputs(mouse_pos.x(), mouse_pos.y())
+            self.learner.update_sensory_inputs(mouse_x, mouse_y)
 
     def update_hunger(self):
         """Update creature hunger level."""
@@ -293,9 +301,9 @@ class PetManager:
                         random.uniform(-speed, speed)
                     ]
 
-        except Exception as e:
-            # Fallback to simple behavior if AI fails
-            print(f"AI decision error: {e}")
+        except (KeyError, ValueError, AttributeError, TypeError) as e:
+            # Fallback to simple behavior if AI decision fails
+            print(f"AI decision error ({type(e).__name__}): {e}")
             self._fallback_behavior()
 
     def _apply_activity_decision(self, activity: str, decision: dict):
@@ -371,9 +379,9 @@ class PetManager:
         cursor_pos = QCursor.pos()
         pet_pos = self.pet_window.pos()
 
-        # Calculate distance to mouse
-        dx = cursor_pos.x() - (pet_pos.x() + 64)  # Center of pet
-        dy = cursor_pos.y() - (pet_pos.y() + 64)
+        # Calculate distance to mouse (using center of pet sprite)
+        dx = cursor_pos.x() - (pet_pos.x() + PET_SIZE[0] // 2)
+        dy = cursor_pos.y() - (pet_pos.y() + PET_SIZE[1] // 2)
         distance = (dx**2 + dy**2)**0.5
 
         if distance < MOUSE_CHASE_DISTANCE and distance > 10:
@@ -431,7 +439,7 @@ class PetManager:
         msg.setWindowTitle("Fed!")
         msg.setText(f"{self.creature.name} enjoyed the food!\n\n"
                    f"Hunger: {self.creature.hunger:.1f}/100")
-        msg.exec_()
+        msg.exec()
 
         self.save_state()
 
@@ -542,7 +550,7 @@ class PetManager:
         msg.setIcon(QMessageBox.Information)
         msg.setWindowTitle(f"{self.creature.name}'s Stats")
         msg.setText(stats_text)
-        msg.exec_()
+        msg.exec()
 
     def exit_application(self):
         """Exit the application."""

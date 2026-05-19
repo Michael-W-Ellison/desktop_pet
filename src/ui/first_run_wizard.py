@@ -390,6 +390,6 @@ def show_first_run_wizard(install_manager: InstallationManager = None) -> bool:
         return True  # Not first run, no wizard needed
 
     wizard = FirstRunWizard(manager)
-    result = wizard.exec_()
+    result = wizard.exec()
 
     return result == QWizard.Accepted or manager.config.get('first_run_complete', False)

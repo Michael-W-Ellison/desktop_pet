@@ -2,19 +2,21 @@
 Advanced optimizers for neural network training.
 """
 import numpy as np
+from abc import ABC, abstractmethod
 from typing import List, Optional
 
 
-class Optimizer:
-    """Base optimizer class."""
+class Optimizer(ABC):
+    """Abstract base optimizer class."""
 
     def __init__(self, learning_rate: float = 0.01):
         self.learning_rate = learning_rate
 
+    @abstractmethod
     def update(self, weights: List[np.ndarray], biases: List[np.ndarray],
                weight_gradients: List[np.ndarray], bias_gradients: List[np.ndarray]):
-        """Update weights and biases using gradients."""
-        raise NotImplementedError
+        """Update weights and biases using gradients. Must be implemented by subclasses."""
+        pass
 
 
 class SGDOptimizer(Optimizer):
