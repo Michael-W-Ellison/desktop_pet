@@ -64,7 +64,7 @@ class EnhancedBehaviorLearner:
         """Initialize medium AI (advanced network with LSTM)."""
         # Use advanced network with LSTM for activity prediction
         self.activity_network = LSTMNetwork(
-            input_size=37,  # State + sensory inputs
+            input_size=len(self.get_state_vector()),  # State + sensory inputs
             hidden_size=32,
             output_size=5,  # Activity probabilities
             num_layers=2,
@@ -375,7 +375,11 @@ class EnhancedBehaviorLearner:
             learner.simple_learner = SimpleBehaviorLearner.from_dict(creature, data['simple_learner'])
 
         elif complexity == AIComplexity.MEDIUM and 'activity_network' in data:
-            learner.activity_network = LSTMNetwork.from_dict(data['activity_network'])
+            saved_network = LSTMNetwork.from_dict(data['activity_network'])
+            # Saves from older versions used an input size that did not match
+            # the state vector; keep the freshly sized network in that case
+            if saved_network.input_size == learner.activity_network.input_size:
+                learner.activity_network = saved_network
 
         else:  # ADVANCED or EXPERT
             if 'network_coordinator' in data:
