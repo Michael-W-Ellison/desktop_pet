@@ -51,17 +51,21 @@ class PetDataManager:
         # Create directory if it doesn't exist
         os.makedirs(os.path.dirname(self.data_file) if os.path.dirname(self.data_file) else '.', exist_ok=True)
 
+        # Encode fully before touching the file, then replace it atomically,
+        # so a failed save never truncates the existing save file
         try:
-            with open(self.data_file, 'w') as f:
-                json.dump(data, f, indent=2)
+            content = json.dumps(data, indent=2)
         except Exception as e:
             print(f"Error saving pet data: {e}")
-            # Try to save a backup without indent (might help with large files)
-            try:
-                with open(self.data_file, 'w') as f:
-                    json.dump(data, f)
-            except Exception as e2:
-                print(f"Critical error: Could not save pet data: {e2}")
+            return
+
+        temp_file = self.data_file + '.tmp'
+        try:
+            with open(temp_file, 'w') as f:
+                f.write(content)
+            os.replace(temp_file, self.data_file)
+        except Exception as e:
+            print(f"Critical error: Could not save pet data: {e}")
 
     def load(self) -> Optional[Dict[str, Any]]:
         """

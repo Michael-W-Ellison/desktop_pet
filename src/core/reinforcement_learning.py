@@ -414,7 +414,12 @@ class ReinforcementLearningAgent:
             'action_counts': self.action_counts.tolist(),
             'q_network_weights': [w.tolist() for w in self.q_network.weights],
             'q_network_biases': [b.tolist() for b in self.q_network.biases],
-            'replay_buffer': list(self.replay_buffer.buffer)[:100]  # Save recent experiences only
+            # Save recent experiences only, as JSON-compatible values
+            'replay_buffer': [
+                [np.asarray(state).tolist(), int(action), float(reward),
+                 np.asarray(next_state).tolist(), bool(done)]
+                for state, action, reward, next_state, done in list(self.replay_buffer.buffer)[-100:]
+            ]
         }
 
     @classmethod
@@ -434,8 +439,8 @@ class ReinforcementLearningAgent:
 
         # Restore some replay buffer experiences (if saved)
         if 'replay_buffer' in data:
-            for exp in data['replay_buffer']:
-                agent.replay_buffer.add(*exp)
+            for state, action, reward, next_state, done in data['replay_buffer']:
+                agent.replay_buffer.add(np.array(state), action, reward, np.array(next_state), done)
 
         return agent
 

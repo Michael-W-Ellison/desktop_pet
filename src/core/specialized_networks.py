@@ -13,6 +13,10 @@ import numpy as np
 from typing import Dict, Any, Tuple
 from .advanced_network import AdvancedNeuralNetwork
 from .lstm_network import LSTMNetwork
+from .config import PersonalityType
+
+# Length of the one-hot personality encoding supplied in 'personality_vector'
+PERSONALITY_SIZE = len(PersonalityType)
 
 
 class MovementNetwork:
@@ -29,10 +33,10 @@ class MovementNetwork:
     def __init__(self, learning_rate: float = 0.001):
         """Initialize movement network."""
         # Input: [pos_x, pos_y, target_x, target_y, energy, distance_to_target,
-        #         screen_edge_distances (4), personality_encoding (8)]
+        #         screen_edge_distances (4), personality_encoding (PERSONALITY_SIZE)]
         # Output: [velocity_x, velocity_y, should_move]
         self.network = AdvancedNeuralNetwork(
-            input_size=18,
+            input_size=10 + PERSONALITY_SIZE,
             hidden_layers=[32, 16, 8],
             output_size=3,
             learning_rate=learning_rate,
@@ -63,7 +67,7 @@ class MovementNetwork:
             state.get('edge_left', 0) / 1920,
             state.get('edge_right', 0) / 1920,
             # Personality (one-hot or distributed encoding)
-            *state.get('personality_vector', [0] * 8)
+            *state.get('personality_vector', [0] * PERSONALITY_SIZE)
         ])
 
         output = self.network.predict(input_vector)
@@ -97,7 +101,7 @@ class MovementNetwork:
             state.get('edge_bottom', 0) / 1080,
             state.get('edge_left', 0) / 1920,
             state.get('edge_right', 0) / 1920,
-            *state.get('personality_vector', [0] * 8)
+            *state.get('personality_vector', [0] * PERSONALITY_SIZE)
         ])
 
         # Target based on action and reward
@@ -162,6 +166,10 @@ class ActivityNetwork:
             activity: Activity that was performed
             enjoyment: How much the creature enjoyed it (0-1)
         """
+        # Interactions such as 'pet' or 'being_fed' are not activity choices
+        if activity not in self.activity_names:
+            return
+
         input_vector = self._encode_state(state)
 
         # Target: High score for chosen activity if enjoyed, low if not
@@ -201,10 +209,10 @@ class EmotionNetwork:
 
     def __init__(self, learning_rate: float = 0.001):
         """Initialize emotion network."""
-        # Input: [hunger, energy, happiness, recent_interactions (10), personality (8)]
+        # Input: [hunger, energy, happiness, recent_interactions (10), personality (PERSONALITY_SIZE)]
         # Output: [joy, excitement, contentment, anxiety, loneliness]
         self.network = AdvancedNeuralNetwork(
-            input_size=21,
+            input_size=13 + PERSONALITY_SIZE,
             hidden_layers=[32, 16],
             output_size=5,
             learning_rate=learning_rate
@@ -228,7 +236,7 @@ class EmotionNetwork:
             state.get('energy', 100) / 100,
             state.get('happiness', 100) / 100,
             *state.get('recent_interaction_quality', [0.5] * 10),  # Last 10 interactions
-            *state.get('personality_vector', [0] * 8)
+            *state.get('personality_vector', [0] * PERSONALITY_SIZE)
         ])
 
         # Predict emotions
@@ -254,7 +262,7 @@ class EmotionNetwork:
             state.get('energy', 100) / 100,
             state.get('happiness', 100) / 100,
             *state.get('recent_interaction_quality', [0.5] * 10),
-            *state.get('personality_vector', [0] * 8)
+            *state.get('personality_vector', [0] * PERSONALITY_SIZE)
         ])
 
         target = np.array([[
@@ -295,7 +303,7 @@ class SocialNetwork:
         #         recent_interaction_types (5), player_mood_estimate]
         # Output: [interaction_probability, predicted_interaction_type (5)]
         self.network = LSTMNetwork(
-            input_size=12,
+            input_size=9,
             hidden_size=24,
             output_size=6,
             num_layers=1,
@@ -491,10 +499,21 @@ class NetworkCoordinator:
         """Load all networks."""
         coordinator = cls()
 
-        coordinator.movement_net.network = AdvancedNeuralNetwork.from_dict(data['movement'])
-        coordinator.activity_net.network = LSTMNetwork.from_dict(data['activity'])
-        coordinator.emotion_net.network = AdvancedNeuralNetwork.from_dict(data['emotion'])
-        coordinator.social_net.network = LSTMNetwork.from_dict(data['social'])
+        # Saves from older versions may hold networks whose input size does not
+        # match the encoded state; keep the freshly sized network in that case
+        def input_size(network):
+            return network.input_size if isinstance(network, LSTMNetwork) else network.layers[0]
+
+        loaded = {
+            'movement': (coordinator.movement_net, AdvancedNeuralNetwork.from_dict(data['movement'])),
+            'activity': (coordinator.activity_net, LSTMNetwork.from_dict(data['activity'])),
+            'emotion': (coordinator.emotion_net, AdvancedNeuralNetwork.from_dict(data['emotion'])),
+            'social': (coordinator.social_net, LSTMNetwork.from_dict(data['social'])),
+        }
+        for net, saved_network in loaded.values():
+            if input_size(saved_network) == input_size(net.network):
+                net.network = saved_network
+
         coordinator.emotion_net.current_emotions = np.array(data['current_emotions'])
 
         return coordinator

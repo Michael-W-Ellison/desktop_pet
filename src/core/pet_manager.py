@@ -76,12 +76,9 @@ class PetManager:
             if not self.is_egg and data.get('creature'):
                 self.creature = data['creature']
 
-                # Create enhanced learner
+                # Use the learner reconstructed by the data manager
                 if data.get('learner'):
-                    self.learner = EnhancedBehaviorLearner.from_dict(
-                        self.creature,
-                        data['learner']
-                    )
+                    self.learner = data['learner']
                 else:
                     # Create new enhanced learner
                     self.learner = EnhancedBehaviorLearner(

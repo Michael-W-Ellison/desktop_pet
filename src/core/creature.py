@@ -376,7 +376,7 @@ class Creature:
     def get_preferred_activity(self) -> str:
         """Get the creature's currently most preferred activity."""
         # Filter out being_fed from activities
-        activities = {k: v for k, v in self.preference_scores.items() if k != 'being_fed'}
+        activities = {k: v for k, v in self.preferences.activity_preferences.items() if k != 'being_fed'}
         if not activities:
             return 'idle'
         return max(activities.items(), key=lambda x: x[1])[0]
@@ -553,7 +553,7 @@ class Creature:
             'recent_activities': self.get_recent_activities(5),
 
             # Preferences
-            'preference_scores': self.preference_scores.copy(),
+            'preference_scores': self.preferences.activity_preferences.copy(),
 
             # State
             'current_state': self.current_state.value,
