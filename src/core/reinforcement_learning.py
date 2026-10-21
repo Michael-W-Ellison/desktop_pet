@@ -318,6 +318,7 @@ class ReinforcementLearningAgent:
         reward += happiness_delta * 0.1  # Scale to reasonable range
 
         # Hunger penalty (encourage eating before starving)
+        hunger_before = state_before.get('hunger', 0)
         hunger_after = state_after.get('hunger', 0)
         if hunger_after > 80:
             reward -= 2.0  # Strong penalty for high hunger
@@ -426,7 +427,7 @@ class ReinforcementLearningAgent:
 
         # Restore Q-network weights
         agent.q_network.weights = [np.array(w) for w in data['q_network_weights']]
-        agent.q_network.biases = [np.array(b) for w in data['q_network_biases']]
+        agent.q_network.biases = [np.array(b) for b in data['q_network_biases']]
 
         # Copy to target network
         agent._copy_weights()

@@ -3,6 +3,7 @@ Main pet manager coordinating creature behavior, UI, and game logic with enhance
 """
 import time
 import random
+from typing import Optional
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QCursor
 from PyQt5.QtWidgets import QMessageBox, QApplication
@@ -221,21 +222,28 @@ class PetManager:
         if self.sensory_update_timer:
             self.sensory_update_timer.stop()
 
-    def update_sensory_inputs(self):
-        """Update sensory system with current mouse position and environment."""
+    def update_sensory_inputs(self, mouse_x: Optional[int] = None, mouse_y: Optional[int] = None):
+        """
+        Update sensory system with current mouse position and environment.
+
+        Args:
+            mouse_x: Cursor X position (read from QCursor if not given)
+            mouse_y: Cursor Y position (read from QCursor if not given)
+        """
         if not self.sensory_system or not self.pet_window:
             return
 
-        # Get current mouse position
-        cursor = QCursor()
-        mouse_pos = cursor.pos()
+        # Get current mouse position if the caller did not supply it
+        if mouse_x is None or mouse_y is None:
+            mouse_pos = QCursor.pos()
+            mouse_x, mouse_y = mouse_pos.x(), mouse_pos.y()
 
         # Update sensory system
-        self.sensory_system.update_mouse_position(mouse_pos.x(), mouse_pos.y())
+        self.sensory_system.update_mouse_position(mouse_x, mouse_y)
 
         # Update learner with sensory data
         if self.learner and hasattr(self.learner, 'update_sensory_inputs'):
-            self.learner.update_sensory_inputs(mouse_pos.x(), mouse_pos.y())
+            self.learner.update_sensory_inputs(mouse_x, mouse_y)
 
     def update_hunger(self):
         """Update creature hunger level."""

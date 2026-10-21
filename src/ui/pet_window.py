@@ -4,9 +4,9 @@ Transparent overlay window for displaying the desktop pal.
 from PyQt5.QtWidgets import QWidget, QLabel, QMenu, QAction, QApplication
 from PyQt5.QtCore import Qt, QTimer, QPoint, QRect
 from PyQt5.QtGui import QPixmap, QCursor, QPainter, QImage
-from PIL import ImageQt
 import random
 from ui.sprite_generator import SpriteGenerator
+from ui.image_utils import pil_to_qimage
 from core.config import BehaviorState, PET_SIZE, FPS, ANIMATION_UPDATE_INTERVAL
 
 
@@ -83,7 +83,7 @@ class PetWindow(QWidget):
             )
 
         # Convert PIL Image to QPixmap
-        qimage = ImageQt.ImageQt(sprite)
+        qimage = pil_to_qimage(sprite)
         pixmap = QPixmap.fromImage(qimage)
         self.sprite_label.setPixmap(pixmap)
 
@@ -245,7 +245,7 @@ class BallWindow(QWidget):
 
         # Generate ball sprite
         sprite = SpriteGenerator.generate_ball_sprite(self.size)
-        qimage = ImageQt.ImageQt(sprite)
+        qimage = pil_to_qimage(sprite)
         pixmap = QPixmap.fromImage(qimage)
 
         label = QLabel(self)

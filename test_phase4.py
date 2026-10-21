@@ -42,7 +42,7 @@ for creature_type in test_types:
     print(f"  - Element: {creature.element.primary_element.value}")
     print(f"  - Variant: {creature.variant.variant.value} ({creature.variant.get_rarity_tier()})")
     print(f"  - Stage: {creature.evolution.get_stage_name()}")
-    print(f"  - Bond: {creature.bond}, Interactions: {creature.total_interactions}")
+    print(f"  - Bond: {creature.bonding.bond}, Interactions: {creature.total_interactions}")
 
 print("✓ Fantastical creatures created successfully!")
 
@@ -58,7 +58,7 @@ print(f"Starting stage: {evo_creature.evolution.get_stage_name()}")
 # Simulate aging and interactions
 evo_creature.age = 3 * 3600  # 3 hours
 evo_creature.happiness = 50
-evo_creature.bond = 35
+evo_creature.bonding.bond = 35
 evo_creature.total_interactions = 60
 
 can_evolve, next_stage, reason = evo_creature.can_evolve()
@@ -170,7 +170,7 @@ display_creature = Creature(creature_type='unicorn', personality=PersonalityType
 display_creature.variant = VariantSystem(VariantType.MYSTIC)
 display_creature.age = 7200  # 2 hours
 display_creature.happiness = 85
-display_creature.bond = 45
+display_creature.bonding.bond = 45
 
 info = display_creature.get_display_info()
 print(f"Display Info for {info['name']}:")
@@ -198,7 +198,7 @@ original.variant = VariantSystem(VariantType.SHINY)
 original.evolution.current_stage = EvolutionStage.JUVENILE
 original.age = 10000
 original.happiness = 75
-original.bond = 60
+original.bonding.bond = 60
 original.total_interactions = 85
 
 print(f"Original creature: {original.name}")
@@ -216,7 +216,7 @@ print(f"\nLoaded creature: {loaded.name}")
 print(f"  Stage: {loaded.evolution.get_stage_name()}")
 print(f"  Element: {loaded.element.primary_element.value}")
 print(f"  Variant: {loaded.variant.variant.value}")
-print(f"  Bond: {loaded.bond}")
+print(f"  Bond: {loaded.bonding.bond}")
 print(f"  Total interactions: {loaded.total_interactions}")
 
 assert loaded.name == original.name, "Name should match"

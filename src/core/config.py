@@ -2,12 +2,22 @@
 Configuration and constants for the Desktop Pal application.
 """
 import os
+import sys
 from enum import Enum
+
+
+def _get_app_dir() -> str:
+    """Directory containing the executable (frozen) or the project root (script)."""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 # Application settings
 APP_NAME = "Desktop Pal"
 VERSION = "1.0.0"
-DATA_FILE = "pet_data.json"
+APP_DIR = _get_app_dir()
+DATA_FILE = os.path.join(APP_DIR, "pet_data.json")
 
 # Window settings
 PET_SIZE = (128, 128)

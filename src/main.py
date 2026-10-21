@@ -9,12 +9,12 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtCore import Qt
-from PIL import ImageQt
 
 from core.pet_manager import PetManager
 from core.installation import InstallationManager
 from ui.pet_window import PetWindow
 from ui.sprite_generator import SpriteGenerator
+from ui.image_utils import pil_to_qimage
 from ui.first_run_wizard import show_first_run_wizard
 
 
@@ -164,7 +164,7 @@ class DesktopPetApp:
             icon_sprite = SpriteGenerator.generate_shelter_sprite((64, 64))
 
         # Convert to QIcon
-        qimage = ImageQt.ImageQt(icon_sprite)
+        qimage = pil_to_qimage(icon_sprite)
         pixmap = QPixmap.fromImage(qimage)
         icon = QIcon(pixmap)
 
