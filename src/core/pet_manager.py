@@ -525,6 +525,33 @@ class PetManager:
 
         self.save_state()
 
+    def train_trick(self, trick_name: str) -> str:
+        """
+        Practice a trick, starting to learn it first if needed.
+
+        Args:
+            trick_name: Name of a trick in TrainingSystem.STANDARD_TRICKS
+
+        Returns:
+            Message describing the result
+        """
+        if not self.creature:
+            return ""
+
+        training = self.creature.training
+        if trick_name not in training.learned_tricks:
+            training.start_learning_trick(trick_name)
+
+        success, message, _ = self.creature.practice_trick(trick_name)
+
+        # Training counts as an interaction (bond, neglect, learning)
+        self.interact('training_success' if success else 'training', positive=success)
+
+        # Knowing enough tricks can unlock the next evolution stage
+        self.check_evolution()
+
+        return message
+
     def show_stats(self):
         """Show creature statistics with enhanced AI information."""
         if not self.creature:

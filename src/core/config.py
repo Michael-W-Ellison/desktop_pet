@@ -36,6 +36,9 @@ HUNGER_DECAY_RATE = 0.1  # Hunger increases by this amount per minute
 STARVATION_THRESHOLD = 100  # Creature dies when hunger reaches this
 MAX_HUNGER = 100
 FEED_AMOUNT = 30  # How much feeding reduces hunger
+HAPPINESS_NEGLECT_GRACE_SECONDS = 300  # Happiness starts falling after 5 minutes without interaction
+HAPPINESS_NEGLECT_ZERO_SECONDS = 3600  # Full happiness reaches 0 after 1 hour without interaction
+HAPPINESS_NEGLECT_DECAY_RATE = 100 / (HAPPINESS_NEGLECT_ZERO_SECONDS - HAPPINESS_NEGLECT_GRACE_SECONDS)  # Per second
 
 # Learning settings - Basic Network
 LEARNING_RATE = 0.001  # Lower for Adam optimizer

@@ -1,7 +1,7 @@
 """
 Transparent overlay window for displaying the desktop pal.
 """
-from PyQt5.QtWidgets import QWidget, QLabel, QMenu, QAction, QApplication
+from PyQt5.QtWidgets import QWidget, QLabel, QMenu, QAction, QApplication, QToolTip
 from PyQt5.QtCore import Qt, QTimer, QPoint
 from PyQt5.QtGui import QPixmap, QCursor
 from PIL import Image
@@ -183,32 +183,72 @@ class PetWindow(QWidget):
 
         if self.pet_manager.creature:
             # Creature is alive - show interaction options
-            feed_action = QAction("Feed", self)
+            feed_action = QAction("Feed", menu)
             feed_action.triggered.connect(self.pet_manager.feed_creature)
             menu.addAction(feed_action)
 
-            play_action = QAction("Play with Ball", self)
+            play_action = QAction("Play with Ball", menu)
             play_action.triggered.connect(self.pet_manager.play_ball)
             menu.addAction(play_action)
 
+            self.add_train_menu(menu)
+
             menu.addSeparator()
 
-            stats_action = QAction("Show Stats", self)
+            stats_action = QAction("Show Stats", menu)
             stats_action.triggered.connect(self.pet_manager.show_stats)
             menu.addAction(stats_action)
         else:
             # Egg state
-            hatch_action = QAction("Hatch Egg", self)
+            hatch_action = QAction("Hatch Egg", menu)
             hatch_action.triggered.connect(lambda: (self.pet_manager.hatch_egg(), self.update_sprite()))
             menu.addAction(hatch_action)
 
         menu.addSeparator()
 
-        exit_action = QAction("Exit", self)
+        exit_action = QAction("Exit", menu)
         exit_action.triggered.connect(self.pet_manager.exit_application)
         menu.addAction(exit_action)
 
         menu.exec_(position)
+
+    def add_train_menu(self, menu: QMenu):
+        """Add the Train submenu: tricks in progress plus tricks not yet started."""
+        training = self.pet_manager.creature.training
+        train_menu = menu.addMenu("Train")
+
+        for name, trick in sorted(training.learned_tricks.items()):
+            if trick.is_mastered():
+                status = "mastered"
+            elif trick.can_perform():
+                status = "known"
+            else:
+                status = "learning"
+            action = QAction(f"{self.trick_label(name)} ({trick.proficiency:.0%}, {status})", train_menu)
+            action.triggered.connect(lambda checked=False, n=name: self.train_trick(n))
+            train_menu.addAction(action)
+
+        new_tricks = [name for name in sorted(training.STANDARD_TRICKS) if name not in training.learned_tricks]
+        if new_tricks:
+            if training.learned_tricks:
+                train_menu.addSeparator()
+            learn_menu = train_menu.addMenu("Learn New Trick")
+            for name in new_tricks:
+                difficulty = training.STANDARD_TRICKS[name].difficulty.name.lower()
+                action = QAction(f"{self.trick_label(name)} ({difficulty})", learn_menu)
+                action.triggered.connect(lambda checked=False, n=name: self.train_trick(n))
+                learn_menu.addAction(action)
+
+    @staticmethod
+    def trick_label(trick_name: str) -> str:
+        """Format a trick name for display, e.g. 'play_dead' -> 'Play Dead'."""
+        return trick_name.replace('_', ' ').title()
+
+    def train_trick(self, trick_name: str):
+        """Practice a trick and show the result next to the pet."""
+        message = self.pet_manager.train_trick(trick_name)
+        if message:
+            QToolTip.showText(self.mapToGlobal(QPoint(0, 0)), message, self)
 
 
 class BallWindow(QWidget):

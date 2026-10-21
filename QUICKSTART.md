@@ -34,7 +34,7 @@
 
 - **Double-click egg** → Hatch creature
 - **Left-click & drag** → Move pet around
-- **Right-click pet** → Menu (Feed, Play, Stats, Exit)
+- **Right-click pet** → Menu (Feed, Play, Train, Stats, Exit)
 - **System tray icon** → Quick access when pet is hidden
 
 ## Your First 5 Minutes
@@ -55,7 +55,14 @@
 💡 **Interact often!**
 - Pets learn from interactions
 - More interaction = happier pet
+- Happiness starts falling after 5 minutes without interaction and reaches 0 after an hour
 - Each pet has unique preferences
+
+🎓 **Train tricks!**
+- Right-click → "Train" → "Learn New Trick" to start a trick, then pick it from "Train" to practice
+- Each practice shows the result and the trick's proficiency
+- Some personalities refuse to practice more often than others
+- Pets need 3 known tricks to evolve into an Elder
 
 ## Troubleshooting
 

@@ -19,7 +19,7 @@ from typing import Dict, Any, Optional, Tuple, List
 from .config import (
     PersonalityType, BehaviorState, CREATURE_TYPES, COLOR_PALETTES,
     PERSONALITY_TRAITS, MAX_HUNGER, HUNGER_DECAY_RATE, STARVATION_THRESHOLD,
-    EvolutionStage, ElementType
+    EvolutionStage, ElementType, HAPPINESS_NEGLECT_GRACE_SECONDS, HAPPINESS_NEGLECT_DECAY_RATE
 )
 from .memory_system import IntegratedMemorySystem
 from .training_system import TrainingSystem
@@ -183,14 +183,16 @@ class Creature:
             self.energy = min(100, self.energy + energy_gain)
 
         # Update happiness based on interactions and care
+        # Only the part of this update past the grace period counts as neglect
         time_since_interaction = time.time() - self.last_interaction_time
-        if time_since_interaction > 300:  # 5 minutes without interaction
-            happiness_decay = 0.1 * delta_time
+        neglected_seconds = min(delta_time, time_since_interaction - HAPPINESS_NEGLECT_GRACE_SECONDS)
+        if neglected_seconds > 0:
+            happiness_decay = HAPPINESS_NEGLECT_DECAY_RATE * neglected_seconds
             self.happiness = max(0, self.happiness - happiness_decay)
 
-        # Hunger affects happiness
+        # Hunger affects happiness (half the neglect rate, scaled by hunger)
         if self.hunger > 50:
-            happiness_decay = 0.05 * delta_time * (self.hunger / 50)
+            happiness_decay = HAPPINESS_NEGLECT_DECAY_RATE * 0.5 * delta_time * (self.hunger / 50)
             self.happiness = max(0, self.happiness - happiness_decay)
 
         # Phase 5: Update emotional states
