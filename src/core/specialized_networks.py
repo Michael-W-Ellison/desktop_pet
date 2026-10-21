@@ -10,7 +10,7 @@ Each network focuses on a specific aspect:
 These networks communicate and influence each other for complex, realistic behavior.
 """
 import numpy as np
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, Tuple
 from .advanced_network import AdvancedNeuralNetwork
 from .lstm_network import LSTMNetwork
 

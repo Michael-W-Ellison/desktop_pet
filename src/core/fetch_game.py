@@ -4,8 +4,7 @@ Phase 12: Fetch Game
 A fetch/catch game where the pet catches thrown objects.
 """
 import random
-import time
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, Optional
 from enum import Enum
 from .game_base import MiniGame, GameDifficulty, GameState
 
@@ -137,10 +136,6 @@ class FetchGame(MiniGame):
     def _calculate_throw_distance(self) -> float:
         """Calculate how far the throw goes."""
         # Physics simulation (simplified)
-        # Distance = power * angle factor
-        angle_radians = (self.throw_angle / 180.0) * 3.14159
-        angle_factor = 2 * angle_radians  # Simplified
-
         # Optimal angle is 45 degrees
         optimal_angle = 45.0
         angle_penalty = abs(self.throw_angle - optimal_angle) / optimal_angle

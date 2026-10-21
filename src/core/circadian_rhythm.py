@@ -4,7 +4,7 @@ Phase 8: Circadian Rhythm System
 Manages natural sleep/wake cycles based on time of day.
 """
 import time
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Tuple
 from datetime import datetime
 from enum import Enum
 
@@ -142,7 +142,6 @@ class CircadianRhythm:
         hours_since_sleep = (time.time() - self.last_sleep_time) / 3600.0
         if hours_since_sleep > 24.0:
             # Calculate sleep debt
-            hours_awake_per_day = 24.0 - self.daily_sleep_need
             expected_sleep_in_period = (hours_since_sleep / 24.0) * self.daily_sleep_need
             actual_sleep = self.total_sleep_hours
 

@@ -8,10 +8,9 @@ Provides different AI complexity levels:
 - EXPERT: All features plus visualization and detailed logging
 """
 import numpy as np
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from .config import AIComplexity, DEFAULT_AI_COMPLEXITY
-from .neural_network import NeuralNetwork, BehaviorLearner as SimpleBehaviorLearner
-from .advanced_network import AdvancedNeuralNetwork
+from .neural_network import BehaviorLearner as SimpleBehaviorLearner
 from .lstm_network import LSTMNetwork
 from .specialized_networks import NetworkCoordinator
 from .sensory_system import CompleteSensorySystem

@@ -17,8 +17,7 @@ from core.fetch_game import FetchGame, ThrowableItem
 from core.trick_show import TrickShow
 from core.memory_match import MemoryMatch
 from core.obstacle_course import ObstacleCourse
-from core.game_rewards import GameRewardsSystem, AchievementType
-import time
+from core.game_rewards import GameRewardsSystem
 
 print("=" * 60)
 print("PHASE 12: MINI-GAMES & ACTIVITIES TEST")
@@ -29,7 +28,7 @@ print("\n1. Testing Game Manager and Base Framework")
 print("-" * 60)
 
 game_manager = GameManager()
-print(f"Game manager initialized")
+print("Game manager initialized")
 print(f"Registered games: {len(game_manager.games)}")
 
 # Create and register games
@@ -64,7 +63,7 @@ fetch.start_game(
     pet_energy=0.9
 )
 
-print(f"Fetch game started")
+print("Fetch game started")
 print(f"Difficulty: {fetch.difficulty.value}")
 print(f"Target catches: {fetch.target_catches}")
 print(f"Time limit: {fetch.time_limit}s")
@@ -88,7 +87,7 @@ for item, power, angle in throws:
 
 # Progress
 progress = fetch.get_progress()
-print(f"\nGame progress:")
+print("\nGame progress:")
 print(f"  Catches: {progress['catches']}/{progress['target_catches']}")
 print(f"  Misses: {progress['misses']}")
 print(f"  Accuracy: {progress['accuracy']:.1f}%")
@@ -101,7 +100,7 @@ while fetch.state == GameState.PLAYING and fetch.catches < fetch.target_catches:
 
 # Game statistics
 stats = fetch.get_statistics()
-print(f"\nFetch game statistics:")
+print("\nFetch game statistics:")
 print(f"  Total plays: {stats['total_plays']}")
 print(f"  Win rate: {stats['win_rate']:.1f}%")
 print(f"  High score: {stats['high_score']}")
@@ -130,7 +129,7 @@ trick_show.start_game(
     pet_confidence=0.7
 )
 
-print(f"Trick show started")
+print("Trick show started")
 print(f"Rounds: {trick_show.rounds}")
 print(f"Available tricks: {len(tricks)}")
 
@@ -146,11 +145,11 @@ for trick_name in tricks_to_perform:
         print(f"    Style: {result['style']:.1f}")
         print(f"    Total score: {result['total_score']:.1f}")
         if result['perfect']:
-            print(f"    ⭐ PERFECT!")
+            print("    ⭐ PERFECT!")
 
 # Progress
 progress = trick_show.get_progress()
-print(f"\nTrick show progress:")
+print("\nTrick show progress:")
 print(f"  Round: {progress['current_round']}/{progress['total_rounds']}")
 print(f"  Perfect performances: {progress['perfect_performances']}")
 print(f"  Crowd pleasers: {progress['crowd_pleasers']}")
@@ -158,7 +157,7 @@ print(f"  Score: {progress['score']}")
 
 # Trick show statistics
 stats = trick_show.get_statistics()
-print(f"\nTrick show statistics:")
+print("\nTrick show statistics:")
 print(f"  Total plays: {stats['total_plays']}")
 print(f"  Win rate: {stats['win_rate']:.1f}%")
 
@@ -174,7 +173,7 @@ memory.start_game(
     pet_intelligence=0.7
 )
 
-print(f"Memory match started")
+print("Memory match started")
 print(f"Grid size: {memory.grid_size}x{memory.grid_size}")
 print(f"Total cards: {len(memory.cards)}")
 print(f"Target matches: {memory.target_matches}")
@@ -182,7 +181,7 @@ print(f"Target matches: {memory.target_matches}")
 # Get hint from pet
 hint = memory.get_hint()
 if hint:
-    print(f"\nPet gave hint:")
+    print("\nPet gave hint:")
     print(f"  Type: {hint['hint_type']}")
     print(f"  Symbol: {hint.get('symbol', 'hidden')}")
 
@@ -206,7 +205,7 @@ for card1_id, card2_id in flips:
 
 # Progress
 progress = memory.get_progress()
-print(f"\nMemory match progress:")
+print("\nMemory match progress:")
 print(f"  Matches: {progress['matches_found']}/{progress['target_matches']}")
 print(f"  Moves: {progress['moves_made']}")
 print(f"  Hints remaining: {progress['hints_remaining']}")
@@ -214,7 +213,7 @@ print(f"  Score: {progress['score']}")
 
 # Memory match statistics
 stats = memory.get_statistics()
-print(f"\nMemory match statistics:")
+print("\nMemory match statistics:")
 print(f"  Total plays: {stats['total_plays']}")
 
 print("✓ Memory match working!")
@@ -231,7 +230,7 @@ obstacle.start_game(
     pet_training=0.6
 )
 
-print(f"Obstacle course started")
+print("Obstacle course started")
 print(f"Number of obstacles: {len(obstacle.obstacles)}")
 print(f"Time limit: {obstacle.time_limit}s")
 
@@ -255,7 +254,7 @@ for i in range(min(3, len(obstacle.obstacles))):
 
 # Progress
 progress = obstacle.get_progress()
-print(f"\nObstacle course progress:")
+print("\nObstacle course progress:")
 print(f"  Obstacles: {progress['current_obstacle']}/{progress['total_obstacles']}")
 print(f"  Perfect runs: {progress['perfect_runs']}")
 print(f"  Total penalties: {progress['total_penalties']}")
@@ -263,7 +262,7 @@ print(f"  Score: {progress['score']}")
 
 # Obstacle course statistics
 stats = obstacle.get_statistics()
-print(f"\nObstacle course statistics:")
+print("\nObstacle course statistics:")
 print(f"  Total plays: {stats['total_plays']}")
 
 print("✓ Obstacle course working!")
@@ -273,7 +272,7 @@ print("\n6. Testing Game Rewards System")
 print("-" * 60)
 
 rewards = GameRewardsSystem()
-print(f"Rewards system initialized")
+print("Rewards system initialized")
 print(f"Player level: {rewards.player_level}")
 print(f"Total achievements: {len(rewards.achievements)}")
 
@@ -307,7 +306,7 @@ for achievement in unlocked[:3]:
 
 # Rewards statistics
 stats = rewards.get_statistics()
-print(f"\nRewards system statistics:")
+print("\nRewards system statistics:")
 print(f"  Player level: {stats['player_level']}")
 print(f"  Total experience: {stats['total_experience']}")
 print(f"  Total coins: {stats['total_coins']}")

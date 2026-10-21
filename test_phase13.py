@@ -11,10 +11,9 @@ import sys
 sys.path.insert(0, '/home/user/desktop_pet/src')
 
 from core.currency_system import CurrencySystem, TransactionType
-from core.shop_system import ShopSystem, ShopItem, ItemCategory, ItemRarity
-from core.inventory_system import InventorySystem, InventorySlot, ItemType
-from core.trading_system import TradingSystem, TradeOffer, TradeStatus
-import time
+from core.shop_system import ShopSystem, ItemCategory
+from core.inventory_system import InventorySystem, ItemType
+from core.trading_system import TradingSystem
 
 print("=" * 60)
 print("PHASE 13: ECONOMY & SHOP SYSTEM TEST")
@@ -25,7 +24,7 @@ print("\n1. Testing Currency System")
 print("-" * 60)
 
 currency = CurrencySystem()
-print(f"Currency system initialized")
+print("Currency system initialized")
 print(f"Starting balance: {currency.balance} coins")
 print(f"Daily allowance: {currency.daily_allowance} coins")
 print(f"Spending limit: {currency.daily_spending_limit} coins")
@@ -60,7 +59,7 @@ for txn in history[:3]:
 
 # Currency statistics
 stats = currency.get_statistics()
-print(f"\nCurrency statistics:")
+print("\nCurrency statistics:")
 print(f"  Total earned: {stats['total_earned']} coins")
 print(f"  Total spent: {stats['total_spent']} coins")
 print(f"  Current balance: {stats['balance']} coins")
@@ -73,7 +72,7 @@ print("\n2. Testing Shop System")
 print("-" * 60)
 
 shop = ShopSystem()
-print(f"Shop initialized")
+print("Shop initialized")
 print(f"Total items: {len(shop.items)}")
 print(f"Shop level: {shop.shop_level}")
 
@@ -122,7 +121,7 @@ print(f"Featured items: {len(featured)}")
 
 # Shop statistics
 stats = shop.get_statistics()
-print(f"\nShop statistics:")
+print("\nShop statistics:")
 print(f"  Total items: {stats['total_items']}")
 print(f"  Total sales: {stats['total_sales']}")
 print(f"  Revenue: {stats['total_revenue']} coins")
@@ -135,7 +134,7 @@ print("\n3. Testing Inventory System")
 print("-" * 60)
 
 inventory = InventorySystem()
-print(f"Inventory initialized")
+print("Inventory initialized")
 print(f"Max capacity: {inventory.max_capacity}")
 print(f"Current items: {len(inventory.slots)}")
 
@@ -175,7 +174,7 @@ if collar:
 consumables = inventory.get_consumables()
 toys = inventory.get_toys()
 equipment = inventory.get_equipment()
-print(f"\nItems by type:")
+print("\nItems by type:")
 print(f"  Consumables: {len(consumables)}")
 print(f"  Toys: {len(toys)}")
 print(f"  Equipment: {len(equipment)}")
@@ -194,7 +193,7 @@ for item in sorted_items:
 
 # Inventory statistics
 stats = inventory.get_statistics()
-print(f"\nInventory statistics:")
+print("\nInventory statistics:")
 print(f"  Unique items: {stats['unique_items']}")
 print(f"  Total items: {stats['total_items']}")
 print(f"  Capacity usage: {stats['capacity_usage']:.1f}%")
@@ -208,7 +207,7 @@ print("\n4. Testing Trading System")
 print("-" * 60)
 
 trading = TradingSystem()
-print(f"Trading system initialized")
+print("Trading system initialized")
 print(f"Fairness check: {trading.enable_fairness_check}")
 print(f"Fairness tolerance: {trading.fairness_tolerance * 100}%")
 
@@ -259,10 +258,10 @@ if trade:
     accept_result = trading.accept_trade(trade.trade_id)
 
     if accept_result and accept_result.get('success'):
-        print(f"✓ Trade accepted!")
+        print("✓ Trade accepted!")
         print(f"  Pet 1 gives: {accept_result['proposer_gives']}")
         print(f"  Pet 2 gives: {accept_result['recipient_gives']}")
-        print(f"  Status: completed")
+        print("  Status: completed")
 
         # Execute the trade (remove items from inventories)
         # Pet 1 loses ball, gets rope_toy
@@ -273,7 +272,7 @@ if trade:
         pet2_inventory.remove_item('rope_toy', 1)
         pet2_inventory.add_item('ball', 'Ball', ItemType.TOY, 1, {'happiness_boost': 15})
 
-        print(f"  Inventories updated!")
+        print("  Inventories updated!")
 
 # Create another trade and decline it
 print("\nCreating second trade offer...")
@@ -293,7 +292,7 @@ if trade2:
 
 # Trading statistics
 stats = trading.get_statistics()
-print(f"\nTrading statistics:")
+print("\nTrading statistics:")
 print(f"  Total proposed: {stats['total_proposed']}")
 print(f"  Total completed: {stats['total_completed']}")
 print(f"  Total declined: {stats['total_declined']}")
@@ -383,7 +382,7 @@ if affordable:
             item_to_buy.effects
         )
 
-        print(f"   ✓ Purchase complete!")
+        print("   ✓ Purchase complete!")
         print(f"   Balance: {currency.balance} coins")
         print(f"   Inventory: {len(inventory.slots)} items")
 

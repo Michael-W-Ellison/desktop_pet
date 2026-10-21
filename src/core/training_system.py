@@ -98,7 +98,6 @@ class Trick:
         proficiency_gain = effective_learning_rate + randomness
 
         # Update proficiency
-        old_proficiency = self.proficiency
         self.proficiency = min(1.0, self.proficiency + proficiency_gain)
 
         # Determine success (easier as proficiency increases)

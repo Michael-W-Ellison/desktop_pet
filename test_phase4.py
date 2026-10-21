@@ -15,8 +15,6 @@ from core.creature import Creature
 from core.config import (
     PersonalityType, CREATURE_TYPES, ElementType, EvolutionStage, VariantType
 )
-from core.evolution_system import EvolutionSystem
-from core.element_system import ElementSystem
 from core.variant_system import VariantSystem
 
 print("=" * 60)
@@ -62,14 +60,14 @@ evo_creature.bonding.bond = 35
 evo_creature.total_interactions = 60
 
 can_evolve, next_stage, reason = evo_creature.can_evolve()
-print(f"\nChecking evolution eligibility:")
+print("\nChecking evolution eligibility:")
 print(f"  Can evolve: {can_evolve}")
 print(f"  Next stage: {next_stage}")
 print(f"  Reason: {reason}")
 
 # Get evolution progress
 progress = evo_creature.get_evolution_progress()
-print(f"\nEvolution Progress:")
+print("\nEvolution Progress:")
 print(f"  Overall: {progress['progress_percent']:.1f}%")
 for req in progress['requirements']:
     status = "✓" if req['met'] else "✗"
@@ -103,7 +101,7 @@ print(f"\nFire element modifiers: {list(fire_mods.keys())[:5]}...")
 
 # Test elemental interaction
 result = fire_phoenix.interact_with_element(ElementType.WATER)
-print(f"\nElemental interaction result:")
+print("\nElemental interaction result:")
 print(f"  Type: {result['interaction_type']}")
 print(f"  Message: {result['message']}")
 print(f"  Multiplier: {result['multiplier']}x")
@@ -137,7 +135,7 @@ for variant_type in VariantType:
 # Test special variant
 crystal_creature = Creature(creature_type='dragon', personality=PersonalityType.LOYAL)
 crystal_creature.variant = VariantSystem(VariantType.CRYSTAL)
-print(f"\nCrystal variant abilities:")
+print("\nCrystal variant abilities:")
 abilities = crystal_creature.variant.get_special_abilities()
 for ability in abilities:
     print(f"  - {ability}")

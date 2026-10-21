@@ -14,13 +14,11 @@ Tests all 8 Phase 8 features:
 import sys
 sys.path.insert(0, '/home/user/desktop_pet/src')
 
-from core.biological_needs import BathroomNeedsSystem, GroomingSystem, CleanlinessLevel
-from core.health_system import HealthSystem, IllnessType, IllnessSeverity
+from core.biological_needs import BathroomNeedsSystem, GroomingSystem
+from core.health_system import HealthSystem
 from core.aging_system import AgingSystem, LifeStage
-from core.breeding_system import BreedingSystem, GeneticTrait, PregnancyStage
-from core.circadian_rhythm import CircadianRhythm, TimeOfDay, SleepState
-import time
-from datetime import datetime
+from core.breeding_system import BreedingSystem
+from core.circadian_rhythm import CircadianRhythm
 
 print("=" * 60)
 print("PHASE 8: LIVING CREATURE BEHAVIORS TEST")
@@ -347,7 +345,7 @@ bathroom_load = BathroomNeedsSystem.from_dict(bathroom_data)
 aging_load = AgingSystem.from_dict(aging_data)
 
 # Verify
-print(f"\nVerifying loaded data:")
+print("\nVerifying loaded data:")
 print(f"Bathroom bladder: {bathroom_load.bladder:.1f} (expected 75.0)")
 print(f"Bathroom house trained: {bathroom_load.house_trained} (expected True)")
 print(f"Aging days: {aging_load.age_days:.1f} (expected 45.0)")

@@ -284,7 +284,6 @@ class ElementSystem:
         primary_desc = descriptions.get(self.primary_element, "Has a unique elemental nature")
 
         if self.secondary_element:
-            secondary_desc = descriptions.get(self.secondary_element, "")
             return f"{primary_desc}, with hints of {self.secondary_element.value} energy"
 
         return primary_desc

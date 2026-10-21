@@ -10,7 +10,7 @@ Features:
 """
 import numpy as np
 import time
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, Any
 from enum import Enum
 from .config import PersonalityType
 
@@ -703,7 +703,6 @@ class PersonalityDrift:
 
         # Analyze patterns in recent experiences
         positive_count = sum(1 for exp in self.experience_buffer if exp['outcome'] == 'positive')
-        negative_count = sum(1 for exp in self.experience_buffer if exp['outcome'] == 'negative')
 
         total = len(self.experience_buffer)
         positive_ratio = positive_count / total if total > 0 else 0.5

@@ -16,18 +16,17 @@ Enhanced with:
 import random
 import time
 from typing import Dict, Any, Optional, Tuple, List
-from datetime import datetime
 from .config import (
     PersonalityType, BehaviorState, CREATURE_TYPES, COLOR_PALETTES,
     PERSONALITY_TRAITS, MAX_HUNGER, HUNGER_DECAY_RATE, STARVATION_THRESHOLD,
-    EvolutionStage, ElementType, VariantType
+    EvolutionStage, ElementType
 )
-from .memory_system import IntegratedMemorySystem, MemoryImportance
+from .memory_system import IntegratedMemorySystem
 from .training_system import TrainingSystem
 from .evolution_system import EvolutionSystem, EvolutionTrigger
 from .element_system import ElementSystem, create_element_system_for_species
 from .variant_system import VariantSystem, generate_random_variant
-from .bonding_system import BondingSystem, BondLevel
+from .bonding_system import BondingSystem
 from .trust_system import TrustSystem
 from .emotional_states import EmotionalStateManager, EmotionalState
 from .preference_system import PreferenceSystem
@@ -150,11 +149,6 @@ class Creature:
         if self.phase7_enabled and self.autobiographical:
             self.autobiographical.record_first_time('birth', birth_details, emotional_intensity=1.0)
 
-        # Show special message for rare variants
-        if self.variant.is_rare():
-            rare_message = self.variant.get_encounter_message()
-            # This message will be shown by pet_manager when creature hatches
-
     def _generate_name(self) -> str:
         """Generate a random name for the creature."""
         prefixes = ['Pip', 'Moo', 'Fluff', 'Spark', 'Dash', 'Glow', 'Puff', 'Zip']
@@ -250,7 +244,6 @@ class Creature:
         # Record in memory system (Phase 2)
         # Check if this is first feeding
         first_feeding = self.memory.recall_event('feed', first_only=True) is None
-        importance = MemoryImportance.CRUCIAL.value if first_feeding else MemoryImportance.NORMAL.value
 
         self.memory.record_interaction(
             'feed',

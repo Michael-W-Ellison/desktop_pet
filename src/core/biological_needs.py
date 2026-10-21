@@ -412,8 +412,6 @@ class GroomingSystem:
         Returns:
             Dictionary with brushing results
         """
-        previous_cleanliness = self.cleanliness
-
         # Brushing improves cleanliness moderately
         cleanliness_gain = min(30.0, 100.0 - self.cleanliness)
         self.cleanliness = min(100.0, self.cleanliness + cleanliness_gain)

@@ -2,8 +2,7 @@
 Advanced neural network for creature learning and behavior adaptation.
 """
 import numpy as np
-from typing import List, Optional
-import json
+from typing import List
 import time
 from .optimizers import AdamOptimizer, clip_gradients, LearningRateScheduler
 

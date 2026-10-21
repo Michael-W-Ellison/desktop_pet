@@ -21,7 +21,6 @@ from core.enhanced_memory import (
     AssociativeMemory, DreamSystem, MemoryImportanceManager
 )
 import time
-from datetime import datetime
 
 print("=" * 60)
 print("PHASE 7: ENHANCED MEMORY SYSTEMS TEST")
@@ -53,7 +52,7 @@ print(f"Tried to record playing again: {second_play} (should be False)")
 
 # Recall first time
 recalled = autobio.recall_first_time('playing')
-print(f"\nRecalled first time playing:")
+print("\nRecalled first time playing:")
 print(f"  Activity: {recalled['details']['activity']}")
 print(f"  Location: {recalled['details']['location']}")
 print(f"  Emotional intensity: {recalled['emotional_intensity']}")
@@ -102,7 +101,7 @@ for event, details, happiness, intensity in memories_to_consider:
 
 # Get top favorites
 top_favorites = favorites.get_favorites(limit=3)
-print(f"\nTop 3 favorite memories:")
+print("\nTop 3 favorite memories:")
 for i, fav in enumerate(top_favorites, 1):
     print(f"  {i}. {fav['event_type']} (score: {fav['score']:.1f})")
     print(f"     {fav['details']}")
@@ -136,7 +135,7 @@ print(f"  Expected bond impact: -{severity * 5:.1f}")
 
 # Check fear trigger
 is_triggered, intensity = trauma.check_trigger('loud_sounds')
-print(f"\nChecking fear trigger 'loud_sounds':")
+print("\nChecking fear trigger 'loud_sounds':")
 print(f"  Triggered: {is_triggered}")
 print(f"  Fear intensity: {intensity:.2f}")
 
@@ -173,7 +172,7 @@ print("Recording associations between contexts and events...")
 print("\nLearning location patterns:")
 for i in range(5):
     associative.record_association('location', 'desk_corner', 'hiding', outcome_valence=0.8)
-print(f"  Recorded 5 instances of hiding at desk_corner")
+print("  Recorded 5 instances of hiding at desk_corner")
 
 # Try to get prediction (need 3+ occurrences)
 prediction = associative.get_pattern_prediction('location', 'desk_corner')
@@ -183,7 +182,7 @@ print(f"  Prediction for desk_corner: {prediction}")
 print("\nLearning time patterns:")
 for i in range(4):
     associative.record_association('time', '18:00', 'playtime', outcome_valence=0.9)
-print(f"  Recorded 4 instances of playtime at 18:00")
+print("  Recorded 4 instances of playtime at 18:00")
 
 prediction = associative.get_pattern_prediction('time', '18:00')
 print(f"  Prediction for 18:00: {prediction}")
@@ -192,10 +191,10 @@ print(f"  Prediction for 18:00: {prediction}")
 print("\nLearning object patterns:")
 for i in range(3):
     associative.record_association('object', 'red_ball', 'fun_times', outcome_valence=0.85)
-print(f"  Recorded 3 instances of fun with red_ball")
+print("  Recorded 3 instances of fun with red_ball")
 
 # Get learned associations
-print(f"\nLearned associations:")
+print("\nLearned associations:")
 association = associative.get_association('location', 'desk_corner')
 if association:
     print(f"  desk_corner -> {association['most_common_event']} (occurrences: {association['total_occurrences']})")
@@ -263,7 +262,7 @@ print(f"  Emotional tone: {dream['emotional_tone']:.2f}")
 
 # Get dream stats
 stats = dream_system.get_dream_statistics()
-print(f"\nDream statistics:")
+print("\nDream statistics:")
 print(f"  Total dreams: {stats['total_dreams']}")
 print(f"  Dream type distribution: {stats['dream_type_distribution']}")
 
@@ -468,7 +467,7 @@ if original.phase7_enabled:
 
     # Save to dict
     saved_data = original.to_dict()
-    print(f"\nSaved data includes Phase 7:")
+    print("\nSaved data includes Phase 7:")
     print(f"  Has autobiographical_memory: {'autobiographical_memory' in saved_data}")
     print(f"  Has favorite_memories: {'favorite_memories' in saved_data}")
     print(f"  Has trauma_memory: {'trauma_memory' in saved_data}")

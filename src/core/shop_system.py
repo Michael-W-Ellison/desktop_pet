@@ -3,7 +3,6 @@ Phase 13: Shop System
 
 Manages the shop where players can purchase items with coins.
 """
-import time
 import random
 from typing import Dict, Any, List, Optional
 from enum import Enum

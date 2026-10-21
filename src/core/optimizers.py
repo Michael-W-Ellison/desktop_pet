@@ -2,7 +2,7 @@
 Advanced optimizers for neural network training.
 """
 import numpy as np
-from typing import List, Optional
+from typing import List
 
 
 class Optimizer:

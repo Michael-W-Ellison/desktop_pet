@@ -2,7 +2,7 @@
 Advanced neural network with dropout, batch normalization, and residual connections.
 """
 import numpy as np
-from typing import List, Optional
+from typing import List
 from .optimizers import AdamOptimizer, clip_gradients, LearningRateScheduler
 
 
@@ -273,7 +273,6 @@ class AdvancedNeuralNetwork:
         deltas = [None] * len(self.weights)
         dropout_masks = caches['dropout_masks']
         batch_norm_caches = caches['batch_norm_caches']
-        pre_activations = caches['pre_activations']
 
         # Calculate output layer delta
         output_error = activations[-1] - y

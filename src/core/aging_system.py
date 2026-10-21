@@ -4,7 +4,7 @@ Phase 8: Aging and Lifespan System
 Manages pet aging from baby to elder and natural end of life.
 """
 import time
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any
 from datetime import datetime
 from enum import Enum
 

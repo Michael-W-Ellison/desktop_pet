@@ -3,7 +3,6 @@ Phase 10: Animation System
 
 Manages smooth sprite animations with frame transitions and interpolation.
 """
-import time
 from typing import Dict, Any, List, Optional, Tuple, Callable
 from enum import Enum
 
@@ -409,8 +408,6 @@ class AnimationSystem:
 
     def get_status(self) -> Dict[str, Any]:
         """Get animation system status."""
-        current_frame = self.get_current_frame()
-
         return {
             'current_state': self.current_state.value,
             'current_animation': self.current_animation.name if self.current_animation else None,

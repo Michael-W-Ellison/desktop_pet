@@ -10,14 +10,12 @@ Tests all 4 Phase 14 features:
 import sys
 sys.path.insert(0, '/home/user/desktop_pet/src')
 
-from core.pet_customization import (PetCustomization, PetAccessory, AccessorySlot,
-                                    ColorPalette, PetPattern)
+from core.pet_customization import (PetCustomization, ColorPalette, PetPattern)
 from core.room_decoration import (RoomDecoration, WallpaperStyle, FloorStyle,
                                   RoomTheme)
-from core.furniture_placement import (FurniturePlacement, PlacedFurniture,
-                                      FurnitureCategory, FurnitureSize)
-from core.customization_presets import (CustomizationPresets, CustomizationPreset,
-                                        PresetType)
+from core.furniture_placement import (FurniturePlacement, FurnitureCategory,
+                                      FurnitureSize)
+from core.customization_presets import (CustomizationPresets, PresetType)
 
 print("=" * 60)
 print("PHASE 14: CUSTOMIZATION & DECORATION SYSTEM TEST")
@@ -28,7 +26,7 @@ print("\n1. Testing Pet Customization")
 print("-" * 60)
 
 pet_custom = PetCustomization()
-print(f"Pet customization initialized")
+print("Pet customization initialized")
 print(f"Available accessories: {len(pet_custom.available_accessories)}")
 print(f"Body size: {pet_custom.body_size}")
 
@@ -74,14 +72,14 @@ print(f"Glow: {pet_custom.glow_effect}")
 
 # Get appearance summary
 summary = pet_custom.get_appearance_summary()
-print(f"\nAppearance summary:")
+print("\nAppearance summary:")
 print(f"  Pattern: {summary['pattern']}")
 print(f"  Palette: {summary['palette']}")
 print(f"  Accessories: {summary['num_accessories']}")
 
 # Pet customization statistics
 stats = pet_custom.get_statistics()
-print(f"\nCustomization statistics:")
+print("\nCustomization statistics:")
 print(f"  Changes made: {stats['customization_changes']}")
 print(f"  Accessories worn: {stats['total_accessories_worn']}")
 print(f"  Unlocked accessories: {stats['unlocked_accessories']}/{stats['total_accessories']}")
@@ -93,7 +91,7 @@ print("\n2. Testing Room Decoration")
 print("-" * 60)
 
 room_decor = RoomDecoration()
-print(f"Room decoration initialized")
+print("Room decoration initialized")
 print(f"Available wallpapers: {len(room_decor.available_wallpapers)}")
 print(f"Available floors: {len(room_decor.available_floors)}")
 
@@ -140,7 +138,7 @@ print(f"Light color: {room_decor.ambient_light_color}")
 
 # Room decoration statistics
 stats = room_decor.get_statistics()
-print(f"\nRoom decoration statistics:")
+print("\nRoom decoration statistics:")
 print(f"  Decoration changes: {stats['decoration_changes']}")
 print(f"  Themes applied: {stats['themes_applied']}")
 print(f"  Favorite theme: {stats['favorite_theme']}")
@@ -153,7 +151,7 @@ print("\n3. Testing Furniture Placement")
 print("-" * 60)
 
 furniture = FurniturePlacement(room_width=20, room_height=15)
-print(f"Furniture placement initialized")
+print("Furniture placement initialized")
 print(f"Room size: {furniture.room_width}x{furniture.room_height} grid units")
 print(f"Grid size: {furniture.grid_size} pixels")
 
@@ -209,13 +207,13 @@ print(f"Room capacity usage: {capacity:.1f}%")
 
 # Layout summary
 layout = furniture.get_layout_summary()
-print(f"\nLayout summary:")
+print("\nLayout summary:")
 print(f"  Total items: {layout['total_items']}")
 print(f"  Items by category: {layout['items_by_category']}")
 
 # Furniture placement statistics
 stats = furniture.get_statistics()
-print(f"\nFurniture statistics:")
+print("\nFurniture statistics:")
 print(f"  Total placements: {stats['total_placements']}")
 print(f"  Total moves: {stats['total_moves']}")
 print(f"  Current items: {stats['current_items']}")
@@ -228,7 +226,7 @@ print("\n4. Testing Customization Presets")
 print("-" * 60)
 
 presets = CustomizationPresets()
-print(f"Presets system initialized")
+print("Presets system initialized")
 print(f"Max presets: {presets.max_presets}")
 
 # Save outfit preset
@@ -278,7 +276,7 @@ if outfit_preset:
 outfit_presets = presets.get_presets_by_type(PresetType.OUTFIT)
 room_presets = presets.get_presets_by_type(PresetType.ROOM)
 complete_presets = presets.get_presets_by_type(PresetType.COMPLETE)
-print(f"\nPresets by type:")
+print("\nPresets by type:")
 print(f"  Outfit presets: {len(outfit_presets)}")
 print(f"  Room presets: {len(room_presets)}")
 print(f"  Complete presets: {len(complete_presets)}")
@@ -306,7 +304,7 @@ for result in results:
 
 # Presets statistics
 stats = presets.get_statistics()
-print(f"\nPresets statistics:")
+print("\nPresets statistics:")
 print(f"  Total presets: {stats['total_presets']}")
 print(f"  Outfit presets: {stats['outfit_presets']}")
 print(f"  Room presets: {stats['room_presets']}")
@@ -406,7 +404,7 @@ print("5. Applying preset to verify...")
 if ocean_preset:
     applied = new_presets.apply_preset(ocean_preset.preset_id)
     if applied:
-        print(f"   ✓ Preset applied successfully")
+        print("   ✓ Preset applied successfully")
         print(f"   Pet data: {'✓' if applied.get('pet_data') else '✗'}")
         print(f"   Room data: {'✓' if applied.get('room_data') else '✗'}")
         print(f"   Furniture data: {'✓' if applied.get('furniture_data') else '✗'}")

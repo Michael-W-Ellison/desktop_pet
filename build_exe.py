@@ -134,7 +134,6 @@ def clean_build_artifacts():
     print_header("Cleaning Old Build Artifacts")
 
     dirs_to_clean = ['build', 'dist', '__pycache__']
-    files_to_clean = ['*.spec~']
 
     for dir_name in dirs_to_clean:
         if os.path.exists(dir_name):
@@ -199,8 +198,8 @@ def print_success_message():
     print(f"\n📁 Location: dist/{exe_name}\n")
     print("What you can do now:")
     print(f"  1. Run the executable: .\\dist\\{exe_name}")
-    print(f"  2. Move it anywhere on your computer")
-    print(f"  3. Share it with others (no Python installation needed!)")
+    print("  2. Move it anywhere on your computer")
+    print("  3. Share it with others (no Python installation needed!)")
     print("\nNote: The executable includes all dependencies and can run")
     print("      on any compatible system without requiring Python.")
     print("\n" + "=" * 70 + "\n")

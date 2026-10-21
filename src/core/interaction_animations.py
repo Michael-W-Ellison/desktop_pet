@@ -3,7 +3,7 @@ Phase 15: Interaction Animations System
 
 Manages animation states for furniture interactions.
 """
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from enum import Enum
 
 

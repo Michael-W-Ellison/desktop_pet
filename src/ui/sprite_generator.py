@@ -6,8 +6,7 @@ Phase 4 Enhanced:
 - Evolution stage scaling (baby/juvenile/adult/elder)
 - Variant color modifications (shiny, mystic, shadow, crystal)
 """
-from PIL import Image, ImageDraw, ImageEnhance
-import random
+from PIL import Image, ImageDraw
 from typing import List, Tuple, Optional
 
 

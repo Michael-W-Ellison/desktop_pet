@@ -3,7 +3,6 @@ Phase 14: Room Decoration System
 
 Manages room appearance, wallpapers, floors, and themes.
 """
-import time
 from typing import Dict, Any, List, Optional
 from enum import Enum
 

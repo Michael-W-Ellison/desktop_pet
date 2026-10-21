@@ -31,6 +31,7 @@ class PetManager:
         self.creature = None
         self.learner = None
         self.pet_window = None
+        self.ball_window = None
         self.is_egg = True
         self.last_update_time = time.time()
         self.ai_complexity = ai_complexity
@@ -176,9 +177,9 @@ class PetManager:
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Information)
         msg.setWindowTitle("Goodbye...")
-        msg.setText(f"Your creature has passed on due to starvation.\n\n"
-                   f"They left behind an egg for you.\n\n"
-                   f"Take better care of the next one!")
+        msg.setText("Your creature has passed on due to starvation.\n\n"
+                   "They left behind an egg for you.\n\n"
+                   "Take better care of the next one!")
         msg.exec_()
 
     def start_timers(self):
@@ -457,7 +458,8 @@ class PetManager:
             random.uniform(-BALL_SPEED, -BALL_SPEED/2)  # Throw upward
         ]
 
-        ball = BallWindow(self, velocity)
+        # Keep a reference so the window is not garbage collected
+        self.ball_window = BallWindow(self, velocity)
 
         # Creature notices and might chase
         if self.creature:
@@ -523,7 +525,7 @@ class PetManager:
         # Add AI-specific information
         if self.ai_complexity == AIComplexity.SIMPLE:
             stats_text += f"Favorite Activity: {self.creature.get_preferred_activity().replace('_', ' ').title()}\n"
-            stats_text += f"\n[AI: Simple Mode]"
+            stats_text += "\n[AI: Simple Mode]"
         elif self.ai_complexity in [AIComplexity.MEDIUM, AIComplexity.ADVANCED, AIComplexity.EXPERT]:
             # Show current decision
             if self.current_decision:

@@ -4,7 +4,7 @@ Trust System for Desktop Pal
 Trust builds gradually through consistent positive interactions and care.
 Trust affects willingness to follow commands, try new things, and respond to owner.
 """
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Tuple
 import time
 import numpy as np
 

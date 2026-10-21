@@ -5,7 +5,7 @@ Manages jealousy when owner gives attention to other pets and competition for re
 """
 import time
 import random
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 from enum import Enum
 

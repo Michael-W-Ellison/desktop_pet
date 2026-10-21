@@ -2,12 +2,11 @@
 Transparent overlay window for displaying the desktop pal.
 """
 from PyQt5.QtWidgets import QWidget, QLabel, QMenu, QAction, QApplication
-from PyQt5.QtCore import Qt, QTimer, QPoint, QRect
-from PyQt5.QtGui import QPixmap, QCursor, QPainter, QImage
-import random
+from PyQt5.QtCore import Qt, QTimer, QPoint
+from PyQt5.QtGui import QPixmap, QCursor
 from ui.sprite_generator import SpriteGenerator
 from ui.image_utils import pil_to_qimage
-from core.config import BehaviorState, PET_SIZE, FPS, ANIMATION_UPDATE_INTERVAL
+from core.config import PET_SIZE, FPS, ANIMATION_UPDATE_INTERVAL
 
 
 class PetWindow(QWidget):

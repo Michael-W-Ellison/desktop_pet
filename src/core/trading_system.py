@@ -4,7 +4,7 @@ Phase 13: Trading System
 Allows trading items between pets (for multi-pet scenarios).
 """
 import time
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 from enum import Enum
 
 

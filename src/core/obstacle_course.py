@@ -4,8 +4,7 @@ Phase 12: Obstacle Course Game
 An agility course where the pet navigates obstacles.
 """
 import random
-import time
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from enum import Enum
 from .game_base import MiniGame, GameDifficulty, GameState
 

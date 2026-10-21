@@ -2,7 +2,7 @@
 LSTM (Long Short-Term Memory) network for temporal pattern learning and memory.
 """
 import numpy as np
-from typing import List, Tuple, Optional
+from typing import List
 from collections import deque
 from .optimizers import AdamOptimizer, clip_gradients
 
