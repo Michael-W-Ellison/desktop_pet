@@ -197,9 +197,12 @@ class Creature:
         self.emotional_states.update(delta_time)
 
         # Phase 5: Process bonding decay from neglect
+        # process_neglect() returns the decay for a whole neglect period, so
+        # pass only the neglected time that falls within this update
         hours_since_interaction = time_since_interaction / 3600.0
         if hours_since_interaction > 1:
-            self.bonding.process_neglect(hours_since_interaction)
+            neglected_hours_this_update = min(delta_time / 3600.0, hours_since_interaction - 1)
+            self.bonding.process_neglect(1 + neglected_hours_this_update)
 
         # Phase 5: Update presence tracking
         # Note: This assumes owner is present if app is running
@@ -716,7 +719,7 @@ class Creature:
             self.memory.record_interaction(
                 'evolved',
                 {
-                    'old_stage': self.evolution.evolution_history[-1]['from_stage'].value,
+                    'old_stage': self.evolution.evolution_history[-1]['from_stage'],
                     'new_stage': new_stage.value,
                     'age_hours': stats['age_hours'],
                     'bond': self.bonding.bond  # Phase 5: Use bonding system

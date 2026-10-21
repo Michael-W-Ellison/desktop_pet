@@ -257,6 +257,32 @@ class PetManager:
         # Check if creature is starving
         if self.creature.is_starving():
             self.creature_died()
+        else:
+            self.check_evolution()
+
+    def check_evolution(self):
+        """Evolve the creature once it meets the requirements for its next stage."""
+        if not self.creature:
+            return
+
+        can_evolve, _, _ = self.creature.can_evolve()
+        if not can_evolve:
+            return
+
+        success, message = self.creature.evolve()
+        if not success:
+            return
+
+        if self.pet_window:
+            self.pet_window.update_sprite()
+
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setWindowTitle("Evolution!")
+        msg.setText(f"{self.creature.name} has grown!\n\n{message}")
+        msg.exec_()
+
+        self.save_state()
 
     def update_behavior(self):
         """Update creature behavior using enhanced AI decision-making."""

@@ -425,7 +425,8 @@ class ReinforcementLearningAgent:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'ReinforcementLearningAgent':
         """Load agent state."""
-        agent = cls()
+        # The first weight matrix has one row per state input
+        agent = cls(state_size=len(data['q_network_weights'][0]))
 
         agent.epsilon = data['epsilon']
         agent.action_counts = np.array(data['action_counts'])
@@ -452,9 +453,14 @@ class GoalOrientedBehaviorSystem:
     Manages creature goals and uses RL to achieve them.
     """
 
-    def __init__(self):
-        """Initialize goal-oriented system."""
-        self.rl_agent = ReinforcementLearningAgent()
+    def __init__(self, state_size: int = 35):
+        """
+        Initialize goal-oriented system.
+
+        Args:
+            state_size: Length of the encoded state vector passed to the agent
+        """
+        self.rl_agent = ReinforcementLearningAgent(state_size=state_size)
         self.current_goal = None
         self.goal_progress = 0.0
         self.steps_since_goal_update = 0

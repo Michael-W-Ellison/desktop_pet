@@ -81,7 +81,7 @@ class EnhancedBehaviorLearner:
         self.network_coordinator = NetworkCoordinator()
 
         # Reinforcement learning system
-        self.rl_system = GoalOrientedBehaviorSystem()
+        self.rl_system = GoalOrientedBehaviorSystem(state_size=len(self.get_state_vector()))
 
         self.activity_network = None
 
@@ -387,7 +387,11 @@ class EnhancedBehaviorLearner:
 
             if 'rl_system' in data:
                 from .reinforcement_learning import ReinforcementLearningAgent
-                learner.rl_system.rl_agent = ReinforcementLearningAgent.from_dict(data['rl_system'])
+                saved_agent = ReinforcementLearningAgent.from_dict(data['rl_system'])
+                # Saves from older versions used a state size that did not match
+                # the state vector; keep the freshly sized agent in that case
+                if saved_agent.state_size == learner.rl_system.rl_agent.state_size:
+                    learner.rl_system.rl_agent = saved_agent
 
         if complexity == AIComplexity.EXPERT and 'learning_history' in data:
             learner.learning_history = data['learning_history']

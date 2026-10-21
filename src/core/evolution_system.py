@@ -142,8 +142,8 @@ class EvolutionSystem:
         # Record evolution event
         evolution_event = {
             'timestamp': time.time(),
-            'from_stage': old_stage,
-            'to_stage': next_stage,
+            'from_stage': old_stage.value,
+            'to_stage': next_stage.value,
             'age_hours': creature_stats.get('age_hours', 0),
             'happiness': creature_stats.get('happiness', 0),
             'bond': creature_stats.get('bond', 0)
@@ -335,8 +335,8 @@ class EvolutionSystem:
         # Record evolution
         evolution_event = {
             'timestamp': time.time(),
-            'from_stage': old_stage,
-            'to_stage': next_stage,
+            'from_stage': old_stage.value,
+            'to_stage': next_stage.value,
             'forced': True
         }
         self.evolution_history.append(evolution_event)

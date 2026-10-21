@@ -4,9 +4,10 @@ Transparent overlay window for displaying the desktop pal.
 from PyQt5.QtWidgets import QWidget, QLabel, QMenu, QAction, QApplication
 from PyQt5.QtCore import Qt, QTimer, QPoint
 from PyQt5.QtGui import QPixmap, QCursor
+from PIL import Image
 from ui.sprite_generator import SpriteGenerator
 from ui.image_utils import pil_to_qimage
-from core.config import PET_SIZE, FPS, ANIMATION_UPDATE_INTERVAL
+from core.config import PET_SIZE, FPS, ANIMATION_UPDATE_INTERVAL, STAGE_SIZE_MULTIPLIERS
 
 
 class PetWindow(QWidget):
@@ -74,12 +75,19 @@ class PetWindow(QWidget):
         else:
             # Show creature
             creature = self.pet_manager.creature
-            sprite = SpriteGenerator.generate_creature_sprite(
+            # Scale by evolution stage so the largest stage fills the window
+            stage_multiplier = (creature.evolution.get_stage_multiplier()
+                                / max(STAGE_SIZE_MULTIPLIERS.values()))
+            body = SpriteGenerator.generate_creature_sprite(
                 creature.creature_type,
                 creature.color_palette,
                 PET_SIZE,
-                creature.facing_right
+                creature.facing_right,
+                stage_multiplier=stage_multiplier
             )
+            # Place the scaled sprite bottom-centred on a window-sized canvas
+            sprite = Image.new('RGBA', PET_SIZE, (0, 0, 0, 0))
+            sprite.paste(body, ((PET_SIZE[0] - body.width) // 2, PET_SIZE[1] - body.height), body)
 
         # Convert PIL Image to QPixmap
         qimage = pil_to_qimage(sprite)
