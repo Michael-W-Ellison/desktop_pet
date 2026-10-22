@@ -255,7 +255,7 @@ EVOLUTION_REQUIREMENTS = {
 }
 
 # Decision stability measurement (EnhancedBehaviorLearner)
-DECISION_STABILITY_WINDOW = 200       # Learning updates compared per measurement
+DECISION_STABILITY_WINDOW = 200       # Player interactions compared per measurement
 DECISION_STABILITY_SMOOTHING = 0.005  # Moving-average weight of each new measurement
 
 # Phase 4: Stage size multipliers (how big the creature is at each stage)

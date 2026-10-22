@@ -375,6 +375,7 @@ class EnhancedBehaviorLearner:
                 'timestamp': time.time()
             })
 
+        # Only player interactions advance the stage
         self._update_decision_stability()
 
     @staticmethod
@@ -443,9 +444,9 @@ class EnhancedBehaviorLearner:
 
     def _update_decision_stability(self):
         """
-        Update how settled each network is after a learning update.
+        Update how settled each network is; called once per player interaction.
 
-        For each network, over the last DECISION_STABILITY_WINDOW updates, compares
+        For each network, over the last DECISION_STABILITY_WINDOW interactions, compares
         how far its probe outputs moved overall with the total distance they
         travelled. A network that is still learning moves consistently in one
         direction (ratio near 1); a settled one only jitters around the same point
@@ -667,7 +668,8 @@ class EnhancedBehaviorLearner:
         if pending['decision']['activity'] == 'hide_seek' and state_before.get('hiding_spot'):
             self.hiding_spots.record(state_before['hiding_spot'], reward01)
 
-        self._update_decision_stability()
+        # Stability (and so evolution) is only measured at player interactions, so
+        # learning from decisions alone does not advance the pet's stage
 
         if self.complexity == AIComplexity.EXPERT:
             agent = self.rl_system.rl_agent
