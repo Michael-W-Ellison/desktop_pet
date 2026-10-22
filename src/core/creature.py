@@ -89,6 +89,8 @@ class Creature:
 
         # Phase 4: Evolution System
         self.evolution = EvolutionSystem(current_stage=EvolutionStage.BABY)
+        # How settled the decision network is (0-1); updated by EnhancedBehaviorLearner
+        self.decision_stability = 0.0
 
         # Phase 4: Element System
         self.element = create_element_system_for_species(self.creature_type)
@@ -244,7 +246,9 @@ class Creature:
             enjoyment = 0.8  # Very hungry = really enjoyed food
         elif old_hunger > 40:
             enjoyment = 0.5  # Moderately hungry
-        self.preferences.record_experience('food', food_type, enjoyment)
+        # Elders' preferences are set
+        if not self.is_elder():
+            self.preferences.record_experience('food', food_type, enjoyment)
 
         # Record in memory system (Phase 2)
         # Check if this is first feeding
@@ -312,7 +316,8 @@ class Creature:
             elif interaction_type in ['play', 'training', 'pet', 'talk']:
                 category = 'activity'
 
-            if category:
+            # Elders' preferences are set
+            if category and not self.is_elder():
                 enjoyment = 0.7 if positive else -0.4
                 if not gentle:
                     enjoyment -= 0.3  # Rough handling reduces enjoyment
@@ -693,8 +698,17 @@ class Creature:
             'happiness': self.happiness,
             'bond': self.bonding.bond,  # Phase 5: Use bonding system
             'total_interactions': self.total_interactions,
-            'tricks_learned': len(self.get_known_tricks())
+            'tricks_learned': len(self.get_known_tricks()),
+            'decision_stability': self.decision_stability
         }
+
+    def is_elder(self) -> bool:
+        """Elders have settled personalities: they stop learning and take no new tricks."""
+        return self.evolution.current_stage == EvolutionStage.ELDER
+
+    def _apply_stage_rules(self):
+        """Apply restrictions that depend on the current evolution stage."""
+        self.training.accepts_new_tricks = not self.is_elder()
 
     def can_evolve(self) -> Tuple[bool, Optional[EvolutionStage], str]:
         """
@@ -717,6 +731,8 @@ class Creature:
         success, new_stage, message = self.evolution.evolve(stats)
 
         if success:
+            self._apply_stage_rules()
+
             # Record evolution in memory as crucial event
             self.memory.record_interaction(
                 'evolved',
@@ -1374,6 +1390,7 @@ class Creature:
             'training_system': self.training.to_dict(),
             # Phase 4: Evolution, Element, Variant
             'evolution_system': self.evolution.to_dict(),
+            'decision_stability': self.decision_stability,
             'element_system': self.element.to_dict(),
             'variant_system': self.variant.to_dict(),
             # Phase 5: Advanced Bonding Systems
@@ -1432,6 +1449,7 @@ class Creature:
         # Phase 4: Restore evolution, element, variant if present
         if 'evolution_system' in data:
             creature.evolution = EvolutionSystem.from_dict(data['evolution_system'])
+        creature.decision_stability = data.get('decision_stability', 0.0)
 
         if 'element_system' in data:
             creature.element = ElementSystem.from_dict(data['element_system'])
@@ -1477,6 +1495,7 @@ class Creature:
                 from .enhanced_memory import DreamSystem
                 creature.dream_system = DreamSystem.from_dict(data['dream_system'])
 
+        creature._apply_stage_rules()
         return creature
 
     def __str__(self) -> str:

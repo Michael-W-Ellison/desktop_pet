@@ -7,9 +7,14 @@ Provides different AI complexity levels:
 - ADVANCED: Full system with specialized networks and RL
 - EXPERT: All features plus visualization and detailed logging
 """
+import copy
+import itertools
+from collections import deque
 import numpy as np
 from typing import Dict, Any
-from .config import AIComplexity, DEFAULT_AI_COMPLEXITY
+from .config import (
+    AIComplexity, DEFAULT_AI_COMPLEXITY, DECISION_STABILITY_WINDOW, DECISION_STABILITY_SMOOTHING
+)
 from .neural_network import BehaviorLearner as SimpleBehaviorLearner
 from .lstm_network import LSTMNetwork
 from .specialized_networks import NetworkCoordinator
@@ -23,6 +28,9 @@ class EnhancedBehaviorLearner:
 
     Adapts sophistication based on user preference and creature age.
     """
+
+    # Fixed (hunger, energy, happiness, time) states used to probe activity decisions
+    STABILITY_PROBES = list(itertools.product((0.1, 0.5, 0.9), (0.2, 0.8), (0.2, 0.8), (0.0, 1.0)))
 
     def __init__(self, creature, complexity: AIComplexity = DEFAULT_AI_COMPLEXITY):
         """
@@ -53,6 +61,9 @@ class EnhancedBehaviorLearner:
         # Performance monitoring
         self.total_interactions = 0
         self.learning_history = []
+
+        # Recent probe outputs for measuring decision stability (not saved)
+        self.probe_history = deque(maxlen=DECISION_STABILITY_WINDOW + 1)
 
     def _init_simple(self):
         """Initialize simple AI (basic feedforward network)."""
@@ -248,6 +259,10 @@ class EnhancedBehaviorLearner:
         """
         self.total_interactions += 1
 
+        # Elders' behavior is set: their networks no longer learn
+        if self.creature.is_elder():
+            return
+
         if self.complexity == AIComplexity.SIMPLE:
             # Simple learning
             self.simple_learner.learn_from_interaction(activity_type, enjoyed)
@@ -301,6 +316,68 @@ class EnhancedBehaviorLearner:
                 'enjoyed': enjoyed,
                 'timestamp': time.time()
             })
+
+        self._update_decision_stability()
+
+    def _probe_activity_scores(self) -> np.ndarray:
+        """
+        Score every activity for each probe state with the activity-decision network.
+
+        Probing does not change the networks' recurrent state.
+
+        Returns:
+            Flat array of activity scores across all probe states
+        """
+        if self.complexity == AIComplexity.SIMPLE:
+            learner = self.simple_learner
+            activities = ['ball_play', 'mouse_chase', 'hide_and_seek', 'icon_interaction']
+            scores = [
+                learner.network.predict(np.array([hunger, energy, happiness, hours] +
+                                                 learner.encode_activity(activity)))[0][0]
+                for hunger, energy, happiness, hours in self.STABILITY_PROBES
+                for activity in activities
+            ]
+            return np.array(scores)
+
+        if self.complexity == AIComplexity.MEDIUM:
+            network = self.activity_network
+            personality = self._encode_personality()
+            padding = [0.0] * (network.input_size - 4 - len(personality))
+            inputs = [np.array([hunger, energy, happiness, hours] + personality + padding)
+                      for hunger, energy, happiness, hours in self.STABILITY_PROBES]
+        else:  # ADVANCED or EXPERT: the coordinator's activity network
+            network = self.network_coordinator.activity_net.network
+            inputs = [np.array([hunger, energy, happiness, hours] + [0.0] * 5 + [0.5] * 5)
+                      for hunger, energy, happiness, hours in self.STABILITY_PROBES]
+
+        saved_states = (copy.deepcopy(network.h_states), copy.deepcopy(network.c_states))
+        scores = [network.forward_sequence([x], reset_state=True)[0][0][0] for x in inputs]
+        network.h_states, network.c_states = saved_states
+        return np.concatenate(scores)
+
+    def _update_decision_stability(self):
+        """
+        Update the creature's decision stability after a learning update.
+
+        Over the last DECISION_STABILITY_WINDOW updates, compares how far the probe
+        scores moved overall with the total distance they travelled. A network that
+        is still learning moves consistently in one direction (ratio near 1); a
+        settled one only jitters around the same point (ratio near 0).
+        """
+        self.probe_history.append(self._probe_activity_scores())
+        if len(self.probe_history) <= DECISION_STABILITY_WINDOW:
+            return
+
+        history = list(self.probe_history)
+        path = sum(np.linalg.norm(b - a) for a, b in zip(history, history[1:]))
+        if path == 0:
+            return
+        net = np.linalg.norm(history[-1] - history[0])
+        settled = 1.0 - net / path
+
+        stability = self.creature.decision_stability
+        stability += DECISION_STABILITY_SMOOTHING * (settled - stability)
+        self.creature.decision_stability = float(stability)
 
     def get_behavioral_decision(self) -> Dict[str, Any]:
         """

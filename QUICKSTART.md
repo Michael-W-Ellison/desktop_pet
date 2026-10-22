@@ -58,11 +58,16 @@
 - Happiness starts falling after 5 minutes without interaction and reaches 0 after an hour
 - Each pet has unique preferences
 
+🌱 **Growing up**
+- Pets evolve from Baby → Juvenile → Adult → Elder as their learned behavior settles
+- Interactions are what train your pet's neural network, so the more you interact, the sooner it grows up
+- Once a pet becomes an Elder, its personality and behavior are set for good
+
 🎓 **Train tricks!**
 - Right-click → "Train" → "Learn New Trick" to start a trick, then pick it from "Train" to practice
 - Each practice shows the result and the trick's proficiency
 - Some personalities refuse to practice more often than others
-- Pets need 3 known tricks to evolve into an Elder
+- Elders can't learn new tricks; they can still practice tricks they already know
 
 ## Troubleshooting
 

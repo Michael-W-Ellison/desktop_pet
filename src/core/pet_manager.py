@@ -279,7 +279,11 @@ class PetManager:
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Information)
         msg.setWindowTitle("Evolution!")
-        msg.setText(f"{self.creature.name} has grown!\n\n{message}")
+        text = f"{self.creature.name} has grown!\n\n{message}"
+        if self.creature.is_elder():
+            text += ("\n\nAs an Elder, its personality and behavior are now set: "
+                     "it won't change its habits or learn new tricks.")
+        msg.setText(text)
         msg.exec_()
 
         self.save_state()
@@ -540,7 +544,9 @@ class PetManager:
 
         training = self.creature.training
         if trick_name not in training.learned_tricks:
-            training.start_learning_trick(trick_name)
+            started, message = training.start_learning_trick(trick_name)
+            if not started:
+                return message
 
         success, message, _ = self.creature.practice_trick(trick_name)
 

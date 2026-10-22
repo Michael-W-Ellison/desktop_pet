@@ -226,7 +226,17 @@ class PetWindow(QWidget):
                 status = "learning"
             action = QAction(f"{self.trick_label(name)} ({trick.proficiency:.0%}, {status})", train_menu)
             action.triggered.connect(lambda checked=False, n=name: self.train_trick(n))
+            # Elders can only practice tricks they already know
+            action.setEnabled(training.accepts_new_tricks or trick.can_perform())
             train_menu.addAction(action)
+
+        if not training.accepts_new_tricks:
+            if training.learned_tricks:
+                train_menu.addSeparator()
+            note = QAction("Elders can't learn new tricks", train_menu)
+            note.setEnabled(False)
+            train_menu.addAction(note)
+            return
 
         new_tricks = [name for name in sorted(training.STANDARD_TRICKS) if name not in training.learned_tricks]
         if new_tricks:

@@ -53,11 +53,8 @@ evo_creature = Creature(creature_type='phoenix', personality=PersonalityType.CLE
 print(f"Created {evo_creature.name} the {evo_creature.creature_type}")
 print(f"Starting stage: {evo_creature.evolution.get_stage_name()}")
 
-# Simulate aging and interactions
-evo_creature.age = 3 * 3600  # 3 hours
-evo_creature.happiness = 50
-evo_creature.bonding.bond = 35
-evo_creature.total_interactions = 60
+# Simulate a decision network that has partly settled
+evo_creature.decision_stability = 0.3
 
 can_evolve, next_stage, reason = evo_creature.can_evolve()
 print("\nChecking evolution eligibility:")

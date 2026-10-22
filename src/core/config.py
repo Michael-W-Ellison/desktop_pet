@@ -227,32 +227,19 @@ ELEMENT_ADVANTAGES = {
     ElementType.NEUTRAL: []
 }
 
-# Phase 4: Evolution requirements for each stage
+# Evolution requirements for each stage: how settled the pet's activity-decision
+# network has become (0 = still changing in a consistent direction, 1 = only small
+# random jitter), as measured by EnhancedBehaviorLearner
 EVOLUTION_REQUIREMENTS = {
-    EvolutionStage.BABY: {
-        "min_age_hours": 0,
-        "min_happiness": 0,
-        "min_bond": 0
-    },
-    EvolutionStage.JUVENILE: {
-        "min_age_hours": 2,
-        "min_happiness": 40,
-        "min_bond": 30
-    },
-    EvolutionStage.ADULT: {
-        "min_age_hours": 6,
-        "min_happiness": 60,
-        "min_bond": 60,
-        "min_interactions": 50
-    },
-    EvolutionStage.ELDER: {
-        "min_age_hours": 12,
-        "min_happiness": 70,
-        "min_bond": 80,
-        "min_interactions": 100,
-        "min_tricks_learned": 3
-    }
+    EvolutionStage.BABY: {"min_decision_stability": 0.0},
+    EvolutionStage.JUVENILE: {"min_decision_stability": 0.25},
+    EvolutionStage.ADULT: {"min_decision_stability": 0.50},
+    EvolutionStage.ELDER: {"min_decision_stability": 0.75},
 }
+
+# Decision stability measurement (EnhancedBehaviorLearner)
+DECISION_STABILITY_WINDOW = 50        # Learning updates compared per measurement
+DECISION_STABILITY_SMOOTHING = 0.005  # Moving-average weight of each new measurement
 
 # Phase 4: Stage size multipliers (how big the creature is at each stage)
 STAGE_SIZE_MULTIPLIERS = {
