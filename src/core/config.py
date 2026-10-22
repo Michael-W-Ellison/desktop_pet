@@ -243,9 +243,10 @@ ELEMENT_ADVANTAGES = {
     ElementType.NEUTRAL: []
 }
 
-# Evolution requirements for each stage: how settled the pet's activity-decision
-# network has become (0 = still changing in a consistent direction, 1 = only small
-# random jitter), as measured by EnhancedBehaviorLearner
+# Evolution requirements for each stage: how settled the pet's neural networks have
+# become (0 = still changing in a consistent direction, 1 = only small random jitter),
+# as measured by EnhancedBehaviorLearner. At ADVANCED/EXPERT every network is measured
+# and the least settled one counts.
 EVOLUTION_REQUIREMENTS = {
     EvolutionStage.BABY: {"min_decision_stability": 0.0},
     EvolutionStage.JUVENILE: {"min_decision_stability": 0.25},
@@ -254,7 +255,7 @@ EVOLUTION_REQUIREMENTS = {
 }
 
 # Decision stability measurement (EnhancedBehaviorLearner)
-DECISION_STABILITY_WINDOW = 50        # Learning updates compared per measurement
+DECISION_STABILITY_WINDOW = 200       # Learning updates compared per measurement
 DECISION_STABILITY_SMOOTHING = 0.005  # Moving-average weight of each new measurement
 
 # Phase 4: Stage size multipliers (how big the creature is at each stage)

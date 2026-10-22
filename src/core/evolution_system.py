@@ -28,8 +28,9 @@ class EvolutionSystem:
     """
     Manages creature evolution through life stages.
 
-    Evolution progression is driven by how settled the pet's activity-decision
-    network has become (see EVOLUTION_REQUIREMENTS in config):
+    Evolution progression is driven by how settled the pet's neural networks have
+    become; at ADVANCED/EXPERT every network must have settled (see
+    EVOLUTION_REQUIREMENTS in config):
     - BABY: starting stage
     - JUVENILE: decisions 25%+ settled
     - ADULT: decisions 50%+ settled
@@ -55,7 +56,7 @@ class EvolutionSystem:
 
         Args:
             creature_stats: Dictionary containing:
-                - decision_stability: How settled the decision network is (0-1)
+                - decision_stability: How settled the neural networks are (0-1)
 
         Returns:
             Tuple of (can_evolve, next_stage, reason)

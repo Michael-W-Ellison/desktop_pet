@@ -95,8 +95,8 @@ class EnhancedBehaviorLearner:
         self.events_since_decision = []
         self.hiding_spots = HidingSpotMemory()
 
-        # Recent probe outputs for measuring decision stability (not saved)
-        self.probe_history = deque(maxlen=DECISION_STABILITY_WINDOW + 1)
+        # Recent probe outputs per network for measuring stability (not saved)
+        self.probe_history = {}
 
     def _init_simple(self):
         """Initialize simple AI (basic feedforward network)."""
@@ -377,65 +377,105 @@ class EnhancedBehaviorLearner:
 
         self._update_decision_stability()
 
-    def _probe_activity_scores(self) -> np.ndarray:
-        """
-        Score every activity for each probe state with the activity-decision network.
+    @staticmethod
+    def _probe_lstm(network: LSTMNetwork, inputs) -> np.ndarray:
+        """Outputs of an LSTM for each input on its own, leaving its recurrent state unchanged."""
+        saved_states = (copy.deepcopy(network.h_states), copy.deepcopy(network.c_states))
+        outputs = [network.forward_sequence([x], reset_state=True)[0][0][0] for x in inputs]
+        network.h_states, network.c_states = saved_states
+        return np.concatenate(outputs)
 
-        Probing does not change the networks' recurrent state.
+    def _probe_network_scores(self) -> Dict[str, np.ndarray]:
+        """
+        Outputs of each learning network for fixed probe states.
+
+        SIMPLE and MEDIUM have one learning network; ADVANCED and EXPERT have five
+        (movement, activity, emotion, social and the RL Q-network).
 
         Returns:
-            Flat array of activity scores across all probe states
+            Network name -> flat array of outputs across all probe states
         """
+        probes = self.STABILITY_PROBES
+
         if self.complexity == AIComplexity.SIMPLE:
             learner = self.simple_learner
             activities = ['ball_play', 'mouse_chase', 'hide_and_seek', 'icon_interaction']
-            scores = [
-                learner.network.predict(np.array([hunger, energy, happiness, hours] +
-                                                 learner.encode_activity(activity)))[0][0]
-                for hunger, energy, happiness, hours in self.STABILITY_PROBES
-                for activity in activities
-            ]
-            return np.array(scores)
+            inputs = np.array([[hunger, energy, happiness, hours] + learner.encode_activity(activity)
+                               for hunger, energy, happiness, hours in probes
+                               for activity in activities])
+            return {'activity': learner.network.predict(inputs).ravel()}
+
+        personality = self._encode_personality()
 
         if self.complexity == AIComplexity.MEDIUM:
             network = self.activity_network
-            personality = self._encode_personality()
             padding = [0.0] * (network.input_size - 4 - len(personality))
             inputs = [np.array([hunger, energy, happiness, hours] + personality + padding)
-                      for hunger, energy, happiness, hours in self.STABILITY_PROBES]
-        else:  # ADVANCED or EXPERT: the coordinator's activity network
-            network = self.network_coordinator.activity_net.network
-            inputs = [np.array([hunger, energy, happiness, hours] + [0.0] * 5 + [0.5] * 5)
-                      for hunger, energy, happiness, hours in self.STABILITY_PROBES]
+                      for hunger, energy, happiness, hours in probes]
+            return {'activity': self._probe_lstm(network, inputs)}
 
-        saved_states = (copy.deepcopy(network.h_states), copy.deepcopy(network.c_states))
-        scores = [network.forward_sequence([x], reset_state=True)[0][0][0] for x in inputs]
-        network.h_states, network.c_states = saved_states
-        return np.concatenate(scores)
+        # ADVANCED or EXPERT: every network, each with probe inputs in its own format
+        coordinator = self.network_coordinator
+        movement_inputs = np.array([coordinator.movement_net.encode_state({
+            'pos_x': 960, 'pos_y': 540, 'target_x': hunger * 1920, 'target_y': happiness * 1080,
+            'energy': energy * 100, 'distance_to_target': hours * 500,
+            'edge_top': 540, 'edge_bottom': 540, 'edge_left': 960, 'edge_right': 960,
+            'personality_vector': personality,
+        }) for hunger, energy, happiness, hours in probes])
+        emotion_inputs = np.array([coordinator.emotion_net.encode_state({
+            'hunger': hunger * 100, 'energy': energy * 100, 'happiness': happiness * 100,
+            'recent_interaction_quality': [hours] * 10, 'personality_vector': personality,
+        }) for hunger, energy, happiness, hours in probes])
+        activity_inputs = [np.array([hunger, energy, happiness, hours] + [0.0] * 5 + [0.5] * 5)
+                           for hunger, energy, happiness, hours in probes]
+        social_inputs = [np.array([hunger, energy, hours] + [happiness] * 5 + [happiness])
+                         for hunger, energy, happiness, hours in probes]
+        rl_inputs = np.array([[hunger, energy, happiness, hours, 0.5, 0.5, 0.0] + [0.0] * (RL_STATE_SIZE - 7)
+                              for hunger, energy, happiness, hours in probes])
+
+        return {
+            'movement': coordinator.movement_net.network.predict(movement_inputs).ravel(),
+            'activity': self._probe_lstm(coordinator.activity_net.network, activity_inputs),
+            'emotion': coordinator.emotion_net.network.predict(emotion_inputs).ravel(),
+            'social': self._probe_lstm(coordinator.social_net.network, social_inputs),
+            'rl': self.rl_system.rl_agent.q_network.forward(rl_inputs)[0].ravel(),
+        }
 
     def _update_decision_stability(self):
         """
-        Update the creature's decision stability after a learning update.
+        Update how settled each network is after a learning update.
 
-        Over the last DECISION_STABILITY_WINDOW updates, compares how far the probe
-        scores moved overall with the total distance they travelled. A network that
-        is still learning moves consistently in one direction (ratio near 1); a
-        settled one only jitters around the same point (ratio near 0).
+        For each network, over the last DECISION_STABILITY_WINDOW updates, compares
+        how far its probe outputs moved overall with the total distance they
+        travelled. A network that is still learning moves consistently in one
+        direction (ratio near 1); a settled one only jitters around the same point
+        (ratio near 0). The creature's decision stability is the least settled network.
         """
-        self.probe_history.append(self._probe_activity_scores())
-        if len(self.probe_history) <= DECISION_STABILITY_WINDOW:
-            return
+        stabilities = self.creature.network_stability
+        for name, scores in self._probe_network_scores().items():
+            history = self.probe_history.setdefault(name, deque(maxlen=DECISION_STABILITY_WINDOW + 1))
+            history.append(scores)
+            if len(history) <= DECISION_STABILITY_WINDOW:
+                continue
 
-        history = list(self.probe_history)
-        path = sum(np.linalg.norm(b - a) for a, b in zip(history, history[1:]))
-        if path == 0:
-            return
-        net = np.linalg.norm(history[-1] - history[0])
-        settled = 1.0 - net / path
+            history = list(history)
+            path = sum(np.linalg.norm(b - a) for a, b in zip(history, history[1:]))
+            if path == 0:
+                continue  # Network has not changed during the window
+            settled = 1.0 - np.linalg.norm(history[-1] - history[0]) / path
 
-        stability = self.creature.decision_stability
-        stability += DECISION_STABILITY_SMOOTHING * (settled - stability)
-        self.creature.decision_stability = float(stability)
+            stability = stabilities.get(name, 0.0)
+            stabilities[name] = float(stability + DECISION_STABILITY_SMOOTHING * (settled - stability))
+
+        # Every network must have settled; one that has not been measured yet counts as 0
+        names = self.network_names()
+        self.creature.decision_stability = min(stabilities.get(name, 0.0) for name in names)
+
+    def network_names(self):
+        """Names of the networks whose stability drives evolution at this level."""
+        if self.complexity in (AIComplexity.ADVANCED, AIComplexity.EXPERT):
+            return ['movement', 'activity', 'emotion', 'social', 'rl']
+        return ['activity']
 
     def get_behavioral_decision(self) -> Dict[str, Any]:
         """
@@ -502,10 +542,14 @@ class EnhancedBehaviorLearner:
             Multi-line description with bars for emotions, Q-values and metrics
         """
         lines = [f"Decision stability: {bar(self.creature.decision_stability)} "
-                 f"{self.creature.decision_stability:.0%}",
-                 f"Stage: {self.creature.evolution.get_stage_name()}"
-                 + (" (behavior set)" if self.creature.is_elder() else ""),
-                 f"Interactions learned from: {self.total_interactions}"]
+                 f"{self.creature.decision_stability:.0%} (least settled network)"]
+        for name in self.network_names():
+            value = self.creature.network_stability.get(name, 0.0)
+            label = 'RL' if name == 'rl' else name.capitalize()
+            lines.append(f"  {label:<12} {bar(value)} {value:.0%}")
+        lines.append(f"Stage: {self.creature.evolution.get_stage_name()}"
+                     + (" (behavior set)" if self.creature.is_elder() else ""))
+        lines.append(f"Interactions learned from: {self.total_interactions}")
 
         if self.complexity not in (AIComplexity.ADVANCED, AIComplexity.EXPERT):
             return "\n".join(lines)

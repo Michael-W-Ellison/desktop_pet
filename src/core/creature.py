@@ -89,7 +89,9 @@ class Creature:
 
         # Phase 4: Evolution System
         self.evolution = EvolutionSystem(current_stage=EvolutionStage.BABY)
-        # How settled the decision network is (0-1); updated by EnhancedBehaviorLearner
+        # How settled each neural network is (0-1), and the least settled of them,
+        # which drives evolution; updated by EnhancedBehaviorLearner
+        self.network_stability = {}
         self.decision_stability = 0.0
         # Energy use set by the emotion network (contentment lowers it, excitement raises it)
         self.emotional_energy_modifier = 1.0
@@ -1409,6 +1411,7 @@ class Creature:
             # Phase 4: Evolution, Element, Variant
             'evolution_system': self.evolution.to_dict(),
             'decision_stability': self.decision_stability,
+            'network_stability': self.network_stability,
             'element_system': self.element.to_dict(),
             'variant_system': self.variant.to_dict(),
             # Phase 5: Advanced Bonding Systems
@@ -1468,6 +1471,9 @@ class Creature:
         if 'evolution_system' in data:
             creature.evolution = EvolutionSystem.from_dict(data['evolution_system'])
         creature.decision_stability = data.get('decision_stability', 0.0)
+        # Saves from before per-network measurement only tracked the activity network
+        creature.network_stability = data.get('network_stability',
+                                              {'activity': creature.decision_stability})
 
         if 'element_system' in data:
             creature.element = ElementSystem.from_dict(data['element_system'])
