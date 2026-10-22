@@ -91,6 +91,8 @@ class Creature:
         self.evolution = EvolutionSystem(current_stage=EvolutionStage.BABY)
         # How settled the decision network is (0-1); updated by EnhancedBehaviorLearner
         self.decision_stability = 0.0
+        # Energy use set by the emotion network (contentment lowers it, excitement raises it)
+        self.emotional_energy_modifier = 1.0
 
         # Phase 4: Element System
         self.element = create_element_system_for_species(self.creature_type)
@@ -174,7 +176,8 @@ class Creature:
 
         # Update energy based on activity
         if self.current_state in [BehaviorState.RUNNING, BehaviorState.PLAYING]:
-            energy_drain = 0.5 * delta_time * self.trait_modifiers.get('energy_consumption', 1.0)
+            energy_drain = (0.5 * delta_time * self.trait_modifiers.get('energy_consumption', 1.0)
+                            * self.emotional_energy_modifier)
             self.energy = max(0, self.energy - energy_drain)
         elif self.current_state == BehaviorState.SLEEPING:
             energy_gain = 2.0 * delta_time
@@ -270,6 +273,20 @@ class Creature:
             important=first_feeding,
             emotional_intensity=0.7 if old_hunger > 70 else 0.5
         )
+
+        # Record in history for neural network learning
+        self.interaction_history.append({
+            'type': 'feed',
+            'positive': True,
+            'timestamp': time.time(),
+            'hunger_level': self.hunger,
+            'energy_level': self.energy,
+            'happiness_level': self.happiness,
+            'bond_gain': bond_gain,
+            'gentle': True
+        })
+        if len(self.interaction_history) > 100:
+            self.interaction_history = self.interaction_history[-100:]
 
     def interact(self, interaction_type: str, positive: bool = True,
                  item: str = None, gentle: bool = True):
@@ -436,7 +453,8 @@ class Creature:
             return [0.0] * count
 
         recent = self.interaction_history[-count:]
-        type_mapping = {'feed': 0.2, 'play_ball': 0.4, 'pet': 0.6, 'talk': 0.8, 'other': 0.5}
+        type_mapping = {'feed': 0.2, 'being_fed': 0.2, 'play_ball': 0.4, 'ball_play': 0.4,
+                        'pet': 0.6, 'talk': 0.8, 'other': 0.5}
 
         encoded = []
         for interaction in recent:
@@ -477,7 +495,7 @@ class Creature:
                 activities.append(0.6)
             elif itype in ['hide_and_seek', 'hide']:
                 activities.append(0.4)
-            elif itype == 'feed':
+            elif itype in ['feed', 'being_fed']:
                 activities.append(0.2)
             else:
                 activities.append(0.0)

@@ -236,7 +236,7 @@ class LearningRateScheduler:
     """
 
     def __init__(self, initial_lr: float, schedule_type: str = 'step',
-                 decay_rate: float = 0.1, decay_steps: int = 1000):
+                 decay_rate: float = 0.1, decay_steps: int = 1000, min_lr: float = 0.0):
         """
         Initialize learning rate scheduler.
 
@@ -245,8 +245,10 @@ class LearningRateScheduler:
             schedule_type: Type of schedule ('step', 'exponential', 'cosine')
             decay_rate: Rate of decay
             decay_steps: Steps between decay (for step schedule)
+            min_lr: Lowest learning rate the schedule returns
         """
         self.initial_lr = initial_lr
+        self.min_lr = min_lr
         self.schedule_type = schedule_type
         self.decay_rate = decay_rate
         self.decay_steps = decay_steps
@@ -254,6 +256,10 @@ class LearningRateScheduler:
 
     def get_lr(self) -> float:
         """Get current learning rate based on schedule."""
+        return max(self.min_lr, self._scheduled_lr())
+
+    def _scheduled_lr(self) -> float:
+        """Learning rate from the schedule before the floor is applied."""
         if self.schedule_type == 'step':
             # Step decay: lr = initial_lr * decay_rate^(step // decay_steps)
             return self.initial_lr * (self.decay_rate ** (self.current_step // self.decay_steps))
@@ -272,3 +278,44 @@ class LearningRateScheduler:
     def step(self):
         """Increment step counter."""
         self.current_step += 1
+
+    def to_dict(self):
+        """Convert scheduler state to dictionary for saving."""
+        return {
+            'initial_lr': self.initial_lr,
+            'schedule_type': self.schedule_type,
+            'decay_rate': self.decay_rate,
+            'decay_steps': self.decay_steps,
+            'current_step': self.current_step,
+            'min_lr': self.min_lr
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        """Create scheduler from dictionary."""
+        scheduler = cls(
+            initial_lr=data['initial_lr'],
+            schedule_type=data['schedule_type'],
+            decay_rate=data['decay_rate'],
+            decay_steps=data['decay_steps'],
+            min_lr=data.get('min_lr', 0.0)
+        )
+        scheduler.current_step = data['current_step']
+        return scheduler
+
+
+def make_adam_optimizer(learning_rate: float) -> 'AdamOptimizer':
+    """Create an Adam optimizer using the configured beta values."""
+    from .config import ADAM_BETA1, ADAM_BETA2
+    return AdamOptimizer(learning_rate=learning_rate, beta1=ADAM_BETA1, beta2=ADAM_BETA2)
+
+
+def make_lr_scheduler(initial_lr: float) -> LearningRateScheduler:
+    """Create the configured exponential learning-rate schedule (constant if disabled)."""
+    from .config import USE_LEARNING_RATE_SCHEDULE, LEARNING_RATE_DECAY, MIN_LEARNING_RATE_FRACTION
+    return LearningRateScheduler(
+        initial_lr=initial_lr,
+        schedule_type='exponential' if USE_LEARNING_RATE_SCHEDULE else 'constant',
+        decay_rate=LEARNING_RATE_DECAY,
+        min_lr=initial_lr * MIN_LEARNING_RATE_FRACTION
+    )

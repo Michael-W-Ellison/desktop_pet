@@ -18,7 +18,7 @@ Choose the right level of AI sophistication for your needs:
 - **Best for**: General use, balanced experience
 - **Features**: LSTM networks with memory + sensory inputs
 - **Learning**: Temporal pattern recognition, schedule learning
-- **Memory**: Remembers sequences of up to 30 interactions
+- **Memory**: Remembers sequences of up to 50 interactions
 - **Performance**: Fast, moderate CPU usage
 
 #### 🟣 ADVANCED Mode (Ages 13+)
@@ -183,7 +183,8 @@ Combines all four networks intelligently:
 - Is near hiding spot
 
 **Environmental Awareness**:
-- Detects desktop icons as obstacles and hiding spots
+- Detects desktop icons as obstacles and hiding spots (reads real icon positions on
+  Windows and rescans every minute; other systems assume a standard icon grid)
 - Tracks mouse movement and predicts approach
 - Knows time of day and adjusts behavior
 - Understands screen boundaries

@@ -56,6 +56,22 @@ ENHANCED_NETWORK_LAYERS = [64, 32, 16, 8]  # Larger, deeper network
 USE_DROPOUT = True  # Prevent overfitting
 DROPOUT_RATE = 0.25  # 25% dropout
 USE_BATCH_NORMALIZATION = True  # Stable training
+USE_RESIDUAL_CONNECTIONS = True  # Skip connections between equal-sized layers
+TRAINING_BATCH_SIZE = 16  # Mini-batch size for feedforward networks (batch norm needs > 1)
+
+# Learning rate scheduling (exponential decay per training step, with a floor)
+LEARNING_RATE_DECAY = 0.0001
+MIN_LEARNING_RATE_FRACTION = 0.1  # Learning rate never drops below this fraction of its start
+
+# LSTM memory
+SEQUENCE_LENGTH = 50  # How many interactions to remember
+
+# Reinforcement learning
+GAMMA = 0.95  # How much to value future rewards (0-1)
+EPSILON_DECAY = 0.995  # How fast to reduce exploration
+EPSILON_MIN = 0.1  # Minimum exploration rate
+RL_REPLAY_CAPACITY = 10000  # Past experiences kept for replay
+RL_STATE_SIZE = 35  # 7 creature stats + 28 sensory inputs
 
 # AI Complexity levels (for different age groups)
 class AIComplexity(Enum):

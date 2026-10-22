@@ -14,3 +14,4 @@ dist/
 pet_data.json
 *.spec
 !desktop_pet.spec
+ai_expert.log*

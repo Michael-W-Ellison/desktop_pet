@@ -7,7 +7,7 @@ from PyQt5.QtGui import QPixmap, QCursor
 from PIL import Image
 from ui.sprite_generator import SpriteGenerator
 from ui.image_utils import pil_to_qimage
-from core.config import PET_SIZE, FPS, ANIMATION_UPDATE_INTERVAL, STAGE_SIZE_MULTIPLIERS
+from core.config import PET_SIZE, FPS, ANIMATION_UPDATE_INTERVAL, STAGE_SIZE_MULTIPLIERS, AIComplexity
 
 
 class PetWindow(QWidget):
@@ -198,6 +198,11 @@ class PetWindow(QWidget):
             stats_action = QAction("Show Stats", menu)
             stats_action.triggered.connect(self.pet_manager.show_stats)
             menu.addAction(stats_action)
+
+            if self.pet_manager.ai_complexity == AIComplexity.EXPERT:
+                insights_action = QAction("AI Insights", menu)
+                insights_action.triggered.connect(self.pet_manager.show_ai_insights)
+                menu.addAction(insights_action)
         else:
             # Egg state
             hatch_action = QAction("Hatch Egg", menu)

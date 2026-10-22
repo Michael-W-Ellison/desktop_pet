@@ -4,7 +4,7 @@ Main pet manager coordinating creature behavior, UI, and game logic with enhance
 import time
 import random
 from typing import Optional
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QCursor
 from PyQt5.QtWidgets import QMessageBox, QApplication
 from .creature import Creature
@@ -301,45 +301,37 @@ class PetManager:
 
         # Get behavioral decision from enhanced learner
         try:
+            self._sync_learner_screen_size()
             decision = self.learner.get_behavioral_decision()
             self.current_decision = decision
 
-            # Extract activity from decision
             activity = decision.get('activity', 'idle')
-
-            # Map activity to behavior state
             self._apply_activity_decision(activity, decision)
 
-            # Apply movement from advanced AI (if available)
-            if 'velocity_x' in decision and 'velocity_y' in decision:
-                if decision.get('should_move', False):
-                    # Use AI-determined velocity
-                    self.creature.velocity = [
-                        decision['velocity_x'],
-                        decision['velocity_y']
-                    ]
-                else:
-                    self.creature.velocity = [0, 0]
-            else:
-                # Fallback to simple random movement for idle/explore
-                if activity in ['explore', 'idle'] and random.random() < 0.3:
-                    speed = 2 * self.creature.trait_modifiers.get('movement_speed', 1.0)
-                    self.creature.velocity = [
-                        random.uniform(-speed, speed),
-                        random.uniform(-speed, speed)
-                    ]
+            # Emotions change how much energy activity uses
+            modifiers = decision.get('emotional_modifiers')
+            if modifiers:
+                self.creature.emotional_energy_modifier = max(0.1, modifiers['energy_consumption'])
 
         except Exception as e:
             # Fallback to simple behavior if AI fails
             print(f"AI decision error: {e}")
             self._fallback_behavior()
 
+    def _sync_learner_screen_size(self):
+        """Give the learner's sensory system the real screen size."""
+        screen = QApplication.desktop().screenGeometry()
+        size = (screen.width(), screen.height())
+        if getattr(self, '_learner_screen_size', None) != (self.learner, size):
+            self.learner.set_screen_size(*size)
+            self._learner_screen_size = (self.learner, size)
+
     def _apply_activity_decision(self, activity: str, decision: dict):
         """
-        Apply activity decision to creature state.
+        Apply activity decision to creature state and movement.
 
         Args:
-            activity: Activity name (e.g., 'mouse_chase', 'hide_and_seek')
+            activity: Activity name (e.g., 'mouse_chase', 'hide_seek')
             decision: Full decision dictionary from AI
         """
         # Map activities to behavior states
@@ -347,10 +339,16 @@ class PetManager:
             'mouse_chase': BehaviorState.CHASING,
             'ball_play': BehaviorState.PLAYING,
             'hide': BehaviorState.HIDING,
+            'hide_seek': BehaviorState.HIDING,
             'seek': BehaviorState.SEEKING,
             'hide_and_seek': BehaviorState.HIDING if random.random() < 0.5 else BehaviorState.SEEKING,
             'explore': BehaviorState.WALKING,
+            'random_wander': BehaviorState.WALKING,
+            'move_to_center': BehaviorState.WALKING,
+            'seek_interaction': BehaviorState.SEEKING,
+            'seek_food': BehaviorState.SEEKING,
             'sleep': BehaviorState.SLEEPING,
+            'stay_still': BehaviorState.IDLE,
             'idle': BehaviorState.IDLE,
             'eat': BehaviorState.EATING,
         }
@@ -358,12 +356,24 @@ class PetManager:
         new_state = activity_state_map.get(activity, BehaviorState.IDLE)
         self.creature.set_state(new_state)
 
-        # Special handling for specific activities
         if activity == 'mouse_chase':
-            # Will be handled by check_mouse_chase
-            pass
-        elif activity == 'hide':
-            # Move toward nearest icon (if sensory system available)
+            # Movement handled by check_mouse_chase
+            return
+
+        if activity in ('sleep', 'stay_still'):
+            self.creature.velocity = [0, 0]
+            return
+
+        if 'velocity_x' in decision:
+            # ADVANCED/EXPERT: the movement network decides how to move
+            if decision.get('should_move', False):
+                self.creature.velocity = [decision['velocity_x'], decision['velocity_y']]
+            else:
+                self.creature.velocity = [0, 0]
+            return
+
+        # SIMPLE/MEDIUM: steer toward a hiding spot, or wander
+        if activity in ('hide', 'hide_and_seek'):
             if self.sensory_system and self.pet_window:
                 state = self.sensory_system.get_state_dict(
                     self.creature.position[0],
@@ -381,6 +391,14 @@ class PetManager:
                             (dx / distance) * speed,
                             (dy / distance) * speed
                         ]
+                        return
+            self.creature.velocity = [0, 0]
+        elif activity in ('explore', 'idle', 'ball_play') and random.random() < 0.3:
+            speed = 2 * self.creature.trait_modifiers.get('movement_speed', 1.0)
+            self.creature.velocity = [
+                random.uniform(-speed, speed),
+                random.uniform(-speed, speed)
+            ]
 
     def _fallback_behavior(self):
         """Fallback to simple random behavior if AI fails."""
@@ -608,6 +626,20 @@ class PetManager:
         msg.setIcon(QMessageBox.Information)
         msg.setWindowTitle(f"{self.creature.name}'s Stats")
         msg.setText(stats_text)
+        msg.exec_()
+
+    def show_ai_insights(self):
+        """Show the EXPERT-mode view of the AI's emotions, action values and metrics."""
+        if not self.creature or not self.learner:
+            return
+
+        import html
+        text = self.learner.get_insights(self.current_decision)
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setWindowTitle(f"{self.creature.name}'s AI Insights")
+        msg.setTextFormat(Qt.RichText)
+        msg.setText(f"<pre>{html.escape(text)}</pre>")
         msg.exec_()
 
     def exit_application(self):

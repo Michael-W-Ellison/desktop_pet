@@ -9,14 +9,65 @@ Each network focuses on a specific aspect:
 
 These networks communicate and influence each other for complex, realistic behavior.
 """
+import datetime
+import random
+from collections import deque
 import numpy as np
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Optional, Tuple
 from .advanced_network import AdvancedNeuralNetwork
 from .lstm_network import LSTMNetwork
-from .config import PersonalityType
+from .config import (
+    PersonalityType, ENHANCED_NETWORK_LAYERS, LEARNING_RATE, SEQUENCE_LENGTH, TRAINING_BATCH_SIZE
+)
 
 # Length of the one-hot personality encoding supplied in 'personality_vector'
 PERSONALITY_SIZE = len(PersonalityType)
+
+# Experiences kept per feedforward network for mini-batch training
+EXPERIENCE_BUFFER_SIZE = 500
+
+# Activities whose movement heads for a target location (see NetworkCoordinator.get_target)
+TARGET_FOR_ACTIVITY = {
+    'mouse_chase': 'mouse',
+    'seek_interaction': 'mouse',
+    'seek_food': 'mouse',
+    'hide_seek': 'hiding_spot',
+    'move_to_center': 'center',
+}
+
+# Activities during which the creature should not move
+STATIONARY_ACTIVITIES = {'sleep', 'stay_still'}
+
+# Speed (pixels per frame) the movement network learns for reaching a target
+TARGET_SPEED = 3.0
+
+
+class ExperienceBuffer:
+    """Recent (input, target) pairs, sampled in mini-batches for training."""
+
+    def __init__(self, capacity: int = EXPERIENCE_BUFFER_SIZE):
+        self.inputs = deque(maxlen=capacity)
+        self.targets = deque(maxlen=capacity)
+
+    def add(self, x: np.ndarray, y: np.ndarray):
+        self.inputs.append(np.asarray(x, dtype=float).ravel())
+        self.targets.append(np.asarray(y, dtype=float).ravel())
+
+    def sample(self, batch_size: int) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+        """Random mini-batch that always includes the newest experience, or None if too few."""
+        if len(self.inputs) < batch_size:
+            return None
+        newest = len(self.inputs) - 1
+        indices = random.sample(range(newest), batch_size - 1) + [newest]
+        return (np.array([self.inputs[i] for i in indices]),
+                np.array([self.targets[i] for i in indices]))
+
+
+def _train_on_batch(network: AdvancedNeuralNetwork, buffer: ExperienceBuffer):
+    """Train once on a mini-batch from the buffer (batch norm needs several samples)."""
+    batch = buffer.sample(TRAINING_BATCH_SIZE)
+    if batch is not None:
+        network.train_step(*batch)
 
 
 class MovementNetwork:
@@ -30,31 +81,23 @@ class MovementNetwork:
     - Personality traits
     """
 
-    def __init__(self, learning_rate: float = 0.001):
+    def __init__(self, learning_rate: float = LEARNING_RATE):
         """Initialize movement network."""
         # Input: [pos_x, pos_y, target_x, target_y, energy, distance_to_target,
         #         screen_edge_distances (4), personality_encoding (PERSONALITY_SIZE)]
         # Output: [velocity_x, velocity_y, should_move]
         self.network = AdvancedNeuralNetwork(
             input_size=10 + PERSONALITY_SIZE,
-            hidden_layers=[32, 16, 8],
+            hidden_layers=list(ENHANCED_NETWORK_LAYERS),
             output_size=3,
-            learning_rate=learning_rate,
-            dropout_rate=0.2
+            learning_rate=learning_rate
         )
+        self.experiences = ExperienceBuffer()
 
-    def predict_movement(self, state: Dict[str, Any]) -> Tuple[float, float, bool]:
-        """
-        Predict movement action.
-
-        Args:
-            state: Dictionary with position, target, energy, etc.
-
-        Returns:
-            (velocity_x, velocity_y, should_move)
-        """
-        # Encode state
-        input_vector = np.array([
+    @staticmethod
+    def encode_state(state: Dict[str, Any]) -> np.ndarray:
+        """Encode position, target, energy, edges and personality as the network input."""
+        return np.array([
             state.get('pos_x', 0) / 1920,  # Normalize to screen size
             state.get('pos_y', 0) / 1080,
             state.get('target_x', 0) / 1920,
@@ -66,11 +109,21 @@ class MovementNetwork:
             state.get('edge_bottom', 0) / 1080,
             state.get('edge_left', 0) / 1920,
             state.get('edge_right', 0) / 1920,
-            # Personality (one-hot or distributed encoding)
+            # Personality (one-hot encoding)
             *state.get('personality_vector', [0] * PERSONALITY_SIZE)
         ])
 
-        output = self.network.predict(input_vector)
+    def predict_movement(self, state: Dict[str, Any]) -> Tuple[float, float, bool]:
+        """
+        Predict movement action.
+
+        Args:
+            state: Dictionary with position, target, energy, etc.
+
+        Returns:
+            (velocity_x, velocity_y, should_move)
+        """
+        output = self.network.predict(self.encode_state(state))
 
         # Decode output
         velocity_x = (output[0][0] - 0.5) * 10  # -5 to +5
@@ -79,40 +132,22 @@ class MovementNetwork:
 
         return float(velocity_x), float(velocity_y), bool(should_move)
 
-    def learn(self, state: Dict[str, Any], action: Tuple[float, float, bool],
-              reward: float):
+    def learn(self, state: Dict[str, Any], target_velocity: Tuple[float, float], should_move: bool):
         """
-        Learn from movement outcome.
+        Learn the movement that should have been made in a state.
 
         Args:
-            state: State when action was taken
-            action: Action taken (velocity_x, velocity_y, should_move)
-            reward: Reward received
+            state: State when the movement was chosen
+            target_velocity: Velocity (x, y) that would have served the activity
+            should_move: Whether the creature should have been moving
         """
-        # Encode input
-        input_vector = np.array([
-            state.get('pos_x', 0) / 1920,
-            state.get('pos_y', 0) / 1080,
-            state.get('target_x', 0) / 1920,
-            state.get('target_y', 0) / 1080,
-            state.get('energy', 100) / 100,
-            min(1.0, state.get('distance_to_target', 0) / 500),
-            state.get('edge_top', 0) / 1080,
-            state.get('edge_bottom', 0) / 1080,
-            state.get('edge_left', 0) / 1920,
-            state.get('edge_right', 0) / 1920,
-            *state.get('personality_vector', [0] * PERSONALITY_SIZE)
+        target = np.array([
+            np.clip(target_velocity[0] / 10 + 0.5, 0.0, 1.0),
+            np.clip(target_velocity[1] / 10 + 0.5, 0.0, 1.0),
+            1.0 if should_move else 0.0
         ])
-
-        # Target based on action and reward
-        velocity_x, velocity_y, should_move = action
-        target = np.array([[
-            (velocity_x / 10 + 0.5) * reward,  # Scale by reward
-            (velocity_y / 10 + 0.5) * reward,
-            1.0 if (should_move and reward > 0.5) else 0.0
-        ]])
-
-        self.network.train_step(input_vector, target)
+        self.experiences.add(self.encode_state(state), target)
+        _train_on_batch(self.network, self.experiences)
 
 
 class ActivityNetwork:
@@ -122,7 +157,7 @@ class ActivityNetwork:
     Uses LSTM to remember recent activities and their outcomes.
     """
 
-    def __init__(self, learning_rate: float = 0.001):
+    def __init__(self, learning_rate: float = LEARNING_RATE):
         """Initialize activity network."""
         # Input: [hunger, energy, happiness, time_of_day, recent_activities (5), emotional_state (5)]
         # Output: [ball_play, mouse_chase, hide_seek, explore, sleep, eat]
@@ -132,17 +167,19 @@ class ActivityNetwork:
             output_size=6,
             num_layers=2,
             learning_rate=learning_rate,
-            sequence_length=20  # Remember last 20 activity decisions
+            sequence_length=SEQUENCE_LENGTH  # Remember recent activity decisions
         )
 
         self.activity_names = ['ball_play', 'mouse_chase', 'hide_seek', 'explore', 'sleep', 'eat']
 
-    def choose_activity(self, state: Dict[str, Any]) -> str:
+    def choose_activity(self, state: Dict[str, Any],
+                        modifiers: Optional[Dict[str, float]] = None) -> str:
         """
         Choose best activity based on current state and history.
 
         Args:
             state: Current creature state
+            modifiers: Emotional modifiers; playfulness favors play activities
 
         Returns:
             Activity name
@@ -150,11 +187,15 @@ class ActivityNetwork:
         input_vector = self._encode_state(state)
 
         # Get prediction from LSTM
-        output = self.network.predict(input_vector, use_sequence=True)
+        scores = self.network.predict(input_vector, use_sequence=True)[0].copy()
 
-        # Choose activity with highest score
-        activity_idx = np.argmax(output)
-        return self.activity_names[activity_idx]
+        # Playful moods favor play; low playfulness favors calmer activities
+        if modifiers:
+            playfulness = modifiers.get('playfulness', 0.5)
+            for name in ('ball_play', 'mouse_chase', 'hide_seek'):
+                scores[self.activity_names.index(name)] *= 0.5 + playfulness
+
+        return self.activity_names[int(np.argmax(scores))]
 
     def learn_from_activity(self, state: Dict[str, Any], activity: str,
                             enjoyment: float):
@@ -166,7 +207,7 @@ class ActivityNetwork:
             activity: Activity that was performed
             enjoyment: How much the creature enjoyed it (0-1)
         """
-        # Interactions such as 'pet' or 'being_fed' are not activity choices
+        # Interactions such as 'pet' are not activity choices
         if activity not in self.activity_names:
             return
 
@@ -207,19 +248,31 @@ class EmotionNetwork:
     Emotions affect all other behaviors and change based on interactions.
     """
 
-    def __init__(self, learning_rate: float = 0.001):
+    def __init__(self, learning_rate: float = LEARNING_RATE):
         """Initialize emotion network."""
         # Input: [hunger, energy, happiness, recent_interactions (10), personality (PERSONALITY_SIZE)]
         # Output: [joy, excitement, contentment, anxiety, loneliness]
         self.network = AdvancedNeuralNetwork(
             input_size=13 + PERSONALITY_SIZE,
-            hidden_layers=[32, 16],
+            hidden_layers=list(ENHANCED_NETWORK_LAYERS),
             output_size=5,
             learning_rate=learning_rate
         )
+        self.experiences = ExperienceBuffer()
 
         self.emotion_names = ['joy', 'excitement', 'contentment', 'anxiety', 'loneliness']
         self.current_emotions = np.array([0.5, 0.5, 0.5, 0.3, 0.3])  # Initial state
+
+    @staticmethod
+    def encode_state(state: Dict[str, Any]) -> np.ndarray:
+        """Encode needs, recent interaction quality and personality as the network input."""
+        return np.array([
+            state.get('hunger', 0) / 100,
+            state.get('energy', 100) / 100,
+            state.get('happiness', 100) / 100,
+            *state.get('recent_interaction_quality', [0.5] * 10),  # Last 10 interactions
+            *state.get('personality_vector', [0] * PERSONALITY_SIZE)
+        ])
 
     def update_emotions(self, state: Dict[str, Any]) -> Dict[str, float]:
         """
@@ -231,16 +284,7 @@ class EmotionNetwork:
         Returns:
             Dictionary of emotion intensities
         """
-        input_vector = np.array([
-            state.get('hunger', 0) / 100,
-            state.get('energy', 100) / 100,
-            state.get('happiness', 100) / 100,
-            *state.get('recent_interaction_quality', [0.5] * 10),  # Last 10 interactions
-            *state.get('personality_vector', [0] * PERSONALITY_SIZE)
-        ])
-
-        # Predict emotions
-        emotions = self.network.predict(input_vector)
+        emotions = self.network.predict(self.encode_state(state))
         self.current_emotions = emotions[0]
 
         return {
@@ -249,7 +293,7 @@ class EmotionNetwork:
         }
 
     def learn_emotional_response(self, state: Dict[str, Any],
-                                  expected_emotions: Dict[str, float]):
+                                 expected_emotions: Dict[str, float]):
         """
         Learn what emotions to feel in given situations.
 
@@ -257,20 +301,9 @@ class EmotionNetwork:
             state: State that triggered emotions
             expected_emotions: Target emotional response
         """
-        input_vector = np.array([
-            state.get('hunger', 0) / 100,
-            state.get('energy', 100) / 100,
-            state.get('happiness', 100) / 100,
-            *state.get('recent_interaction_quality', [0.5] * 10),
-            *state.get('personality_vector', [0] * PERSONALITY_SIZE)
-        ])
-
-        target = np.array([[
-            expected_emotions.get(name, 0.5)
-            for name in self.emotion_names
-        ]])
-
-        self.network.train_step(input_vector, target)
+        target = np.array([expected_emotions.get(name, 0.5) for name in self.emotion_names])
+        self.experiences.add(self.encode_state(state), target)
+        _train_on_batch(self.network, self.experiences)
 
     def get_emotional_modifiers(self) -> Dict[str, float]:
         """
@@ -297,7 +330,9 @@ class SocialNetwork:
     Learns when player is likely to interact, what they like to do, etc.
     """
 
-    def __init__(self, learning_rate: float = 0.001):
+    INTERACTION_TYPES = ['feed', 'play_ball', 'pet', 'talk', 'ignore']
+
+    def __init__(self, learning_rate: float = LEARNING_RATE):
         """Initialize social network."""
         # Input: [time_of_day, day_of_week, time_since_last_interaction,
         #         recent_interaction_types (5), player_mood_estimate]
@@ -311,6 +346,18 @@ class SocialNetwork:
             sequence_length=50  # Remember patterns over many interactions
         )
 
+    @staticmethod
+    def encode_state(state: Dict[str, Any]) -> np.ndarray:
+        """Encode time, time since interaction, recent interaction types and player mood."""
+        now = datetime.datetime.now()
+        return np.array([
+            now.hour / 24.0,  # Time of day
+            now.weekday() / 7.0,  # Day of week
+            min(1.0, state.get('time_since_interaction', 0) / 3600),  # Hours
+            *state.get('recent_interaction_types', [0, 0, 0, 0, 0]),
+            state.get('player_mood_estimate', 0.5)
+        ])
+
     def predict_player_behavior(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Predict player interaction likelihood and type.
@@ -321,61 +368,38 @@ class SocialNetwork:
         Returns:
             Predictions about player behavior
         """
-        import datetime
-        now = datetime.datetime.now()
-
-        input_vector = np.array([
-            now.hour / 24.0,  # Time of day
-            now.weekday() / 7.0,  # Day of week
-            min(1.0, state.get('time_since_interaction', 0) / 3600),  # Hours
-            *state.get('recent_interaction_types', [0, 0, 0, 0, 0]),
-            state.get('player_mood_estimate', 0.5)
-        ])
-
-        output = self.network.predict(input_vector, use_sequence=True)
+        output = self.network.predict(self.encode_state(state), use_sequence=True)
 
         return {
             'interaction_probability': float(output[0][0]),
             'likely_interaction_type': {
-                'feed': float(output[0][1]),
-                'play_ball': float(output[0][2]),
-                'pet': float(output[0][3]),
-                'talk': float(output[0][4]),
-                'ignore': float(output[0][5])
+                name: float(output[0][i + 1]) for i, name in enumerate(self.INTERACTION_TYPES)
             }
         }
 
     def learn_from_interaction(self, state: Dict[str, Any],
-                                interaction_type: str, positive: bool):
+                               interaction_type: Optional[str], positive: bool = True):
         """
-        Learn from player interaction.
+        Learn whether the player interacted during a period, and how.
 
         Args:
-            state: State when interaction occurred
-            interaction_type: Type of interaction
+            state: State at the start of the period
+            interaction_type: Type of interaction ('feed', 'play_ball', 'pet', 'talk'),
+                or None if the player did not interact
             positive: Whether it was positive
         """
-        import datetime
-        now = datetime.datetime.now()
-
-        input_vector = np.array([
-            now.hour / 24.0,
-            now.weekday() / 7.0,
-            min(1.0, state.get('time_since_interaction', 0) / 3600),
-            *state.get('recent_interaction_types', [0, 0, 0, 0, 0]),
-            state.get('player_mood_estimate', 0.5)
-        ])
-
-        # Build target
-        interaction_types = ['feed', 'play_ball', 'pet', 'talk', 'ignore']
         target = np.zeros((1, 6))
-        target[0, 0] = 1.0  # Interaction occurred
+        if interaction_type is None:
+            target[0, 5] = 1.0  # 'ignore'
+        else:
+            target[0, 0] = 1.0  # Interaction occurred
+            if interaction_type in self.INTERACTION_TYPES:
+                target[0, self.INTERACTION_TYPES.index(interaction_type) + 1] = 1.0 if positive else 0.2
 
-        if interaction_type in interaction_types:
-            idx = interaction_types.index(interaction_type) + 1
-            target[0, idx] = 1.0 if positive else 0.2
-
-        self.network.add_to_sequence(input_vector)
+        self.network.add_to_sequence(self.encode_state(state))
+        if len(self.network.sequence_buffer) >= 3:
+            sequence = list(self.network.sequence_buffer)[-3:]
+            self.network.train_sequence(sequence, [target] * len(sequence))
 
 
 class NetworkCoordinator:
@@ -392,6 +416,47 @@ class NetworkCoordinator:
         self.activity_net = ActivityNetwork()
         self.emotion_net = EmotionNetwork()
         self.social_net = SocialNetwork()
+
+    @staticmethod
+    def get_target(state: Dict[str, Any], activity: str) -> Optional[Tuple[float, float]]:
+        """Target location for an activity, or None if it has no destination."""
+        name = TARGET_FOR_ACTIVITY.get(activity)
+        target = state.get('targets', {}).get(name) if name else None
+        return tuple(target) if target else None
+
+    def movement_state(self, state: Dict[str, Any], activity: str) -> Dict[str, Any]:
+        """State for the movement network, including the activity's target."""
+        movement_state = state.copy()
+        target = self.get_target(state, activity)
+        x, y = state.get('pos_x', 0), state.get('pos_y', 0)
+        tx, ty = target if target else (x, y)
+        movement_state.update({
+            'activity': activity,
+            'target_x': tx,
+            'target_y': ty,
+            'distance_to_target': ((tx - x) ** 2 + (ty - y) ** 2) ** 0.5
+        })
+        return movement_state
+
+    def plan_movement(self, state: Dict[str, Any], activity: str,
+                      emotional_modifiers: Dict[str, float]) -> Dict[str, Any]:
+        """
+        Decide how to move for an activity (influenced by emotions).
+
+        Returns:
+            Dictionary with velocity_x, velocity_y and should_move
+        """
+        velocity_x, velocity_y, should_move = self.movement_net.predict_movement(
+            self.movement_state(state, activity)
+        )
+
+        # Apply emotional modifiers
+        speed_modifier = emotional_modifiers['movement_speed']
+        return {
+            'velocity_x': velocity_x * speed_modifier,
+            'velocity_y': velocity_y * speed_modifier,
+            'should_move': should_move
+        }
 
     def decide_behavior(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -415,74 +480,67 @@ class NetworkCoordinator:
 
         # Choose activity (influenced by emotions and player prediction)
         state['player_interaction_likely'] = player_prediction['interaction_probability']
-        activity = self.activity_net.choose_activity(state)
+        network_activity = self.activity_net.choose_activity(state, emotional_modifiers)
+        # The pet cannot feed itself, so wanting to eat means seeking food from the player
+        activity = 'seek_food' if network_activity == 'eat' else network_activity
 
-        # Decide movement based on chosen activity and emotions
-        movement_state = state.copy()
-        movement_state.update({
+        decision = {
             'activity': activity,
-            'emotional_modifiers': emotional_modifiers
-        })
-
-        velocity_x, velocity_y, should_move = self.movement_net.predict_movement(movement_state)
-
-        # Apply emotional modifiers
-        speed_modifier = emotional_modifiers['movement_speed']
-        velocity_x *= speed_modifier
-        velocity_y *= speed_modifier
-
-        return {
-            'activity': activity,
-            'velocity_x': velocity_x,
-            'velocity_y': velocity_y,
-            'should_move': should_move,
+            'network_activity': network_activity,
             'emotions': emotions,
             'player_prediction': player_prediction,
             'emotional_modifiers': emotional_modifiers
         }
+        decision.update(self.plan_movement(state, activity, emotional_modifiers))
+        return decision
 
-    def learn_from_outcome(self, state: Dict[str, Any], action: Dict[str, Any],
+    def learn_from_outcome(self, state: Dict[str, Any], decision: Dict[str, Any],
                            outcome: Dict[str, Any]):
         """
-        Learn from behavioral outcome across all networks.
+        Learn from the outcome of a behavioral decision across all networks.
 
         Args:
-            state: State when action was taken
-            action: Action that was performed
-            outcome: Result of the action
+            state: State when the decision was made
+            decision: Decision that was carried out (activity, velocity, ...)
+            outcome: Result of the decision:
+                - reward01: Reward scaled to 0-1
+                - expected_emotions: Emotions the situation called for
+                - interaction_type: Player interaction during the period, or None
+                - positive: Whether that interaction was positive
         """
-        reward = outcome.get('reward', 0.5)
+        reward01 = outcome.get('reward01', 0.5)
+        activity = decision.get('activity', 'explore')
 
-        # Learn movement
-        if 'velocity_x' in action:
-            self.movement_net.learn(
-                state,
-                (action['velocity_x'], action['velocity_y'], action['should_move']),
-                reward
-            )
+        # Movement: head for the activity's target, stay put when resting,
+        # and repeat free movement that turned out well
+        target = self.get_target(state, activity)
+        movement_state = self.movement_state(state, activity)
+        if activity in STATIONARY_ACTIVITIES:
+            self.movement_net.learn(movement_state, (0.0, 0.0), False)
+        elif target is not None:
+            dx, dy = target[0] - movement_state['pos_x'], target[1] - movement_state['pos_y']
+            distance = (dx ** 2 + dy ** 2) ** 0.5
+            if distance > 10:
+                velocity = (dx / distance * TARGET_SPEED, dy / distance * TARGET_SPEED)
+                self.movement_net.learn(movement_state, velocity, True)
+            else:
+                self.movement_net.learn(movement_state, (0.0, 0.0), False)
+        elif reward01 >= 0.5 and 'velocity_x' in decision:
+            self.movement_net.learn(movement_state, (decision['velocity_x'], decision['velocity_y']),
+                                    decision.get('should_move', True))
 
-        # Learn activity choice
-        if 'activity' in action:
-            self.activity_net.learn_from_activity(
-                state,
-                action['activity'],
-                outcome.get('enjoyment', reward)
-            )
+        # Activity choice, judged by how the period went
+        network_activity = decision.get('network_activity', activity)
+        self.activity_net.learn_from_activity(state, network_activity, reward01)
 
-        # Learn emotions
+        # Emotions the situation called for
         if 'expected_emotions' in outcome:
-            self.emotion_net.learn_emotional_response(
-                state,
-                outcome['expected_emotions']
-            )
+            self.emotion_net.learn_emotional_response(state, outcome['expected_emotions'])
 
-        # Learn social patterns
-        if outcome.get('player_interaction'):
-            self.social_net.learn_from_interaction(
-                state,
-                outcome.get('interaction_type', 'unknown'),
-                outcome.get('positive', True)
-            )
+        # Whether (and how) the player interacted during the period
+        self.social_net.learn_from_interaction(
+            state, outcome.get('interaction_type'), outcome.get('positive', True)
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         """Save all networks."""
@@ -499,10 +557,13 @@ class NetworkCoordinator:
         """Load all networks."""
         coordinator = cls()
 
-        # Saves from older versions may hold networks whose input size does not
-        # match the encoded state; keep the freshly sized network in that case
-        def input_size(network):
-            return network.input_size if isinstance(network, LSTMNetwork) else network.layers[0]
+        # Saves from older versions may hold networks with a different architecture;
+        # keep the freshly built network in that case
+        def architecture(network):
+            if isinstance(network, LSTMNetwork):
+                return ('lstm', network.input_size, network.hidden_size,
+                        network.output_size, network.num_layers)
+            return ('advanced', tuple(network.layers), bool(network.shortcut_weights))
 
         loaded = {
             'movement': (coordinator.movement_net, AdvancedNeuralNetwork.from_dict(data['movement'])),
@@ -511,7 +572,9 @@ class NetworkCoordinator:
             'social': (coordinator.social_net, LSTMNetwork.from_dict(data['social'])),
         }
         for net, saved_network in loaded.values():
-            if input_size(saved_network) == input_size(net.network):
+            if architecture(saved_network) == architecture(net.network):
+                if isinstance(saved_network, LSTMNetwork):
+                    saved_network.set_sequence_length(net.network.sequence_length)
                 net.network = saved_network
 
         coordinator.emotion_net.current_emotions = np.array(data['current_emotions'])

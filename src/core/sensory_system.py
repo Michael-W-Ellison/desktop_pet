@@ -11,6 +11,109 @@ import numpy as np
 from typing import List, Dict, Tuple, Optional, Any
 import datetime
 import math
+import random
+import sys
+import time
+
+# Seconds between rescans of the desktop icon layout
+ICON_RESCAN_INTERVAL = 60.0
+
+
+def read_windows_desktop_icons() -> Optional[List[Dict[str, float]]]:
+    """
+    Read desktop icon positions from the Windows desktop (Explorer's list view).
+
+    The desktop is a SysListView32 control owned by Explorer. Its item positions
+    are read by sending LVM_GETITEMPOSITION with a buffer allocated inside
+    Explorer's process, then copying the result back.
+
+    Returns:
+        List of icon rectangles in screen coordinates, or None if unavailable
+    """
+    if sys.platform != 'win32':
+        return None
+
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = ctypes.WinDLL('user32', use_last_error=True)
+        kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+
+        user32.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
+        user32.FindWindowW.restype = wintypes.HWND
+        user32.FindWindowExW.argtypes = [wintypes.HWND, wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR]
+        user32.FindWindowExW.restype = wintypes.HWND
+        user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        user32.SendMessageW.restype = ctypes.c_ssize_t
+        user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+        user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+        kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.VirtualAllocEx.argtypes = [wintypes.HANDLE, ctypes.c_void_p, ctypes.c_size_t,
+                                            wintypes.DWORD, wintypes.DWORD]
+        kernel32.VirtualAllocEx.restype = ctypes.c_void_p
+        kernel32.VirtualFreeEx.argtypes = [wintypes.HANDLE, ctypes.c_void_p, ctypes.c_size_t, wintypes.DWORD]
+        kernel32.VirtualFreeEx.restype = wintypes.BOOL
+        kernel32.ReadProcessMemory.argtypes = [wintypes.HANDLE, ctypes.c_void_p, ctypes.c_void_p,
+                                               ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t)]
+        kernel32.ReadProcessMemory.restype = wintypes.BOOL
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel32.CloseHandle.restype = wintypes.BOOL
+
+        LVM_GETITEMCOUNT = 0x1004
+        LVM_GETITEMPOSITION = 0x1010
+        LVM_GETITEMSPACING = 0x1033
+        PROCESS_VM_OPERATION, PROCESS_VM_READ, PROCESS_VM_WRITE = 0x0008, 0x0010, 0x0020
+        MEM_COMMIT, MEM_RELEASE, PAGE_READWRITE = 0x1000, 0x8000, 0x04
+
+        # The icon view lives under Progman, or under a WorkerW window when a
+        # wallpaper slideshow or similar is active
+        defview = user32.FindWindowExW(user32.FindWindowW('Progman', None), None, 'SHELLDLL_DefView', None)
+        worker = None
+        while not defview:
+            worker = user32.FindWindowExW(None, worker, 'WorkerW', None)
+            if not worker:
+                return None
+            defview = user32.FindWindowExW(worker, None, 'SHELLDLL_DefView', None)
+        listview = user32.FindWindowExW(defview, None, 'SysListView32', None)
+        if not listview:
+            return None
+
+        count = user32.SendMessageW(listview, LVM_GETITEMCOUNT, 0, 0)
+        spacing = user32.SendMessageW(listview, LVM_GETITEMSPACING, 0, 0)
+        width, height = (spacing & 0xFFFF) or 75, ((spacing >> 16) & 0xFFFF) or 75
+
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(listview, ctypes.byref(pid))
+        process = kernel32.OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE,
+                                       False, pid.value)
+        if not process:
+            return None
+
+        icons = []
+        try:
+            remote_point = kernel32.VirtualAllocEx(process, None, ctypes.sizeof(wintypes.POINT),
+                                                   MEM_COMMIT, PAGE_READWRITE)
+            if not remote_point:
+                return None
+            try:
+                point = wintypes.POINT()
+                for index in range(count):
+                    if not user32.SendMessageW(listview, LVM_GETITEMPOSITION, index, remote_point):
+                        continue
+                    if kernel32.ReadProcessMemory(process, remote_point, ctypes.byref(point),
+                                                  ctypes.sizeof(point), None):
+                        icons.append({'x': float(point.x), 'y': float(point.y),
+                                      'width': float(width), 'height': float(height)})
+            finally:
+                kernel32.VirtualFreeEx(process, remote_point, 0, MEM_RELEASE)
+        finally:
+            kernel32.CloseHandle(process)
+
+        return icons
+    except Exception:
+        return None
 
 
 class SensoryEncoder:
@@ -216,19 +319,30 @@ class ScreenLayoutAnalyzer:
         self.screen_height = screen_height
         self.detected_icons = []  # List of (x, y, width, height)
         self.last_scan_time = 0
+        self.icons_are_real = False  # Whether icons came from the desktop or the fallback grid
+
+    def refresh_icons(self):
+        """Rescan the desktop icons if the last scan is older than ICON_RESCAN_INTERVAL."""
+        if not self.detected_icons or time.time() - self.last_scan_time > ICON_RESCAN_INTERVAL:
+            self.detected_icons = self.detect_desktop_icons()
 
     def detect_desktop_icons(self) -> List[Dict[str, float]]:
         """
-        Detect desktop icons (Windows-specific, simplified version).
+        Detect desktop icons.
 
-        In a full implementation, this would use Windows API to get actual icon positions.
-        For now, we'll simulate common icon positions.
+        On Windows this reads the real icon positions from the desktop. Elsewhere,
+        or if reading fails, it assumes a standard icon grid on the left side.
 
         Returns:
             List of icon positions
         """
-        # Simplified: Assume standard desktop icon grid
-        # Real implementation would use win32api to get actual positions
+        self.last_scan_time = time.time()
+        icons = read_windows_desktop_icons()
+        if icons is not None:
+            self.icons_are_real = True
+            return icons
+
+        self.icons_are_real = False
         icons = []
 
         # Common icon positions on desktop (left side, vertical grid)
@@ -254,8 +368,7 @@ class ScreenLayoutAnalyzer:
 
     def find_nearest_icon(self, x: float, y: float) -> Optional[Dict[str, float]]:
         """Find nearest icon to given position."""
-        if not self.detected_icons:
-            self.detected_icons = self.detect_desktop_icons()
+        self.refresh_icons()
 
         nearest = None
         min_distance = float('inf')
@@ -285,8 +398,7 @@ class ScreenLayoutAnalyzer:
         Returns:
             List of nearby hiding spots
         """
-        if not self.detected_icons:
-            self.detected_icons = self.detect_desktop_icons()
+        self.refresh_icons()
 
         hiding_spots = []
 
@@ -302,6 +414,8 @@ class ScreenLayoutAnalyzer:
                 hiding_spots.append({
                     'x': icon['x'],
                     'y': icon['y'],
+                    'width': icon['width'],
+                    'height': icon['height'],
                     'distance': distance
                 })
 
@@ -427,6 +541,12 @@ class CompleteSensorySystem:
         self.screen_width = screen_width
         self.screen_height = screen_height
 
+    def set_screen_size(self, screen_width: int, screen_height: int):
+        """Use the actual screen size for layout, edge and mouse sensing."""
+        for sensor in (self, self.layout_analyzer, self.proximity_sensor):
+            sensor.screen_width = screen_width
+            sensor.screen_height = screen_height
+
     def update_mouse_position(self, x: float, y: float):
         """Update mouse tracking."""
         self.mouse_tracker.update(x, y)
@@ -454,10 +574,9 @@ class CompleteSensorySystem:
             self.screen_width, self.screen_height
         )
 
-        # Icon positions
+        # Icon positions (rescanned periodically so layout changes are noticed)
+        self.layout_analyzer.refresh_icons()
         icons = self.layout_analyzer.detected_icons
-        if not icons:
-            icons = self.layout_analyzer.detect_desktop_icons()
 
         # Proximity sensing (8 values)
         proximity_features = self.proximity_sensor.encode_proximity(
@@ -511,3 +630,48 @@ class CompleteSensorySystem:
             'time_of_day': datetime.datetime.now().hour,
             'is_weekend': datetime.datetime.now().weekday() >= 5
         }
+
+
+class HidingSpotMemory:
+    """
+    Learns which hiding spots (desktop icons) work well.
+
+    Each spot keeps a running average of the reward earned while hiding there;
+    spots are chosen greedily by that value, with occasional exploration.
+    """
+
+    def __init__(self, exploration: float = 0.1):
+        self.exploration = exploration
+        self.values = {}  # "x,y" -> [average reward (0-1), visits]
+
+    @staticmethod
+    def key(spot: Dict[str, float]) -> str:
+        return f"{int(spot['x'])},{int(spot['y'])}"
+
+    def value(self, spot: Dict[str, float]) -> float:
+        """Learned value of a spot (0.5 if never tried)."""
+        return self.values.get(self.key(spot), [0.5, 0])[0]
+
+    def choose(self, spots: List[Dict[str, float]]) -> Optional[Dict[str, float]]:
+        """Pick the best-known spot, or a random one some of the time."""
+        if not spots:
+            return None
+        if random.random() < self.exploration:
+            return random.choice(spots)
+        return max(spots, key=self.value)
+
+    def record(self, spot: Dict[str, float], reward01: float):
+        """Update a spot's value with the reward earned while hiding there."""
+        value, visits = self.values.get(self.key(spot), [0.5, 0])
+        visits += 1
+        value += (reward01 - value) / min(visits, 20)
+        self.values[self.key(spot)] = [value, visits]
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {'values': self.values}
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'HidingSpotMemory':
+        memory = cls()
+        memory.values = {k: list(v) for k, v in data.get('values', {}).items()}
+        return memory
