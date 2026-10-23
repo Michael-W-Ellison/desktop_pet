@@ -10,6 +10,7 @@ Provides different AI complexity levels:
 import copy
 import itertools
 import math
+import random
 import time
 from collections import deque
 import numpy as np
@@ -18,7 +19,7 @@ from .config import (
     AIComplexity, DEFAULT_AI_COMPLEXITY, DECISION_STABILITY_WINDOW, DECISION_STABILITY_SMOOTHING,
     DECISION_STABILITY_MIN_CHANGE,
     LEARNING_RATE, SEQUENCE_LENGTH, RL_STATE_SIZE, BehaviorState, PLANNER_MIN_EXPERIENCE,
-    ANTICIPATION_THRESHOLD
+    ANTICIPATION_THRESHOLD, MEDIUM_REPLAY_CAPACITY
 )
 from .neural_network import BehaviorLearner as SimpleBehaviorLearner
 from .lstm_network import LSTMNetwork
@@ -103,6 +104,10 @@ class EnhancedBehaviorLearner:
 
         # Recent probe outputs per network for measuring stability (not saved)
         self.probe_history = {}
+
+        # MEDIUM: past player interactions (input sequence, activity index, target),
+        # replayed one per decision
+        self.interaction_replay = deque(maxlen=MEDIUM_REPLAY_CAPACITY)
 
     def _init_simple(self):
         """Initialize simple AI (basic feedforward network)."""
@@ -342,6 +347,7 @@ class EnhancedBehaviorLearner:
             outcome: Additional outcome information
         """
         self.total_interactions += 1
+        self.creature.record_player_interaction(activity_type)
 
         if self.complexity == AIComplexity.SIMPLE:
             # Interactions that are not themselves activities (petting, feeding)
@@ -366,6 +372,8 @@ class EnhancedBehaviorLearner:
                 mask[0, idx] = 1.0
                 sequence = list(self.activity_network.sequence_buffer)[-3:]
                 self.activity_network.train_sequence(sequence, [target] * len(sequence), output_mask=mask)
+                # Kept for replay at later decisions
+                self.interaction_replay.append((sequence, idx, target[0, idx]))
 
         else:  # ADVANCED or EXPERT
             # The interaction is credited to the current decision at the next decision
@@ -494,6 +502,27 @@ class EnhancedBehaviorLearner:
         names = self.network_names()
         self.creature.decision_stability = min(stabilities.get(name, 0.0) for name in names)
 
+    def _replay_past_interaction(self):
+        """
+        MEDIUM: train once on a stored past interaction (one is chosen at random).
+
+        Gives the LSTM a training step at every decision, as ADVANCED's networks
+        get, while still learning only from what the player has done.
+        """
+        if not self.interaction_replay:
+            return
+        sequence, idx, value = random.choice(self.interaction_replay)
+        output_size = self.activity_network.output_size
+        target = np.zeros((1, output_size))
+        mask = np.zeros((1, output_size))
+        target[0, idx] = value
+        mask[0, idx] = 1.0
+        # Train without disturbing the recurrent state used for live decisions
+        saved_states = (copy.deepcopy(self.activity_network.h_states),
+                        copy.deepcopy(self.activity_network.c_states))
+        self.activity_network.train_sequence(sequence, [target] * len(sequence), output_mask=mask)
+        self.activity_network.h_states, self.activity_network.c_states = saved_states
+
     def network_names(self):
         """Names of the networks whose stability drives evolution at this level."""
         if self.complexity in (AIComplexity.ADVANCED, AIComplexity.EXPERT):
@@ -508,6 +537,8 @@ class EnhancedBehaviorLearner:
             Dictionary with activity, movement, emotional state, etc.
         """
         if self.complexity in [AIComplexity.SIMPLE, AIComplexity.MEDIUM]:
+            if self.complexity == AIComplexity.MEDIUM:
+                self._replay_past_interaction()
             # Activity only; the pet manager handles movement
             return {'activity': self.choose_activity()}
 
@@ -759,6 +790,10 @@ class EnhancedBehaviorLearner:
 
         elif self.complexity == AIComplexity.MEDIUM:
             data['activity_network'] = self.activity_network.to_dict()
+            data['interaction_replay'] = [
+                {'sequence': [np.round(x, 5).tolist() for x in sequence], 'activity': idx, 'target': value}
+                for sequence, idx, value in self.interaction_replay
+            ]
 
         else:  # ADVANCED or EXPERT
             if self.network_coordinator:
@@ -796,6 +831,9 @@ class EnhancedBehaviorLearner:
             if saved_network.input_size == learner.activity_network.input_size:
                 saved_network.set_sequence_length(SEQUENCE_LENGTH)
                 learner.activity_network = saved_network
+                for item in data.get('interaction_replay', []):
+                    learner.interaction_replay.append(
+                        ([np.array(x) for x in item['sequence']], item['activity'], item['target']))
 
         elif complexity in (AIComplexity.ADVANCED, AIComplexity.EXPERT):
             if 'hiding_spots' in data:

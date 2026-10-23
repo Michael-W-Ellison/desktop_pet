@@ -18,7 +18,8 @@ Choose the right level of AI sophistication for your needs:
 - **Best for**: General use, balanced experience
 - **Features**: LSTM networks with memory + sensory inputs
 - **Learning**: Temporal pattern recognition, schedule learning
-- **Memory**: Remembers sequences of up to 50 interactions
+- **Memory**: Remembers sequences of up to 50 interactions, and replays one of its last 500
+  player interactions at each decision so it keeps learning between interactions
 - **Performance**: Fast, moderate CPU usage
 
 #### 🟣 ADVANCED Mode (Ages 13+)

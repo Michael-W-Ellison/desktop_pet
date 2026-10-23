@@ -281,12 +281,20 @@ EVOLUTION_REQUIREMENTS = {
     EvolutionStage.ELDER: {"min_decision_stability": 0.75},
 }
 
+# Elder also needs enough experience of its own player's habits
+ELDER_MIN_INTERACTION_DAYS = 7    # Separate days with player interaction (a weekly pattern seen)
+ELDER_HABIT_SHARE = 0.05          # Interaction types making up this share of all interactions are habits
+ELDER_MIN_HABIT_SAMPLES = 30      # Interactions of each habit type needed
+
 # Decision stability measurement (EnhancedBehaviorLearner)
 DECISION_STABILITY_WINDOW = 200       # Player interactions compared per measurement
 DECISION_STABILITY_SMOOTHING = 0.005  # Moving-average weight of each new measurement
 # Change in a network's outputs (root-mean-square per output, over one window) below which
 # the network counts as settled even if it still moves steadily in one direction
 DECISION_STABILITY_MIN_CHANGE = 0.01
+
+# MEDIUM: past player interactions kept and replayed, one per decision
+MEDIUM_REPLAY_CAPACITY = 500
 
 # Phase 4: Stage size multipliers (how big the creature is at each stage)
 STAGE_SIZE_MULTIPLIERS = {

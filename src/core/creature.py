@@ -22,7 +22,7 @@ from .config import (
     PERSONALITY_TRAITS, MAX_HUNGER, HUNGER_DECAY_RATE, STARVATION_THRESHOLD,
     EvolutionStage, ElementType, HAPPINESS_NEGLECT_GRACE_SECONDS, HAPPINESS_NEGLECT_DECAY_RATE,
     INTERACTION_MEMORY_DAYS, INTERACTION_MEMORY_WINDOW, AWAKE_AFTER_INTERACTION_SECONDS,
-    MAX_SLEEP_DRIVE_AWAKE
+    MAX_SLEEP_DRIVE_AWAKE, ELDER_HABIT_SHARE
 )
 from .memory_system import IntegratedMemorySystem
 from .personality_behavior import PersonalityBehavior
@@ -87,6 +87,10 @@ class Creature:
         self.interaction_history = []
         # When the player interacted, kept for INTERACTION_MEMORY_DAYS (memory of past days)
         self.interaction_times = []
+        # Experience of the player's habits (Elder needs enough of it)
+        self.interaction_type_counts: Dict[str, int] = {}
+        self.interaction_day_count = 0  # Separate days with player interaction
+        self.last_interaction_day = None  # Local date (YYYY-MM-DD) of the latest one
 
         # Personality trait modifiers, and the behavior they produce
         self.trait_modifiers = PERSONALITY_TRAITS[self.personality]
@@ -455,6 +459,32 @@ class Creature:
         if self.current_state == BehaviorState.SLEEPING:
             self.set_state(BehaviorState.IDLE)
         self.awake_until = time.time() + AWAKE_AFTER_INTERACTION_SECONDS
+
+    # Interaction names that are the same habit
+    HABIT_NAMES = {'training_success': 'training', 'play_ball': 'ball_play', 'feed': 'being_fed'}
+
+    def record_player_interaction(self, interaction_type: str):
+        """Count a player interaction toward the pet's experience of its player's habits."""
+        kind = self.HABIT_NAMES.get(interaction_type, interaction_type)
+        self.interaction_type_counts[kind] = self.interaction_type_counts.get(kind, 0) + 1
+        today = time.strftime('%Y-%m-%d', time.localtime())
+        if today != self.last_interaction_day:
+            self.interaction_day_count += 1
+            self.last_interaction_day = today
+
+    def player_experience(self) -> Dict[str, Any]:
+        """
+        How much of its player's habits the pet has seen.
+
+        Returns:
+            'days': separate days with player interaction;
+            'habits': interaction type -> count, for types making up at least
+            ELDER_HABIT_SHARE of all interactions (what this player regularly does)
+        """
+        total = sum(self.interaction_type_counts.values())
+        habits = {kind: count for kind, count in self.interaction_type_counts.items()
+                  if total and count / total >= ELDER_HABIT_SHARE}
+        return {'days': self.interaction_day_count, 'habits': habits}
 
     def remember_interaction_time(self):
         """Remember that the player interacted now, forgetting interactions older than the memory span."""
@@ -836,7 +866,8 @@ class Creature:
             'bond': self.bonding.bond,  # Phase 5: Use bonding system
             'total_interactions': self.total_interactions,
             'tricks_learned': len(self.get_known_tricks()),
-            'decision_stability': self.decision_stability
+            'decision_stability': self.decision_stability,
+            'player_experience': self.player_experience()
         }
 
     def is_elder(self) -> bool:
@@ -1517,6 +1548,9 @@ class Creature:
             'position': self.position,
             'interaction_history': self.interaction_history,
             'interaction_times': self.interaction_times,
+            'interaction_type_counts': self.interaction_type_counts,
+            'interaction_day_count': self.interaction_day_count,
+            'last_interaction_day': self.last_interaction_day,
             # Phase 2: Memory and Training
             'memory_system': self.memory.to_dict(),
             'training_system': self.training.to_dict(),
@@ -1573,6 +1607,15 @@ class Creature:
         creature.position = data['position']
         creature.interaction_history = data['interaction_history']
         creature.interaction_times = data.get('interaction_times', [])
+        creature.interaction_type_counts = data.get('interaction_type_counts', {})
+        if 'interaction_day_count' in data:
+            creature.interaction_day_count = data['interaction_day_count']
+            creature.last_interaction_day = data.get('last_interaction_day')
+        else:
+            # Older saves: the days still in the remembered interaction times
+            days = sorted({time.strftime('%Y-%m-%d', time.localtime(t)) for t in creature.interaction_times})
+            creature.interaction_day_count = len(days)
+            creature.last_interaction_day = days[-1] if days else None
 
         # Phase 2: Restore memory and training if present
         if 'memory_system' in data:

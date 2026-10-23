@@ -61,6 +61,8 @@
 🌱 **Growing up**
 - Pets evolve from Baby → Juvenile → Adult → Elder as their learned behavior settles
 - Interactions are what train your pet's neural network, so the more you interact, the sooner it grows up
+- To become an Elder, a pet must also know your habits: interactions on at least 7 separate days, and
+  at least 30 of each kind of interaction you regularly use (one that makes up 5% or more of your interactions)
 - An Elder's behavior has reached full complexity, and it keeps adapting as things change
 
 🎓 **Train tricks!**

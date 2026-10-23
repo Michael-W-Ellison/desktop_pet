@@ -2,15 +2,18 @@
 Evolution System for Desktop Pal
 
 Handles creature evolution through different life stages (baby -> juvenile -> adult -> elder).
-Evolution is based on age, care quality, bond strength, and interactions.
+Evolution is based on how settled the pet's neural networks are; Elder also
+needs enough experience of the player's habits.
 """
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 import time
 from enum import Enum
 from core.config import (
     EvolutionStage,
     EVOLUTION_REQUIREMENTS,
-    STAGE_SIZE_MULTIPLIERS
+    STAGE_SIZE_MULTIPLIERS,
+    ELDER_MIN_INTERACTION_DAYS,
+    ELDER_MIN_HABIT_SAMPLES
 )
 
 
@@ -73,7 +76,26 @@ class EvolutionSystem:
             return False, None, (f"Behavior still developing - decisions {stability:.0%} settled, "
                                  f"needs {required:.0%}")
 
+        if next_stage == EvolutionStage.ELDER:
+            missing = self._missing_player_experience(creature_stats)
+            if missing:
+                return False, None, f"Still getting to know its player - {missing[0]}"
+
         return True, next_stage, f"Ready to evolve to {next_stage.value.title()}!"
+
+    @staticmethod
+    def _missing_player_experience(creature_stats: Dict[str, Any]) -> List[str]:
+        """What the pet has not yet seen enough of its player to be an Elder (empty when enough)."""
+        experience = creature_stats.get('player_experience', {'days': 0, 'habits': {}})
+        missing = []
+        if experience['days'] < ELDER_MIN_INTERACTION_DAYS:
+            missing.append(f"interactions on {experience['days']} of {ELDER_MIN_INTERACTION_DAYS} days")
+        if not experience['habits']:
+            missing.append("no interactions yet")
+        for kind, count in sorted(experience['habits'].items()):
+            if count < ELDER_MIN_HABIT_SAMPLES:
+                missing.append(f"{count} of {ELDER_MIN_HABIT_SAMPLES} '{kind}' interactions")
+        return missing
 
     def _next_stage(self) -> EvolutionStage:
         """Get the stage after the current one (current stage must not be Elder)."""
@@ -153,18 +175,38 @@ class EvolutionSystem:
 
         can_evolve, _, reason = self.check_evolution_eligibility(creature_stats)
 
+        requirements = [{
+            'name': 'Decision Stability',
+            'current': stability,
+            'required': required,
+            'progress': progress,
+            'met': stability >= required
+        }]
+        if next_stage == EvolutionStage.ELDER:
+            experience = creature_stats.get('player_experience', {'days': 0, 'habits': {}})
+            requirements.append({
+                'name': 'Days With Player',
+                'current': experience['days'],
+                'required': ELDER_MIN_INTERACTION_DAYS,
+                'progress': min(100, experience['days'] / ELDER_MIN_INTERACTION_DAYS * 100),
+                'met': experience['days'] >= ELDER_MIN_INTERACTION_DAYS
+            })
+            for kind, count in sorted(experience['habits'].items()):
+                requirements.append({
+                    'name': f"'{kind}' Interactions",
+                    'current': count,
+                    'required': ELDER_MIN_HABIT_SAMPLES,
+                    'progress': min(100, count / ELDER_MIN_HABIT_SAMPLES * 100),
+                    'met': count >= ELDER_MIN_HABIT_SAMPLES
+                })
+            progress = min(r['progress'] for r in requirements)
+
         return {
             'current_stage': self.current_stage,
             'next_stage': next_stage,
             'can_evolve': can_evolve,
             'progress_percent': progress,
-            'requirements': [{
-                'name': 'Decision Stability',
-                'current': stability,
-                'required': required,
-                'progress': progress,
-                'met': stability >= required
-            }],
+            'requirements': requirements,
             'message': reason
         }
 
