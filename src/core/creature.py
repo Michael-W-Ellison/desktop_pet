@@ -272,9 +272,7 @@ class Creature:
             enjoyment = 0.8  # Very hungry = really enjoyed food
         elif old_hunger > 40:
             enjoyment = 0.5  # Moderately hungry
-        # Elders' preferences are set
-        if not self.is_elder():
-            self.preferences.record_experience('food', food_type, enjoyment)
+        self.preferences.record_experience('food', food_type, enjoyment)
 
         # Record in memory system (Phase 2)
         # Check if this is first feeding
@@ -372,8 +370,7 @@ class Creature:
             elif interaction_type in ['play', 'training', 'pet', 'talk']:
                 category = 'activity'
 
-            # Elders' preferences are set
-            if category and not self.is_elder():
+            if category:
                 enjoyment = 0.7 if positive else -0.4
                 if not gentle:
                     enjoyment -= 0.3  # Rough handling reduces enjoyment
@@ -447,15 +444,18 @@ class Creature:
         i = bisect.bisect_left(self.interaction_times, moment - window)
         return i < len(self.interaction_times) and self.interaction_times[i] <= moment + window
 
-    def recall_same_time(self) -> Dict[str, float]:
+    def recall_same_time(self, at: Optional[float] = None) -> Dict[str, float]:
         """
         What the pet remembers about this time of day on previous days.
+
+        Args:
+            at: Time of day to recall, as a timestamp (defaults to now)
 
         Returns:
             yesterday_same_time: 1.0 if the player interacted around this time yesterday
             week_same_time: share of the last 7 days with an interaction around this time
         """
-        now = time.time()
+        now = time.time() if at is None else at
         days = [self.interacted_around(now - d * 24 * 3600) for d in range(1, 8)]
         return {
             'yesterday_same_time': 1.0 if days[0] else 0.0,
@@ -807,12 +807,8 @@ class Creature:
         }
 
     def is_elder(self) -> bool:
-        """Elders have settled personalities: they stop learning and take no new tricks."""
+        """Elders' behavior has reached full complexity; they keep learning and adapting."""
         return self.evolution.current_stage == EvolutionStage.ELDER
-
-    def _apply_stage_rules(self):
-        """Apply restrictions that depend on the current evolution stage."""
-        self.training.accepts_new_tricks = not self.is_elder()
 
     def can_evolve(self) -> Tuple[bool, Optional[EvolutionStage], str]:
         """
@@ -835,8 +831,6 @@ class Creature:
         success, new_stage, message = self.evolution.evolve(stats)
 
         if success:
-            self._apply_stage_rules()
-
             # Record evolution in memory as crucial event
             self.memory.record_interaction(
                 'evolved',
@@ -1609,7 +1603,6 @@ class Creature:
                 from .enhanced_memory import DreamSystem
                 creature.dream_system = DreamSystem.from_dict(data['dream_system'])
 
-        creature._apply_stage_rules()
         return creature
 
     def __str__(self) -> str:

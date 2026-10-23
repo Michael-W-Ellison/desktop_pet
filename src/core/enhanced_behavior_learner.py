@@ -16,8 +16,7 @@ import numpy as np
 from typing import Dict, Any, Optional
 from .config import (
     AIComplexity, DEFAULT_AI_COMPLEXITY, DECISION_STABILITY_WINDOW, DECISION_STABILITY_SMOOTHING,
-    ADVANCED_DECISION_STABILITY_SMOOTHING,
-    LEARNING_RATE, SEQUENCE_LENGTH, RL_STATE_SIZE, BehaviorState
+    LEARNING_RATE, SEQUENCE_LENGTH, RL_STATE_SIZE, BehaviorState, PLANNER_MIN_EXPERIENCE
 )
 from .neural_network import BehaviorLearner as SimpleBehaviorLearner
 from .lstm_network import LSTMNetwork
@@ -25,6 +24,7 @@ from .specialized_networks import NetworkCoordinator
 from .sensory_system import CompleteSensorySystem, HidingSpotMemory
 from .reinforcement_learning import GoalOrientedBehaviorSystem
 from .expert_monitor import ExpertMonitor, bar
+from .planner import Planner
 
 # Final activity for each RL action type
 RL_ACTION_ACTIVITY = {
@@ -130,6 +130,9 @@ class EnhancedBehaviorLearner:
 
         # Reinforcement learning system
         self.rl_system = GoalOrientedBehaviorSystem(state_size=RL_STATE_SIZE)
+
+        # Strategic planner: chooses goals by planning the coming day
+        self.planner = Planner()
 
         self.activity_network = None
 
@@ -338,10 +341,6 @@ class EnhancedBehaviorLearner:
         """
         self.total_interactions += 1
 
-        # Elders' behavior is set: their networks no longer learn
-        if self.creature.is_elder():
-            return
-
         if self.complexity == AIComplexity.SIMPLE:
             # Interactions that are not themselves activities (petting, feeding)
             # are credited to what the pet was doing at the time
@@ -471,9 +470,6 @@ class EnhancedBehaviorLearner:
         (ratio near 0). The creature's decision stability is the least settled network.
         """
         stabilities = self.creature.network_stability
-        smoothing = (ADVANCED_DECISION_STABILITY_SMOOTHING
-                     if self.complexity in (AIComplexity.ADVANCED, AIComplexity.EXPERT)
-                     else DECISION_STABILITY_SMOOTHING)
         for name, scores in self._probe_network_scores().items():
             history = self.probe_history.setdefault(name, deque(maxlen=DECISION_STABILITY_WINDOW + 1))
             history.append(scores)
@@ -487,7 +483,7 @@ class EnhancedBehaviorLearner:
             settled = 1.0 - np.linalg.norm(history[-1] - history[0]) / path
 
             stability = stabilities.get(name, 0.0)
-            stabilities[name] = float(stability + smoothing * (settled - stability))
+            stabilities[name] = float(stability + DECISION_STABILITY_SMOOTHING * (settled - stability))
 
         # Every network must have settled; one that has not been measured yet counts as 0
         names = self.network_names()
@@ -524,6 +520,20 @@ class EnhancedBehaviorLearner:
         state_dict['interaction_desire'] = (modifiers['interaction_desire']
                                             * self.creature.behavior.interaction_desire)
 
+        # Once experienced, the planner picks the goal that does best over the coming day
+        goal_source = 'rules'
+        if self.planner.ready:
+            now = time.time()
+            if self.planner.needs_replan(now):
+                self.planner.make_plan(
+                    {key: state_dict[key] for key in ('hunger', 'energy', 'happiness')},
+                    now, self._forecast_player
+                )
+            rule_goal = self.rl_system.rule_goal(state_dict)
+            state_dict['planned_goal'] = self.planner.choose_goal(rule_goal)
+            if state_dict['planned_goal'] != rule_goal:
+                goal_source = 'planner'
+
         # The RL agent works toward the current goal; its action is carried out
         # when it serves that goal, otherwise the networks' choice stands
         rl_decision = self.rl_system.execute_goal(rl_state, state_dict)
@@ -531,6 +541,7 @@ class EnhancedBehaviorLearner:
             'rl_goal': rl_decision['goal'],
             'rl_action': rl_decision['action'],
             'rl_q_value': rl_decision['q_value'],
+            'goal_source': goal_source,
             'decided_by': 'networks',
         })
         if rl_decision['serves_goal']:
@@ -547,6 +558,8 @@ class EnhancedBehaviorLearner:
             'state': state_dict,
             'rl_state': rl_state,
             'rl_action_idx': rl_decision['action_idx'],
+            'goal': rl_decision['goal'],
+            'time': time.time(),
             'decision': decision,
         }
         self.events_since_decision = []
@@ -572,8 +585,7 @@ class EnhancedBehaviorLearner:
             value = self.creature.network_stability.get(name, 0.0)
             label = 'RL' if name == 'rl' else name.capitalize()
             lines.append(f"  {label:<12} {bar(value)} {value:.0%}")
-        lines.append(f"Stage: {self.creature.evolution.get_stage_name()}"
-                     + (" (behavior set)" if self.creature.is_elder() else ""))
+        lines.append(f"Stage: {self.creature.evolution.get_stage_name()}")
         lines.append(f"Interactions learned from: {self.total_interactions}")
 
         if self.complexity not in (AIComplexity.ADVANCED, AIComplexity.EXPERT):
@@ -595,6 +607,12 @@ class EnhancedBehaviorLearner:
         q_values, _ = agent.q_network.forward(self.get_rl_state_vector())
         q_values = q_values[0]
         low, high = float(np.min(q_values)), float(np.max(q_values))
+        if self.planner.ready and self.planner.plan:
+            lines += ["", "Plan for the coming day:"] + [f"  {line}" for line in self.planner.describe()]
+        else:
+            lines += ["", f"Planner: learning ({self.planner.model.experience} of "
+                          f"{PLANNER_MIN_EXPERIENCE} decisions observed); goals follow fixed rules"]
+
         lines += ["", f"Action values (exploration {agent.epsilon:.0%}):"]
         for i, q in enumerate(q_values):
             name = agent.get_action_description(i)['name']
@@ -615,6 +633,17 @@ class EnhancedBehaviorLearner:
                              f"{entry['activity']} via {entry['decided_by']} (goal {entry['goal']})")
 
         return "\n".join(lines)
+
+    def _forecast_player(self, when: float) -> float:
+        """Forecast P(player interacts within 30 minutes) at a future time, for the planner."""
+        social = self.network_coordinator.social_net
+        state = {
+            'time_since_interaction': max(0.0, when - self.creature.last_interaction_time),
+            'recent_interaction_types': self.creature.get_recent_interaction_types(5),
+            'player_mood_estimate': float(np.mean(self._get_recent_interaction_quality())),
+            **self.creature.recall_same_time(at=when),
+        }
+        return social.predict_player_behavior(state, when)['interaction_probability']
 
     def _expected_emotions(self, state: Dict[str, Any]) -> Dict[str, float]:
         """
@@ -658,7 +687,7 @@ class EnhancedBehaviorLearner:
         """
         pending, events = self.pending_decision, self.events_since_decision
         self.pending_decision = None
-        if pending is None or self.creature.is_elder():
+        if pending is None:
             return
 
         state_before = pending['state']
@@ -673,6 +702,10 @@ class EnhancedBehaviorLearner:
             'interaction_positive': positive,
             'ball_caught': any(e['type'] == 'ball_play' and e['positive'] for e in events),
         }
+
+        # The planner's world model learns what pursuing this goal did
+        self.planner.model.observe(pending['goal'], time.time() - pending['time'], before, after,
+                                   bool(events), positive)
 
         # Reinforcement learning from the real transition
         reward = self.rl_system.learn_from_outcome(
@@ -723,6 +756,7 @@ class EnhancedBehaviorLearner:
                 data['rl_system'] = self.rl_system.rl_agent.to_dict()
 
             data['hiding_spots'] = self.hiding_spots.to_dict()
+            data['planner'] = self.planner.to_dict()
 
         if self.complexity == AIComplexity.EXPERT:
             data['learning_history'] = self.learning_history[-100:]  # Last 100 only
@@ -754,6 +788,8 @@ class EnhancedBehaviorLearner:
         elif complexity in (AIComplexity.ADVANCED, AIComplexity.EXPERT):
             if 'hiding_spots' in data:
                 learner.hiding_spots = HidingSpotMemory.from_dict(data['hiding_spots'])
+            if 'planner' in data:
+                learner.planner = Planner.from_dict(data['planner'])
 
             if 'network_coordinator' in data:
                 learner.network_coordinator = NetworkCoordinator.from_dict(data['network_coordinator'])

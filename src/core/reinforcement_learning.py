@@ -513,27 +513,42 @@ class GoalOrientedBehaviorSystem:
         Returns:
             Goal description
         """
+        # A strategic plan, when there is one, sets the goal
+        if state.get('planned_goal'):
+            self.current_goal = state['planned_goal']
+        else:
+            self.current_goal = self.rule_goal(state)
+        return self.current_goal
+
+    def rule_goal(self, state: Dict[str, Any]) -> str:
+        """
+        Goal from fixed priority rules on the creature's needs.
+
+        Args:
+            state: Current creature state
+
+        Returns:
+            Goal name
+        """
         hunger = state.get('hunger', 0)
         energy = state.get('energy', 100)
         happiness = state.get('happiness', 100)
 
         # Priority-based goal setting
         if hunger > 70:
-            self.current_goal = 'seek_food'
+            return 'seek_food'
         elif energy < 25:
-            self.current_goal = 'rest'
+            return 'rest'
         elif happiness < 40 or state.get('interaction_desire', 0) > 0.8:
             # Unhappy or lonely pets look for their player
-            self.current_goal = 'seek_interaction'
+            return 'seek_interaction'
         elif state.get('player_nearby', False):
-            self.current_goal = 'play'
+            return 'play'
         elif state.get('player_interaction_likely', 0) > ANTICIPATION_THRESHOLD:
             # The player usually turns up about now: go and meet them
-            self.current_goal = 'seek_interaction'
+            return 'seek_interaction'
         else:
-            self.current_goal = 'explore'
-
-        return self.current_goal
+            return 'explore'
 
     def execute_goal(self, state: np.ndarray, full_state: Dict[str, Any]) -> Dict[str, Any]:
         """

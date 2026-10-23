@@ -281,8 +281,8 @@ class PetManager:
         msg.setWindowTitle("Evolution!")
         text = f"{self.creature.name} has grown!\n\n{message}"
         if self.creature.is_elder():
-            text += ("\n\nAs an Elder, its personality and behavior are now set: "
-                     "it won't change its habits or learn new tricks.")
+            text += ("\n\nAs an Elder, its behavior has reached full complexity. "
+                     "It has the experience to keep adapting to changes.")
         msg.setText(text)
         msg.exec_()
 

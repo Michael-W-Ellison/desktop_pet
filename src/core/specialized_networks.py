@@ -367,9 +367,15 @@ class SocialNetwork:
         self.recent_interactions = deque()
 
     @staticmethod
-    def encode_state(state: Dict[str, Any]) -> np.ndarray:
-        """Encode time (as cycles), time since interaction, recent interaction types and player mood."""
-        now = datetime.datetime.now()
+    def encode_state(state: Dict[str, Any], when: Optional[float] = None) -> np.ndarray:
+        """
+        Encode time (as cycles), time since interaction, recent interaction types and player mood.
+
+        Args:
+            state: Creature state
+            when: Timestamp to encode (defaults to now; the planner forecasts future times)
+        """
+        now = datetime.datetime.now() if when is None else datetime.datetime.fromtimestamp(when)
         hour = now.hour + now.minute / 60.0
         weekday = now.weekday() + hour / 24.0
         return np.array([
@@ -383,17 +389,18 @@ class SocialNetwork:
             state.get('week_same_time', 0.0)
         ])
 
-    def predict_player_behavior(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    def predict_player_behavior(self, state: Dict[str, Any], when: Optional[float] = None) -> Dict[str, Any]:
         """
         Predict whether the player will interact soon, and how.
 
         Args:
             state: Current time and context
+            when: Time to predict for (defaults to now)
 
         Returns:
             Predictions about player behavior
         """
-        output = self.network.predict_single(self.encode_state(state))
+        output = self.network.predict_single(self.encode_state(state, when))
 
         return {
             'interaction_probability': float(output[0][0]),

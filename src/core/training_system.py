@@ -457,8 +457,6 @@ class TrainingSystem:
         """
         self.personality = personality
         self.learned_tricks = {}  # Tricks currently being learned or mastered
-        # False once the pet is an Elder: no new tricks can be started or learned
-        self.accepts_new_tricks = True
         self.command_recognition = CommandRecognition()
         self.name_recognition = NameRecognition(creature_name)
 
@@ -534,8 +532,6 @@ class TrainingSystem:
         if trick_name in self.learned_tricks:
             return False, f"Already know or learning '{trick_name}'"
 
-        if not self.accepts_new_tricks:
-            return False, "You can't teach an old pet new tricks!"
 
         if trick_name not in self.STANDARD_TRICKS:
             return False, f"Unknown trick '{trick_name}'"
@@ -567,10 +563,6 @@ class TrainingSystem:
             return False, f"Haven't started learning '{trick_name}' yet", 0.0
 
         trick = self.learned_tricks[trick_name]
-
-        # Tricks not yet known count as new tricks
-        if not self.accepts_new_tricks and not trick.can_perform():
-            return False, f"Too set in its ways to learn '{trick_name}' now", 0.0
 
         # Check stubbornness - sometimes pet refuses
         if np.random.random() < self.learning_modifiers['stubbornness']:

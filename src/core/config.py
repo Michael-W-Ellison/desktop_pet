@@ -83,6 +83,14 @@ INTERACTION_MEMORY_WINDOW = 30 * 60  # "Around this time" means within 30 minute
 # Expected player interaction above which a content pet goes to meet the player
 ANTICIPATION_THRESHOLD = 0.5
 
+# Strategic planner (ADVANCED/EXPERT, see planner.py)
+PLANNER_STEP_MINUTES = 15  # Length of one plan step
+PLANNER_HORIZON_HOURS = 24  # How far ahead the pet plans
+PLANNER_DISCOUNT = 0.99  # Weight of each later step relative to the one before
+PLANNER_MIN_EXPERIENCE = 500  # Decision steps observed before plans replace the goal rules
+PLANNER_REPLAN_SECONDS = 5 * 60  # How often the plan is recomputed
+PLANNER_MARGIN = 1.0  # How much better (in reward over the horizon) a plan must be to override the goal rules
+
 # Reinforcement learning
 GAMMA = 0.95  # How much to value future rewards (0-1)
 EPSILON_DECAY = 0.995  # How fast to reduce exploration
@@ -274,9 +282,6 @@ EVOLUTION_REQUIREMENTS = {
 # Decision stability measurement (EnhancedBehaviorLearner)
 DECISION_STABILITY_WINDOW = 200       # Player interactions compared per measurement
 DECISION_STABILITY_SMOOTHING = 0.005  # Moving-average weight of each new measurement
-# ADVANCED/EXPERT use slower smoothing so their more complex AI takes the longest to
-# mature (tuned so Elder takes roughly 3,000 interactions)
-ADVANCED_DECISION_STABILITY_SMOOTHING = 0.00065
 
 # Phase 4: Stage size multipliers (how big the creature is at each stage)
 STAGE_SIZE_MULTIPLIERS = {

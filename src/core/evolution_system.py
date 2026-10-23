@@ -34,7 +34,7 @@ class EvolutionSystem:
     - BABY: starting stage
     - JUVENILE: decisions 25%+ settled
     - ADULT: decisions 50%+ settled
-    - ELDER: decisions 75%+ settled; learning stops and no new tricks can be taught
+    - ELDER: decisions 75%+ settled; behavior has reached full complexity and keeps adapting
     """
 
     def __init__(self, current_stage: EvolutionStage = EvolutionStage.BABY):
