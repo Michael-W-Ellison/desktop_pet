@@ -25,6 +25,9 @@ from .config import (
     PLANNER_REPLAN_SECONDS, PLANNER_MARGIN, SOCIAL_PREDICTION_HORIZON
 )
 
+# Forecast at or above which the player counts as "around" for learning goal effects
+PLAYER_AROUND_FORECAST = 0.3
+
 PLANNER_GOALS = ['seek_food', 'rest', 'seek_interaction', 'play', 'explore']
 NEEDS = ('hunger', 'energy', 'happiness')
 
@@ -45,17 +48,29 @@ class WorldModel:
         # Per goal: steps observed and steps with an interaction
         self.steps = {g: 0 for g in PLANNER_GOALS}
         self.interacting_steps = {g: 0 for g in PLANNER_GOALS}
+        # The same, counted only while the player was forecast to be around, so a goal
+        # is not credited for interactions that only happen at times the player is there
+        self.around_steps = {g: 0 for g in PLANNER_GOALS}
+        self.around_interacting_steps = {g: 0 for g in PLANNER_GOALS}
 
     @property
     def experience(self) -> int:
         return sum(self.steps.values())
 
     def observe(self, goal: str, seconds: float, before: Dict[str, float], after: Dict[str, float],
-                interacted: bool, positive: bool):
-        """Record one decision step: the goal pursued, its duration and what changed."""
+                interacted: bool, positive: bool, player_forecast: float = 0.0):
+        """
+        Record one decision step: the goal pursued, its duration and what changed.
+
+        Args:
+            player_forecast: Forecast chance the player would interact, when the step began
+        """
         if goal not in self.steps or seconds <= 0:
             return
         self.steps[goal] += 1
+        if player_forecast >= PLAYER_AROUND_FORECAST:
+            self.around_steps[goal] += 1
+            self.around_interacting_steps[goal] += interacted
         deltas = {n: after[n] - before[n] for n in NEEDS}
         if interacted:
             self.interacting_steps[goal] += 1
@@ -97,22 +112,23 @@ class WorldModel:
         return entry['positive'] / entry['count'] if entry else 1.0
 
     def interaction_ratio(self, goal: str) -> float:
-        """How much more (or less) often the player interacts while the pet pursues this goal."""
-        total_steps = sum(self.steps.values())
-        total_interacting = sum(self.interacting_steps.values())
-        if self.steps[goal] < 50 or total_interacting == 0:
+        """How much more (or less) often the player interacts, while around, when the pet pursues this goal."""
+        total_steps = sum(self.around_steps.values())
+        total_interacting = sum(self.around_interacting_steps.values())
+        if self.around_steps[goal] < 50 or total_interacting == 0:
             return 1.0
-        goal_rate = self.interacting_steps[goal] / self.steps[goal]
+        goal_rate = self.around_interacting_steps[goal] / self.around_steps[goal]
         return float(np.clip(goal_rate / (total_interacting / total_steps), 0.2, 5.0))
 
     def to_dict(self) -> Dict[str, Any]:
         return {'drift': self.drift, 'events': self.events, 'steps': self.steps,
-                'interacting_steps': self.interacting_steps}
+                'interacting_steps': self.interacting_steps, 'around_steps': self.around_steps,
+                'around_interacting_steps': self.around_interacting_steps}
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'WorldModel':
         model = cls()
-        for name in ('drift', 'events', 'steps', 'interacting_steps'):
+        for name in ('drift', 'events', 'steps', 'interacting_steps', 'around_steps', 'around_interacting_steps'):
             for goal, value in data.get(name, {}).items():
                 if goal in model.steps:
                     getattr(model, name)[goal] = value

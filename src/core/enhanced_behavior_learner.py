@@ -711,8 +711,9 @@ class EnhancedBehaviorLearner:
         }
 
         # The planner's world model learns what pursuing this goal did
+        forecast = pending['decision'].get('player_prediction', {}).get('interaction_probability', 0.0)
         self.planner.model.observe(pending['goal'], time.time() - pending['time'], before, after,
-                                   bool(events), positive)
+                                   bool(events), positive, forecast)
 
         # Reinforcement learning from the real transition
         reward = self.rl_system.learn_from_outcome(
