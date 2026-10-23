@@ -8,7 +8,7 @@ Implements Q-learning and experience replay for creatures to learn:
 - Exploration vs exploitation balance
 """
 import numpy as np
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Optional, Tuple
 from collections import deque
 import random
 from .config import (
@@ -253,34 +253,38 @@ class ReinforcementLearningAgent:
             self.target_network.weights[i] = self.q_network.weights[i].copy()
             self.target_network.biases[i] = self.q_network.biases[i].copy()
 
-    def choose_action(self, state: np.ndarray, explore: bool = True) -> int:
+    def choose_action(self, state: np.ndarray, explore: bool = True,
+                      allowed: Optional[List[int]] = None) -> int:
         """
         Choose action using epsilon-greedy policy.
 
         Args:
             state: Current state
             explore: Whether to use exploration
+            allowed: Indices of the actions to choose from (all actions if omitted)
 
         Returns:
             Action index
         """
+        candidates = np.array(allowed if allowed else range(self.action_size))
+
         # Exploration vs exploitation
         if explore and random.random() < self.epsilon:
             # Explore: choose random action (with curiosity bias)
             # Actions that have been tried less get higher probability
-            action_probs = 1.0 / (self.action_counts + 1)  # Inverse frequency
+            action_probs = 1.0 / (self.action_counts[candidates] + 1)  # Inverse frequency
             action_probs /= action_probs.sum()  # Normalize
-            return np.random.choice(self.action_size, p=action_probs)
+            return int(np.random.choice(candidates, p=action_probs))
         else:
             # Exploit: choose action with highest Q-value
             q_values, _ = self.q_network.forward(state)
+            q_values = q_values[0]
 
             # Add small curiosity bonus to Q-values
             if explore:
-                curiosity_bonus = self.curiosity_weight / (self.action_counts + 1)
-                q_values = q_values + curiosity_bonus
+                q_values = q_values + self.curiosity_weight / (self.action_counts + 1)
 
-            return int(np.argmax(q_values[0]))
+            return int(candidates[np.argmax(q_values[candidates])])
 
     def get_action_description(self, action_idx: int) -> Dict[str, Any]:
         """Get description of action."""
@@ -481,6 +485,9 @@ class GoalOrientedBehaviorSystem:
         'explore': {'explore', 'random_wander', 'hide', 'move_to_center'},
     }
 
+    # Goals driven by a need: the agent only considers actions that serve them
+    NEED_GOALS = {'seek_food', 'rest', 'seek_interaction'}
+
     # Learning updates between copies of the Q-network into the target network
     TARGET_UPDATE_INTERVAL = 100
 
@@ -494,7 +501,6 @@ class GoalOrientedBehaviorSystem:
         self.rl_agent = ReinforcementLearningAgent(state_size=state_size)
         self.current_goal = None
         self.goal_progress = 0.0
-        self.steps_since_goal_update = 0
         self.learning_steps = 0
 
     def set_goal_based_on_state(self, state: Dict[str, Any]) -> str:
@@ -537,14 +543,16 @@ class GoalOrientedBehaviorSystem:
         Returns:
             Action to take, the current goal, and whether the action serves it
         """
-        # Update goal when first needed and every 10 steps after that
-        self.steps_since_goal_update += 1
-        if self.current_goal is None or self.steps_since_goal_update > 10:
-            self.set_goal_based_on_state(full_state)
-            self.steps_since_goal_update = 0
+        # Re-evaluate the goal every step so needs are acted on as soon as they arise
+        self.set_goal_based_on_state(full_state)
 
-        # Choose action using RL
-        action_idx = self.rl_agent.choose_action(state)
+        # For a need, choose among the actions that serve it (the agent learns which
+        # works best); otherwise any action, used only if it suits the goal
+        allowed = None
+        if self.current_goal in self.NEED_GOALS:
+            allowed = [i for i, action in self.rl_agent.action_map.items()
+                       if action['type'] in self.GOAL_ACTIONS[self.current_goal]]
+        action_idx = self.rl_agent.choose_action(state, allowed=allowed)
         action = self.rl_agent.get_action_description(action_idx)
         q_values, _ = self.rl_agent.q_network.forward(state)
 
