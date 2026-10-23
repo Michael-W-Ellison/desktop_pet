@@ -16,6 +16,7 @@ import numpy as np
 from typing import Dict, Any, Optional
 from .config import (
     AIComplexity, DEFAULT_AI_COMPLEXITY, DECISION_STABILITY_WINDOW, DECISION_STABILITY_SMOOTHING,
+    ADVANCED_DECISION_STABILITY_SMOOTHING,
     LEARNING_RATE, SEQUENCE_LENGTH, RL_STATE_SIZE, BehaviorState
 )
 from .neural_network import BehaviorLearner as SimpleBehaviorLearner
@@ -453,6 +454,9 @@ class EnhancedBehaviorLearner:
         (ratio near 0). The creature's decision stability is the least settled network.
         """
         stabilities = self.creature.network_stability
+        smoothing = (ADVANCED_DECISION_STABILITY_SMOOTHING
+                     if self.complexity in (AIComplexity.ADVANCED, AIComplexity.EXPERT)
+                     else DECISION_STABILITY_SMOOTHING)
         for name, scores in self._probe_network_scores().items():
             history = self.probe_history.setdefault(name, deque(maxlen=DECISION_STABILITY_WINDOW + 1))
             history.append(scores)
@@ -466,7 +470,7 @@ class EnhancedBehaviorLearner:
             settled = 1.0 - np.linalg.norm(history[-1] - history[0]) / path
 
             stability = stabilities.get(name, 0.0)
-            stabilities[name] = float(stability + DECISION_STABILITY_SMOOTHING * (settled - stability))
+            stabilities[name] = float(stability + smoothing * (settled - stability))
 
         # Every network must have settled; one that has not been measured yet counts as 0
         names = self.network_names()
