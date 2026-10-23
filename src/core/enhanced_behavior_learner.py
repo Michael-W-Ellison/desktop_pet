@@ -414,8 +414,9 @@ class EnhancedBehaviorLearner:
         """
         Outputs of each learning network for fixed probe states.
 
-        SIMPLE and MEDIUM have one learning network; ADVANCED and EXPERT have five
-        (movement, activity, emotion, social and the RL Q-network).
+        SIMPLE and MEDIUM have one learning network; ADVANCED and EXPERT have four
+        here (movement, activity, emotion and the RL Q-network). The social network is
+        judged by the accuracy of its forecasts instead (_update_decision_stability).
 
         Returns:
             Network name -> flat array of outputs across all probe states
@@ -453,11 +454,6 @@ class EnhancedBehaviorLearner:
         }) for hunger, energy, happiness, hours in probes])
         activity_inputs = [np.array([hunger, energy, happiness, hours] + [0.0] * 5 + [0.5] * 5)
                            for hunger, energy, happiness, hours in probes]
-        social_inputs = [np.array([math.sin(2 * math.pi * hunger), math.cos(2 * math.pi * hunger),
-                                   math.sin(2 * math.pi * energy), math.cos(2 * math.pi * energy),
-                                   1.0 if happiness > 0.5 else 0.0, hours] + [happiness] * 5 + [happiness]
-                                  + [hours, energy])
-                         for hunger, energy, happiness, hours in probes]
         rl_inputs = np.array([[hunger, energy, happiness, hours, 0.5, 0.5, 0.0] + [0.0] * (RL_STATE_SIZE - 7)
                               for hunger, energy, happiness, hours in probes])
         # The pet picks the action with the highest Q-value, so only how actions compare
@@ -470,7 +466,6 @@ class EnhancedBehaviorLearner:
             'movement': coordinator.movement_net.network.predict(movement_inputs).ravel(),
             'activity': self._probe_lstm(coordinator.activity_net.network, activity_inputs),
             'emotion': coordinator.emotion_net.network.predict(emotion_inputs).ravel(),
-            'social': self._probe_lstm(coordinator.social_net.network, social_inputs),
             'rl': q_values_relative.ravel(),
         }
 
@@ -482,7 +477,8 @@ class EnhancedBehaviorLearner:
         how far its probe outputs moved overall with the total distance they
         travelled. A network that is still learning moves consistently in one
         direction (ratio near 1); a settled one only jitters around the same point
-        (ratio near 0). The creature's decision stability is the least settled network.
+        (ratio near 0). The social network is judged by forecast accuracy instead.
+        The creature's decision stability is the least settled network.
         """
         stabilities = self.creature.network_stability
         for name, scores in self._probe_network_scores().items():
@@ -502,6 +498,15 @@ class EnhancedBehaviorLearner:
 
             stability = stabilities.get(name, 0.0)
             stabilities[name] = float(stability + DECISION_STABILITY_SMOOTHING * (settled - stability))
+
+        # The social network keeps sharpening its forecasts around when sessions start and
+        # end, so its outputs never stop moving; it counts as settled once its forecasts
+        # have stopped getting more accurate
+        if self.network_coordinator:
+            settled = self.network_coordinator.social_net.accuracy_settledness()
+            if settled is not None:
+                stability = stabilities.get('social', 0.0)
+                stabilities['social'] = float(stability + DECISION_STABILITY_SMOOTHING * (settled - stability))
 
         # Every network must have settled; one that has not been measured yet counts as 0
         names = self.network_names()

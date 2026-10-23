@@ -15,13 +15,14 @@ import random
 import time
 from collections import deque
 import numpy as np
-from typing import Callable, Dict, Any, Optional, Tuple
+from typing import Callable, Dict, Any, List, Optional, Tuple
 from .advanced_network import AdvancedNeuralNetwork
 from .lstm_network import LSTMNetwork
 from .config import (
     PersonalityType, ENHANCED_NETWORK_LAYERS, LEARNING_RATE, SEQUENCE_LENGTH, TRAINING_BATCH_SIZE,
     SOCIAL_PREDICTION_HORIZON, SOCIAL_LEARNING_RATE, SOCIAL_REPLAY_CAPACITY,
-    SOCIAL_CALIBRATION_MOMENTS, SOCIAL_CALIBRATION_MIN_MOMENTS
+    SOCIAL_CALIBRATION_MOMENTS, SOCIAL_CALIBRATION_MIN_MOMENTS,
+    SOCIAL_ACCURACY_SIGNIFICANCE, SOCIAL_ACCURACY_MIN_IMPROVEMENT
 )
 
 # Length of the one-hot personality encoding supplied in 'personality_vector'
@@ -376,6 +377,11 @@ class SocialNetwork:
         # learning from the moment) and what happened y: [count, y, f, f*f, f*y]
         self.calibration = [0.0] * 5
 
+        # Accuracy of the forecasts as used, checked when each moment is labelled:
+        # hour number -> [sum of squared errors, moments, moments the player interacted]
+        # for the last 48 hours
+        self.forecast_errors: Dict[int, List[float]] = {}
+
     @staticmethod
     def encode_state(state: Dict[str, Any], when: Optional[float] = None) -> np.ndarray:
         """
@@ -449,7 +455,9 @@ class SocialNetwork:
                     target[0, self.INTERACTION_TYPES.index(kind) + 1] = 1.0 if was_positive else 0.2
             else:
                 target[0, 5] = 1.0  # 'ignore'
-            self._record_calibration(float(self.network.predict_single(x)[0][0]), target[0, 0])
+            forecast = float(self.network.predict_single(x)[0][0])
+            self._record_accuracy(moment, self.calibrated(forecast), target[0, 0])
+            self._record_calibration(forecast, target[0, 0])
 
             # Store the moment, then train on a random stored one
             slot = self.replay_count % SOCIAL_REPLAY_CAPACITY
@@ -469,6 +477,47 @@ class SocialNetwork:
         keep = 1.0 - 1.0 / SOCIAL_CALIBRATION_MOMENTS
         values = (1.0, happened, forecast, forecast * forecast, forecast * happened)
         self.calibration = [total * keep + value for total, value in zip(self.calibration, values)]
+
+    def _record_accuracy(self, moment: float, forecast: float, happened: float):
+        """Record the error of a forecast as used, for its hour; forget hours older than 48."""
+        hour = int(moment // 3600)
+        entry = self.forecast_errors.setdefault(hour, [0.0, 0, 0])
+        entry[0] += (forecast - happened) ** 2
+        entry[1] += 1
+        entry[2] += happened
+        for old in [h for h in self.forecast_errors if h <= hour - 48]:
+            del self.forecast_errors[old]
+
+    def accuracy_settledness(self) -> Optional[float]:
+        """
+        How settled the social network is, judged by the accuracy of its forecasts (0-1).
+
+        Each hour of the last 24 is paired with the same hour the day before, and the
+        drop in mean squared error, less SOCIAL_ACCURACY_MIN_IMPROVEMENT (drops too small
+        to matter), is tested against its standard error. No improvement scores 1; an
+        improvement SOCIAL_ACCURACY_SIGNIFICANCE standard errors or more scores 0. A player
+        who cannot be predicted scores near 1 once the forecasts are as good as they get
+        (blending keeps them at about the player's average rate).
+
+        Returns:
+            The score, or None with fewer than 12 hours that have forecasts on both days
+        """
+        if not self.forecast_errors:
+            return None
+        latest = max(self.forecast_errors)
+        pairs = [(self.forecast_errors[h - 24], self.forecast_errors[h])
+                 for h in range(latest - 23, latest + 1)
+                 if h in self.forecast_errors and h - 24 in self.forecast_errors]
+        if len(pairs) < 12:
+            return None
+
+        drops = np.array([before[0] / before[1] - after[0] / after[1] for before, after in pairs])
+        improvement = drops.mean() - SOCIAL_ACCURACY_MIN_IMPROVEMENT
+        spread = drops.std(ddof=1)
+        if spread == 0:
+            return 1.0 if improvement <= 0 else 0.0
+        t = improvement / (spread / math.sqrt(len(drops)))
+        return float(1.0 - min(1.0, max(0.0, t / SOCIAL_ACCURACY_SIGNIFICANCE)))
 
     def calibrated(self, forecast: float) -> float:
         """
@@ -637,6 +686,7 @@ class NetworkCoordinator:
             'emotion': self.emotion_net.network.to_dict(),
             'social': self.social_net.network.to_dict(),
             'social_calibration': self.social_net.calibration,
+            'social_forecast_errors': {str(h): v for h, v in self.social_net.forecast_errors.items()},
             'current_emotions': self.emotion_net.current_emotions.tolist()
         }
 
@@ -667,5 +717,7 @@ class NetworkCoordinator:
 
         coordinator.emotion_net.current_emotions = np.array(data['current_emotions'])
         coordinator.social_net.calibration = list(data.get('social_calibration', [0.0] * 5))
+        coordinator.social_net.forecast_errors = {
+            int(h): list(v) for h, v in data.get('social_forecast_errors', {}).items()}
 
         return coordinator

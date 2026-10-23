@@ -87,6 +87,12 @@ SOCIAL_REPLAY_CAPACITY = 7 * 24 * 720
 # one decision every 5 s), and how many it needs before blending
 SOCIAL_CALIBRATION_MOMENTS = 75000
 SOCIAL_CALIBRATION_MIN_MOMENTS = 100
+# The social network counts as settled once its forecasts (as used, after blending) have
+# stopped getting more accurate: each hour of the last 24 is compared with the same hour the
+# day before. Drops in mean squared error smaller than SOCIAL_ACCURACY_MIN_IMPROVEMENT do not
+# count; an improvement beyond that by this many standard errors scores 0, none scores 1
+SOCIAL_ACCURACY_SIGNIFICANCE = 3.0
+SOCIAL_ACCURACY_MIN_IMPROVEMENT = 0.005
 
 # Memory of when the player interacted on previous days
 INTERACTION_MEMORY_DAYS = 14
