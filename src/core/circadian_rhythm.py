@@ -75,6 +75,9 @@ class CircadianRhythm:
         # Sleep quality
         self.sleep_quality = 1.0  # 0-1 multiplier
 
+        # How fast sleep drive builds (set from the sleep_frequency personality trait)
+        self.drive_multiplier = 1.0
+
     def _get_preferred_sleep_time(self, species: str) -> int:
         """
         Get preferred sleep time (hour of day, 0-23).
@@ -130,7 +133,7 @@ class CircadianRhythm:
     def _update_awake(self, hours_elapsed: float, current_hour: int):
         """Update while awake."""
         # Sleep drive increases while awake
-        drive_increase = hours_elapsed * 5.0  # 5 points per hour
+        drive_increase = hours_elapsed * 5.0 * self.drive_multiplier  # 5 points per hour
 
         # Increased drive during preferred sleep time
         if self._is_preferred_sleep_time(current_hour):
@@ -223,6 +226,10 @@ class CircadianRhythm:
             return True, "nighttime"
 
         return False, "not_tired"
+
+    def should_stay_asleep(self, current_hour: int) -> bool:
+        """Whether a sleeping pet keeps sleeping: through the night, or until rested."""
+        return 0 <= current_hour < 6 or self.sleep_drive > 20
 
     def fall_asleep(self):
         """Pet falls asleep."""

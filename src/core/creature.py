@@ -23,6 +23,7 @@ from .config import (
 )
 from .memory_system import IntegratedMemorySystem
 from .personality_behavior import PersonalityBehavior
+from .circadian_rhythm import CircadianRhythm
 from .training_system import TrainingSystem
 from .evolution_system import EvolutionSystem, EvolutionTrigger
 from .element_system import ElementSystem, create_element_system_for_species
@@ -76,6 +77,10 @@ class Creature:
         # Personality trait modifiers, and the behavior they produce
         self.trait_modifiers = PERSONALITY_TRAITS[self.personality]
         self.behavior = PersonalityBehavior(self.trait_modifiers)
+
+        # Day/night sleep cycle; sleepy personalities tire faster
+        self.circadian = CircadianRhythm(species_type=self.creature_type)
+        self.circadian.drive_multiplier = self.behavior.trait('sleep_frequency')
 
         # Phase 2: Enhanced Memory System
         self.memory = IntegratedMemorySystem(
@@ -172,6 +177,14 @@ class Creature:
         """
         # Update age
         self.age = time.time() - self.birth_time
+
+        # Day/night sleep cycle, kept in step with whether the creature is asleep
+        self.circadian.update(delta_time / 3600.0, self.current_hour())
+        asleep = self.current_state == BehaviorState.SLEEPING
+        if asleep and not self.circadian.is_sleeping:
+            self.circadian.fall_asleep()
+        elif not asleep and self.circadian.is_sleeping:
+            self.circadian.wake_up()
 
         # Update hunger
         minutes_elapsed = delta_time / 60.0
@@ -417,8 +430,24 @@ class Creature:
         return self.hunger >= STARVATION_THRESHOLD
 
     def should_sleep(self) -> bool:
-        """Determine if creature should sleep based on energy (sleepy personalities sooner)."""
-        return self.energy < self.behavior.sleep_energy_threshold
+        """
+        Determine if creature should sleep, based on energy and its day/night cycle.
+
+        Low energy always means sleep (sooner for sleepy personalities). Otherwise the
+        sleep drive decides: bedtime, night, exhaustion or sleep debt send it to sleep,
+        and once asleep it sleeps through the night or until rested.
+        """
+        if self.energy < self.behavior.sleep_energy_threshold:
+            return True
+        hour = self.current_hour()
+        if self.current_state == BehaviorState.SLEEPING:
+            return self.circadian.should_stay_asleep(hour)
+        return self.circadian.should_sleep(hour, self.energy)[0]
+
+    @staticmethod
+    def current_hour() -> int:
+        """Local hour of day (0-23)."""
+        return time.localtime(time.time()).tm_hour
 
     def get_preferred_activity(self) -> str:
         """Get the creature's currently most preferred activity."""
@@ -1428,6 +1457,7 @@ class Creature:
             'training_system': self.training.to_dict(),
             # Phase 4: Evolution, Element, Variant
             'evolution_system': self.evolution.to_dict(),
+            'circadian': self.circadian.to_dict(),
             'decision_stability': self.decision_stability,
             'network_stability': self.network_stability,
             'element_system': self.element.to_dict(),
@@ -1488,6 +1518,9 @@ class Creature:
         # Phase 4: Restore evolution, element, variant if present
         if 'evolution_system' in data:
             creature.evolution = EvolutionSystem.from_dict(data['evolution_system'])
+        if 'circadian' in data:
+            creature.circadian = CircadianRhythm.from_dict(data['circadian'])
+            creature.circadian.drive_multiplier = creature.behavior.trait('sleep_frequency')
         creature.decision_stability = data.get('decision_stability', 0.0)
         # Saves from before per-network measurement only tracked the activity network
         creature.network_stability = data.get('network_stability',
