@@ -127,7 +127,7 @@ class Creature:
 
         # Apply variant modifiers to initial stats
         variant_mods = self.variant.get_variant_modifiers()
-        self.happiness *= variant_mods.get('happiness_gain', 1.0)
+        self.happiness = min(100.0, self.happiness * variant_mods.get('happiness_gain', 1.0))
 
         # Phase 5: Advanced Bonding Systems
         self.bonding = BondingSystem(initial_bond=0.0)
