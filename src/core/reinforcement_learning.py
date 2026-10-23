@@ -13,7 +13,7 @@ from collections import deque
 import random
 from .config import (
     LEARNING_RATE, GAMMA, EPSILON_DECAY, EPSILON_MIN, RL_REPLAY_CAPACITY, RL_STATE_SIZE,
-    GRADIENT_CLIP_NORM
+    GRADIENT_CLIP_NORM, ANTICIPATION_THRESHOLD
 )
 from .optimizers import (
     AdamOptimizer, LearningRateScheduler, clip_gradients, make_adam_optimizer, make_lr_scheduler
@@ -527,6 +527,9 @@ class GoalOrientedBehaviorSystem:
             self.current_goal = 'seek_interaction'
         elif state.get('player_nearby', False):
             self.current_goal = 'play'
+        elif state.get('player_interaction_likely', 0) > ANTICIPATION_THRESHOLD:
+            # The player usually turns up about now: go and meet them
+            self.current_goal = 'seek_interaction'
         else:
             self.current_goal = 'explore'
 

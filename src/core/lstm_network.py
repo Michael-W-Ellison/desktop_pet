@@ -424,6 +424,13 @@ class LSTMNetwork:
             outputs, _ = self.forward_sequence([x], reset_state=False)
             return outputs[0]
 
+    def predict_single(self, x: np.ndarray):
+        """Prediction for one input on its own, leaving the recurrent state unchanged."""
+        saved_states = ([h.copy() for h in self.h_states], [c.copy() for c in self.c_states])
+        outputs, _ = self.forward_sequence([x], reset_state=True)
+        self.h_states, self.c_states = saved_states
+        return outputs[0]
+
     def add_to_sequence(self, x: np.ndarray):
         """Add input to sequence buffer."""
         self.sequence_buffer.append(x)

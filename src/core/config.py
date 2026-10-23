@@ -72,6 +72,12 @@ MIN_LEARNING_RATE_FRACTION = 0.1  # Learning rate never drops below this fractio
 # LSTM memory
 SEQUENCE_LENGTH = 50  # How many interactions to remember
 
+# Social network: predicts whether the player will interact within this many seconds
+SOCIAL_PREDICTION_HORIZON = 30 * 60
+
+# Expected player interaction above which a content pet goes to meet the player
+ANTICIPATION_THRESHOLD = 0.5
+
 # Reinforcement learning
 GAMMA = 0.95  # How much to value future rewards (0-1)
 EPSILON_DECAY = 0.995  # How fast to reduce exploration

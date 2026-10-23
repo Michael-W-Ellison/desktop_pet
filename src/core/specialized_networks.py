@@ -10,14 +10,17 @@ Each network focuses on a specific aspect:
 These networks communicate and influence each other for complex, realistic behavior.
 """
 import datetime
+import math
 import random
+import time
 from collections import deque
 import numpy as np
 from typing import Callable, Dict, Any, Optional, Tuple
 from .advanced_network import AdvancedNeuralNetwork
 from .lstm_network import LSTMNetwork
 from .config import (
-    PersonalityType, ENHANCED_NETWORK_LAYERS, LEARNING_RATE, SEQUENCE_LENGTH, TRAINING_BATCH_SIZE
+    PersonalityType, ENHANCED_NETWORK_LAYERS, LEARNING_RATE, SEQUENCE_LENGTH, TRAINING_BATCH_SIZE,
+    SOCIAL_PREDICTION_HORIZON
 )
 
 # Length of the one-hot personality encoding supplied in 'personality_vector'
@@ -335,18 +338,21 @@ class SocialNetwork:
     """
     Network for learning player interaction patterns.
 
-    Learns when player is likely to interact, what they like to do, etc.
+    Learns when the player is likely to interact (time of day, day of week) and
+    what they like to do. It predicts whether the player will interact within the
+    next SOCIAL_PREDICTION_HORIZON seconds; each moment is labelled once that
+    period has passed.
     """
 
     INTERACTION_TYPES = ['feed', 'play_ball', 'pet', 'talk', 'ignore']
 
     def __init__(self, learning_rate: float = LEARNING_RATE):
         """Initialize social network."""
-        # Input: [time_of_day, day_of_week, time_since_last_interaction,
-        #         recent_interaction_types (5), player_mood_estimate]
+        # Input: [time_of_day (sin, cos), day_of_week (sin, cos), is_weekend,
+        #         time_since_last_interaction, recent_interaction_types (5), player_mood_estimate]
         # Output: [interaction_probability, predicted_interaction_type (5)]
         self.network = LSTMNetwork(
-            input_size=9,
+            input_size=12,
             hidden_size=24,
             output_size=6,
             num_layers=1,
@@ -354,13 +360,21 @@ class SocialNetwork:
             sequence_length=50  # Remember patterns over many interactions
         )
 
+        # Moments waiting to be labelled: (timestamp, encoded input)
+        self.pending = deque()
+        # Recent player interactions: (timestamp, type, positive)
+        self.recent_interactions = deque()
+
     @staticmethod
     def encode_state(state: Dict[str, Any]) -> np.ndarray:
-        """Encode time, time since interaction, recent interaction types and player mood."""
+        """Encode time (as cycles), time since interaction, recent interaction types and player mood."""
         now = datetime.datetime.now()
+        hour = now.hour + now.minute / 60.0
+        weekday = now.weekday() + hour / 24.0
         return np.array([
-            now.hour / 24.0,  # Time of day
-            now.weekday() / 7.0,  # Day of week
+            math.sin(2 * math.pi * hour / 24), math.cos(2 * math.pi * hour / 24),
+            math.sin(2 * math.pi * weekday / 7), math.cos(2 * math.pi * weekday / 7),
+            1.0 if now.weekday() >= 5 else 0.0,
             min(1.0, state.get('time_since_interaction', 0) / 3600),  # Hours
             *state.get('recent_interaction_types', [0, 0, 0, 0, 0]),
             state.get('player_mood_estimate', 0.5)
@@ -368,7 +382,7 @@ class SocialNetwork:
 
     def predict_player_behavior(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Predict player interaction likelihood and type.
+        Predict whether the player will interact soon, and how.
 
         Args:
             state: Current time and context
@@ -376,7 +390,7 @@ class SocialNetwork:
         Returns:
             Predictions about player behavior
         """
-        output = self.network.predict(self.encode_state(state), use_sequence=True)
+        output = self.network.predict_single(self.encode_state(state))
 
         return {
             'interaction_probability': float(output[0][0]),
@@ -385,29 +399,41 @@ class SocialNetwork:
             }
         }
 
-    def learn_from_interaction(self, state: Dict[str, Any],
-                               interaction_type: Optional[str], positive: bool = True):
+    def observe(self, state: Dict[str, Any], interaction_type: Optional[str], positive: bool = True,
+                now: Optional[float] = None):
         """
-        Learn whether the player interacted during a period, and how.
+        Record one decision period and learn from periods that are now labelled.
 
         Args:
             state: State at the start of the period
-            interaction_type: Type of interaction ('feed', 'play_ball', 'pet', 'talk'),
-                or None if the player did not interact
-            positive: Whether it was positive
+            interaction_type: Player interaction during the period ('feed', 'play_ball',
+                'pet', 'talk', ...), or None if the player did not interact
+            positive: Whether that interaction was positive
+            now: Current time (defaults to time.time())
         """
-        target = np.zeros((1, 6))
-        if interaction_type is None:
-            target[0, 5] = 1.0  # 'ignore'
-        else:
-            target[0, 0] = 1.0  # Interaction occurred
-            if interaction_type in self.INTERACTION_TYPES:
-                target[0, self.INTERACTION_TYPES.index(interaction_type) + 1] = 1.0 if positive else 0.2
+        now = time.time() if now is None else now
+        self.pending.append((now, self.encode_state(state)))
+        if interaction_type is not None:
+            self.recent_interactions.append((now, interaction_type, positive))
 
-        self.network.add_to_sequence(self.encode_state(state))
-        if len(self.network.sequence_buffer) >= 3:
-            sequence = list(self.network.sequence_buffer)[-3:]
-            self.network.train_sequence(sequence, [target] * len(sequence))
+        # Label every moment whose prediction window has passed
+        while self.pending and now - self.pending[0][0] >= SOCIAL_PREDICTION_HORIZON:
+            moment, x = self.pending.popleft()
+            target = np.zeros((1, 6))
+            following = [i for i in self.recent_interactions
+                         if moment < i[0] <= moment + SOCIAL_PREDICTION_HORIZON]
+            if following:
+                _, kind, was_positive = following[0]
+                target[0, 0] = 1.0  # The player interacted within the window
+                if kind in self.INTERACTION_TYPES:
+                    target[0, self.INTERACTION_TYPES.index(kind) + 1] = 1.0 if was_positive else 0.2
+            else:
+                target[0, 5] = 1.0  # 'ignore'
+            self.network.train_sequence([x], [target])
+
+        # Forget interactions too old to label any pending moment
+        while self.recent_interactions and now - self.recent_interactions[0][0] > 2 * SOCIAL_PREDICTION_HORIZON:
+            self.recent_interactions.popleft()
 
 
 class NetworkCoordinator:
@@ -548,9 +574,7 @@ class NetworkCoordinator:
             self.emotion_net.learn_emotional_response(state, outcome['expected_emotions'])
 
         # Whether (and how) the player interacted during the period
-        self.social_net.learn_from_interaction(
-            state, outcome.get('interaction_type'), outcome.get('positive', True)
-        )
+        self.social_net.observe(state, outcome.get('interaction_type'), outcome.get('positive', True))
 
     def to_dict(self) -> Dict[str, Any]:
         """Save all networks."""

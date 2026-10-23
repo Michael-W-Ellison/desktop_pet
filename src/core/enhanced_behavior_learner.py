@@ -442,7 +442,9 @@ class EnhancedBehaviorLearner:
         }) for hunger, energy, happiness, hours in probes])
         activity_inputs = [np.array([hunger, energy, happiness, hours] + [0.0] * 5 + [0.5] * 5)
                            for hunger, energy, happiness, hours in probes]
-        social_inputs = [np.array([hunger, energy, hours] + [happiness] * 5 + [happiness])
+        social_inputs = [np.array([math.sin(2 * math.pi * hunger), math.cos(2 * math.pi * hunger),
+                                   math.sin(2 * math.pi * energy), math.cos(2 * math.pi * energy),
+                                   1.0 if happiness > 0.5 else 0.0, hours] + [happiness] * 5 + [happiness])
                          for hunger, energy, happiness, hours in probes]
         rl_inputs = np.array([[hunger, energy, happiness, hours, 0.5, 0.5, 0.0] + [0.0] * (RL_STATE_SIZE - 7)
                               for hunger, energy, happiness, hours in probes])
