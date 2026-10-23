@@ -13,7 +13,8 @@ from collections import deque
 import random
 from .config import (
     LEARNING_RATE, GAMMA, EPSILON_DECAY, EPSILON_MIN, RL_REPLAY_CAPACITY, RL_STATE_SIZE,
-    GRADIENT_CLIP_NORM, ANTICIPATION_THRESHOLD
+    GRADIENT_CLIP_NORM, ANTICIPATION_THRESHOLD, RL_LEARNING_RATE, RL_INTERACTION_REPLAY_CAPACITY,
+    RL_INTERACTION_SAMPLE_SHARE
 )
 from .optimizers import (
     AdamOptimizer, LearningRateScheduler, clip_gradients, make_adam_optimizer, make_lr_scheduler
@@ -190,7 +191,7 @@ class ReinforcementLearningAgent:
     """
 
     def __init__(self, state_size: int = RL_STATE_SIZE, action_size: int = 10,
-                 learning_rate: float = LEARNING_RATE, gamma: float = GAMMA,
+                 learning_rate: float = RL_LEARNING_RATE, gamma: float = GAMMA,
                  epsilon: float = 1.0, epsilon_decay: float = EPSILON_DECAY,
                  epsilon_min: float = EPSILON_MIN):
         """
@@ -219,6 +220,8 @@ class ReinforcementLearningAgent:
 
         # Experience replay
         self.replay_buffer = ExperienceReplayBuffer(capacity=RL_REPLAY_CAPACITY)
+        # Experiences from periods with player interaction, also kept apart
+        self.interaction_buffer = ExperienceReplayBuffer(capacity=RL_INTERACTION_REPLAY_CAPACITY)
 
         # Action mapping (discrete actions)
         self.action_map = self._create_action_map()
@@ -291,7 +294,7 @@ class ReinforcementLearningAgent:
         return self.action_map.get(action_idx, {'type': 'unknown', 'name': 'Unknown'})
 
     def store_experience(self, state: np.ndarray, action: int, reward: float,
-                        next_state: np.ndarray, done: bool):
+                        next_state: np.ndarray, done: bool, player_interacted: bool = False):
         """
         Store experience in replay buffer.
 
@@ -301,8 +304,11 @@ class ReinforcementLearningAgent:
             reward: Reward received
             next_state: State after action
             done: Whether episode ended
+            player_interacted: Whether the player interacted during the action
         """
         self.replay_buffer.add(state, action, reward, next_state, done)
+        if player_interacted:
+            self.interaction_buffer.add(state, action, reward, next_state, done)
         self.action_counts[action] += 1
 
     def calculate_reward(self, state_before: Dict[str, Any],
@@ -385,8 +391,13 @@ class ReinforcementLearningAgent:
         if len(self.replay_buffer) < batch_size:
             return
 
-        # Sample batch of experiences
-        experiences = self.replay_buffer.sample(batch_size)
+        # Sample batch of experiences; part of it comes from periods with player
+        # interaction, so hours without the player do not overwrite what was learned
+        interaction_count = int(batch_size * RL_INTERACTION_SAMPLE_SHARE)
+        if len(self.interaction_buffer) < interaction_count:
+            interaction_count = 0
+        experiences = (self.interaction_buffer.sample(interaction_count)
+                       + self.replay_buffer.sample(batch_size - interaction_count))
 
         # Prepare batch
         states = np.array([exp[0] for exp in experiences])
@@ -438,6 +449,12 @@ class ReinforcementLearningAgent:
                 [np.asarray(state).tolist(), int(action), float(reward),
                  np.asarray(next_state).tolist(), bool(done)]
                 for state, action, reward, next_state, done in list(self.replay_buffer.buffer)[-100:]
+            ],
+            # Interaction experiences take days to collect, so all are saved
+            'interaction_buffer': [
+                [np.round(state, 5).tolist(), int(action), float(reward),
+                 np.round(next_state, 5).tolist(), bool(done)]
+                for state, action, reward, next_state, done in self.interaction_buffer.buffer
             ]
         }
 
@@ -465,6 +482,8 @@ class ReinforcementLearningAgent:
         if 'replay_buffer' in data:
             for state, action, reward, next_state, done in data['replay_buffer']:
                 agent.replay_buffer.add(np.array(state), action, reward, np.array(next_state), done)
+        for state, action, reward, next_state, done in data.get('interaction_buffer', []):
+            agent.interaction_buffer.add(np.array(state), action, reward, np.array(next_state), done)
 
         return agent
 
@@ -605,7 +624,8 @@ class GoalOrientedBehaviorSystem:
 
         # Store experience
         done = not after_dict.get('alive', True)
-        self.rl_agent.store_experience(state_before, action_idx, reward, state_after, done)
+        self.rl_agent.store_experience(state_before, action_idx, reward, state_after, done,
+                                       after_dict.get('player_interacted', False))
 
         # Learn from experiences
         self.rl_agent.learn(batch_size=32)

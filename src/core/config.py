@@ -98,6 +98,11 @@ GAMMA = 0.95  # How much to value future rewards (0-1)
 EPSILON_DECAY = 0.995  # How fast to reduce exploration
 EPSILON_MIN = 0.1  # Minimum exploration rate
 RL_REPLAY_CAPACITY = 10000  # Past experiences kept for replay
+RL_LEARNING_RATE = LEARNING_RATE  # Q-network learning rate
+# Experiences from periods when the player interacted, kept apart so long periods without the
+# player do not push them out of replay (the Q-network would forget what sessions are like)
+RL_INTERACTION_REPLAY_CAPACITY = 2000
+RL_INTERACTION_SAMPLE_SHARE = 0.5  # Share of each training batch drawn from them
 RL_STATE_SIZE = 35  # 7 creature stats + 28 sensory inputs
 
 # AI Complexity levels (for different age groups)
