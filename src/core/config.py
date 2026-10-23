@@ -259,7 +259,7 @@ DECISION_STABILITY_WINDOW = 200       # Player interactions compared per measure
 DECISION_STABILITY_SMOOTHING = 0.005  # Moving-average weight of each new measurement
 # ADVANCED/EXPERT use slower smoothing so their more complex AI takes the longest to
 # mature (tuned so Elder takes roughly 3,000 interactions)
-ADVANCED_DECISION_STABILITY_SMOOTHING = 0.005
+ADVANCED_DECISION_STABILITY_SMOOTHING = 0.00065
 
 # Phase 4: Stage size multipliers (how big the creature is at each stage)
 STAGE_SIZE_MULTIPLIERS = {
