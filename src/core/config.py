@@ -81,6 +81,12 @@ SOCIAL_LEARNING_RATE = 0.003  # Higher than LEARNING_RATE so the schedule is lea
 # random past moments instead of the newest stops long runs without the player overwriting
 # what sessions are like
 SOCIAL_REPLAY_CAPACITY = 7 * 24 * 720
+# The social forecast is blended toward the player's average visit rate by as much as its
+# past accuracy shows is best, so a player without a pattern gets about the average rate.
+# Labelled moments the record spans (decays with this time constant, about 4 days at
+# one decision every 5 s), and how many it needs before blending
+SOCIAL_CALIBRATION_MOMENTS = 75000
+SOCIAL_CALIBRATION_MIN_MOMENTS = 100
 
 # Memory of when the player interacted on previous days
 INTERACTION_MEMORY_DAYS = 14

@@ -20,7 +20,8 @@ from .advanced_network import AdvancedNeuralNetwork
 from .lstm_network import LSTMNetwork
 from .config import (
     PersonalityType, ENHANCED_NETWORK_LAYERS, LEARNING_RATE, SEQUENCE_LENGTH, TRAINING_BATCH_SIZE,
-    SOCIAL_PREDICTION_HORIZON, SOCIAL_LEARNING_RATE, SOCIAL_REPLAY_CAPACITY
+    SOCIAL_PREDICTION_HORIZON, SOCIAL_LEARNING_RATE, SOCIAL_REPLAY_CAPACITY,
+    SOCIAL_CALIBRATION_MOMENTS, SOCIAL_CALIBRATION_MIN_MOMENTS
 )
 
 # Length of the one-hot personality encoding supplied in 'personality_vector'
@@ -371,6 +372,10 @@ class SocialNetwork:
         self.replay_targets = np.zeros((SOCIAL_REPLAY_CAPACITY, 6), dtype=np.float32)
         self.replay_count = 0  # Moments stored so far (the buffer holds the newest)
 
+        # Decaying sums over labelled moments of the network's forecast f (made before
+        # learning from the moment) and what happened y: [count, y, f, f*f, f*y]
+        self.calibration = [0.0] * 5
+
     @staticmethod
     def encode_state(state: Dict[str, Any], when: Optional[float] = None) -> np.ndarray:
         """
@@ -408,7 +413,7 @@ class SocialNetwork:
         output = self.network.predict_single(self.encode_state(state, when))
 
         return {
-            'interaction_probability': float(output[0][0]),
+            'interaction_probability': self.calibrated(float(output[0][0])),
             'likely_interaction_type': {
                 name: float(output[0][i + 1]) for i, name in enumerate(self.INTERACTION_TYPES)
             }
@@ -444,6 +449,7 @@ class SocialNetwork:
                     target[0, self.INTERACTION_TYPES.index(kind) + 1] = 1.0 if was_positive else 0.2
             else:
                 target[0, 5] = 1.0  # 'ignore'
+            self._record_calibration(float(self.network.predict_single(x)[0][0]), target[0, 0])
 
             # Store the moment, then train on a random stored one
             slot = self.replay_count % SOCIAL_REPLAY_CAPACITY
@@ -456,6 +462,31 @@ class SocialNetwork:
         # Forget interactions too old to label any pending moment
         while self.recent_interactions and now - self.recent_interactions[0][0] > 2 * SOCIAL_PREDICTION_HORIZON:
             self.recent_interactions.popleft()
+
+
+    def _record_calibration(self, forecast: float, happened: float):
+        """Add one labelled moment to the record of how well forecasts matched what happened."""
+        keep = 1.0 - 1.0 / SOCIAL_CALIBRATION_MOMENTS
+        values = (1.0, happened, forecast, forecast * forecast, forecast * happened)
+        self.calibration = [total * keep + value for total, value in zip(self.calibration, values)]
+
+    def calibrated(self, forecast: float) -> float:
+        """
+        Blend a network forecast toward the player's average visit rate.
+
+        Returns rate + s * (forecast - mean forecast), where s (0-1) is the weight that
+        best fitted past labelled moments: near 1 when the network's forecasts carry
+        information about this player, near 0 when they only fit noise (a player who
+        visits at random). Raw forecast until enough moments are recorded.
+        """
+        count, happened, total, squares, products = self.calibration
+        if count < SOCIAL_CALIBRATION_MIN_MOMENTS:
+            return forecast
+        rate, mean = happened / count, total / count
+        variance = squares / count - mean * mean
+        covariance = products / count - mean * rate
+        weight = 0.0 if variance <= 1e-9 else min(1.0, max(0.0, covariance / variance))
+        return float(min(1.0, max(0.0, rate + weight * (forecast - mean))))
 
 
 class NetworkCoordinator:
@@ -605,6 +636,7 @@ class NetworkCoordinator:
             'activity': self.activity_net.network.to_dict(),
             'emotion': self.emotion_net.network.to_dict(),
             'social': self.social_net.network.to_dict(),
+            'social_calibration': self.social_net.calibration,
             'current_emotions': self.emotion_net.current_emotions.tolist()
         }
 
@@ -634,5 +666,6 @@ class NetworkCoordinator:
                 net.network = saved_network
 
         coordinator.emotion_net.current_emotions = np.array(data['current_emotions'])
+        coordinator.social_net.calibration = list(data.get('social_calibration', [0.0] * 5))
 
         return coordinator
