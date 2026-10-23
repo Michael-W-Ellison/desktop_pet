@@ -77,6 +77,10 @@ SEQUENCE_LENGTH = 50  # How many interactions to remember
 # Social network: predicts whether the player will interact within this many seconds
 SOCIAL_PREDICTION_HORIZON = 30 * 60
 SOCIAL_LEARNING_RATE = 0.003  # Higher than LEARNING_RATE so the schedule is learned within days
+# Labelled moments kept for replay (7 days at one decision every 5 s; not saved). Training on
+# random past moments instead of the newest stops long runs without the player overwriting
+# what sessions are like
+SOCIAL_REPLAY_CAPACITY = 7 * 24 * 720
 
 # Memory of when the player interacted on previous days
 INTERACTION_MEMORY_DAYS = 14

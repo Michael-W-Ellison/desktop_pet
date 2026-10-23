@@ -20,7 +20,7 @@ from .advanced_network import AdvancedNeuralNetwork
 from .lstm_network import LSTMNetwork
 from .config import (
     PersonalityType, ENHANCED_NETWORK_LAYERS, LEARNING_RATE, SEQUENCE_LENGTH, TRAINING_BATCH_SIZE,
-    SOCIAL_PREDICTION_HORIZON, SOCIAL_LEARNING_RATE
+    SOCIAL_PREDICTION_HORIZON, SOCIAL_LEARNING_RATE, SOCIAL_REPLAY_CAPACITY
 )
 
 # Length of the one-hot personality encoding supplied in 'personality_vector'
@@ -366,6 +366,11 @@ class SocialNetwork:
         # Recent player interactions: (timestamp, type, positive)
         self.recent_interactions = deque()
 
+        # Labelled moments for replay, as a ring buffer (not saved)
+        self.replay_inputs = np.zeros((SOCIAL_REPLAY_CAPACITY, 14), dtype=np.float32)
+        self.replay_targets = np.zeros((SOCIAL_REPLAY_CAPACITY, 6), dtype=np.float32)
+        self.replay_count = 0  # Moments stored so far (the buffer holds the newest)
+
     @staticmethod
     def encode_state(state: Dict[str, Any], when: Optional[float] = None) -> np.ndarray:
         """
@@ -439,7 +444,14 @@ class SocialNetwork:
                     target[0, self.INTERACTION_TYPES.index(kind) + 1] = 1.0 if was_positive else 0.2
             else:
                 target[0, 5] = 1.0  # 'ignore'
-            self.network.train_sequence([x], [target])
+
+            # Store the moment, then train on a random stored one
+            slot = self.replay_count % SOCIAL_REPLAY_CAPACITY
+            self.replay_inputs[slot] = x
+            self.replay_targets[slot] = target[0]
+            self.replay_count += 1
+            i = random.randrange(min(self.replay_count, SOCIAL_REPLAY_CAPACITY))
+            self.network.train_sequence([self.replay_inputs[i]], [self.replay_targets[i:i + 1]])
 
         # Forget interactions too old to label any pending moment
         while self.recent_interactions and now - self.recent_interactions[0][0] > 2 * SOCIAL_PREDICTION_HORIZON:
