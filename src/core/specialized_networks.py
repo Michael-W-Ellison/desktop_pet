@@ -13,7 +13,7 @@ import datetime
 import random
 from collections import deque
 import numpy as np
-from typing import Dict, Any, Optional, Tuple
+from typing import Callable, Dict, Any, Optional, Tuple
 from .advanced_network import AdvancedNeuralNetwork
 from .lstm_network import LSTMNetwork
 from .config import (
@@ -173,13 +173,16 @@ class ActivityNetwork:
         self.activity_names = ['ball_play', 'mouse_chase', 'hide_seek', 'explore', 'sleep', 'eat']
 
     def choose_activity(self, state: Dict[str, Any],
-                        modifiers: Optional[Dict[str, float]] = None) -> str:
+                        modifiers: Optional[Dict[str, float]] = None,
+                        choose: Optional[Callable[[Dict[str, float]], str]] = None) -> str:
         """
-        Choose best activity based on current state and history.
+        Choose an activity based on current state and history.
 
         Args:
             state: Current creature state
             modifiers: Emotional modifiers; playfulness favors play activities
+            choose: Picks an activity from the scores (e.g. shaped by personality);
+                defaults to the highest score
 
         Returns:
             Activity name
@@ -195,6 +198,8 @@ class ActivityNetwork:
             for name in ('ball_play', 'mouse_chase', 'hide_seek'):
                 scores[self.activity_names.index(name)] *= 0.5 + playfulness
 
+        if choose is not None:
+            return choose(dict(zip(self.activity_names, (float(s) for s in scores))))
         return self.activity_names[int(np.argmax(scores))]
 
     def learn_from_activity(self, state: Dict[str, Any], activity: str,
@@ -458,12 +463,14 @@ class NetworkCoordinator:
             'should_move': should_move
         }
 
-    def decide_behavior(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    def decide_behavior(self, state: Dict[str, Any],
+                        choose: Optional[Callable[[Dict[str, float]], str]] = None) -> Dict[str, Any]:
         """
         Coordinate all networks to decide creature behavior.
 
         Args:
             state: Complete creature state
+            choose: Picks an activity from the activity network's scores
 
         Returns:
             Unified behavioral decision
@@ -480,7 +487,7 @@ class NetworkCoordinator:
 
         # Choose activity (influenced by emotions and player prediction)
         state['player_interaction_likely'] = player_prediction['interaction_probability']
-        network_activity = self.activity_net.choose_activity(state, emotional_modifiers)
+        network_activity = self.activity_net.choose_activity(state, emotional_modifiers, choose)
         # The pet cannot feed itself, so wanting to eat means seeking food from the player
         activity = 'seek_food' if network_activity == 'eat' else network_activity
 

@@ -39,6 +39,12 @@ FEED_AMOUNT = 30  # How much feeding reduces hunger
 HAPPINESS_NEGLECT_GRACE_SECONDS = 300  # Happiness starts falling after 5 minutes without interaction
 HAPPINESS_NEGLECT_ZERO_SECONDS = 3600  # Full happiness reaches 0 after 1 hour without interaction
 HAPPINESS_NEGLECT_DECAY_RATE = 100 / (HAPPINESS_NEGLECT_ZERO_SECONDS - HAPPINESS_NEGLECT_GRACE_SECONDS)  # Per second
+SLEEP_ENERGY_THRESHOLD = 20  # Energy below which the pet sleeps (scaled by the sleep_frequency trait)
+
+# Personality-driven activity choice (see personality_behavior.py)
+ACTIVITY_CHOICE_TEMPERATURE = 0.1  # Lower = learned scores matter more relative to frequency traits
+BASE_ACTIVITY_PERSISTENCE = 0.3  # Chance of keeping the current activity (scaled by attention traits)
+BASE_RANDOM_ACTIVITY_CHANCE = 0.05  # Chance of a random activity (scaled by unpredictability traits)
 
 # Learning settings - Basic Network
 LEARNING_RATE = 0.001  # Lower for Adam optimizer

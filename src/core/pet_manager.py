@@ -351,6 +351,7 @@ class PetManager:
             'stay_still': BehaviorState.IDLE,
             'idle': BehaviorState.IDLE,
             'eat': BehaviorState.EATING,
+            'icon_interaction': BehaviorState.WALKING,
         }
 
         new_state = activity_state_map.get(activity, BehaviorState.IDLE)
@@ -365,15 +366,16 @@ class PetManager:
             return
 
         if 'velocity_x' in decision:
-            # ADVANCED/EXPERT: the movement network decides how to move
+            # ADVANCED/EXPERT: the movement network decides how to move, at the personality's pace
             if decision.get('should_move', False):
-                self.creature.velocity = [decision['velocity_x'], decision['velocity_y']]
+                speed = self.creature.trait_modifiers.get('movement_speed', 1.0)
+                self.creature.velocity = [decision['velocity_x'] * speed, decision['velocity_y'] * speed]
             else:
                 self.creature.velocity = [0, 0]
             return
 
-        # SIMPLE/MEDIUM: steer toward a hiding spot, or wander
-        if activity in ('hide', 'hide_and_seek'):
+        # SIMPLE/MEDIUM: steer toward a hiding spot or an icon, or wander
+        if activity in ('hide', 'hide_and_seek', 'icon_interaction'):
             if self.sensory_system and self.pet_window:
                 state = self.sensory_system.get_state_dict(
                     self.creature.position[0],
@@ -540,7 +542,10 @@ class PetManager:
         if not self.creature or not self.learner:
             return
 
-        self.creature.interact(interaction_type, positive)
+        # The creature may receive the interaction badly (e.g. cranky personalities)
+        positive = self.creature.interact(interaction_type, positive)
+        if outcome:
+            outcome['positive'] = positive
 
         # Use enhanced learning with outcome data
         self.learner.learn_from_interaction(interaction_type, positive, outcome or {})

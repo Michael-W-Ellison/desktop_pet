@@ -96,6 +96,9 @@ class EnhancedBehaviorLearner:
         self.events_since_decision = []
         self.hiding_spots = HidingSpotMemory()
 
+        # Most recent activity chosen (personalities with long attention spans stick with it)
+        self.last_activity = None
+
         # Recent probe outputs per network for measuring stability (not saved)
         self.probe_history = {}
 
@@ -245,22 +248,28 @@ class EnhancedBehaviorLearner:
         """
         if self.complexity == AIComplexity.SIMPLE:
             # Use simple learner
-            return self.simple_learner.get_best_activity()
+            scores = self.simple_learner.get_activity_scores()
 
         elif self.complexity == AIComplexity.MEDIUM:
             # Use LSTM network
-            state = self.get_state_vector()
-            output = self.activity_network.predict(state)
-
+            output = self.activity_network.predict(self.get_state_vector())[0]
             activities = ['ball_play', 'mouse_chase', 'hide_and_seek', 'explore', 'idle']
-            return activities[np.argmax(output)]
+            scores = dict(zip(activities, (float(s) for s in output)))
 
         else:  # ADVANCED or EXPERT
             # Use full network coordinator
-            state_dict = self._get_complete_state_dict()
-            behavior = self.network_coordinator.decide_behavior(state_dict)
-
+            behavior = self.network_coordinator.decide_behavior(
+                self._get_complete_state_dict(), self._choose_by_personality
+            )
             return behavior.get('activity', 'idle')
+
+        return self._choose_by_personality(scores)
+
+    def _choose_by_personality(self, scores: Dict[str, float]) -> str:
+        """Pick an activity from learned scores, shaped by the creature's personality."""
+        activity = self.creature.behavior.choose_activity(scores, self.last_activity)
+        self.last_activity = activity
+        return activity
 
     def _get_complete_state_dict(self) -> Dict[str, Any]:
         """Get complete state dictionary for advanced AI."""
@@ -501,9 +510,11 @@ class EnhancedBehaviorLearner:
         self._learn_from_previous_decision(state_dict, rl_state)
 
         # Emotion -> social -> activity -> movement networks
-        decision = self.network_coordinator.decide_behavior(state_dict)
+        decision = self.network_coordinator.decide_behavior(state_dict, self._choose_by_personality)
         modifiers = decision['emotional_modifiers']
-        state_dict['interaction_desire'] = modifiers['interaction_desire']
+        # Emotional desire for company, scaled by how social the personality is
+        state_dict['interaction_desire'] = (modifiers['interaction_desire']
+                                            * self.creature.behavior.interaction_desire)
 
         # The RL agent works toward the current goal; its action is carried out
         # when it serves that goal, otherwise the networks' choice stands
@@ -520,6 +531,7 @@ class EnhancedBehaviorLearner:
                 decision['activity'] = activity
                 decision.update(self.network_coordinator.plan_movement(state_dict, activity, modifiers))
             decision['decided_by'] = 'rl'
+            self.last_activity = activity
 
         decision['target'] = self.network_coordinator.get_target(state_dict, decision['activity'])
 
@@ -618,12 +630,14 @@ class EnhancedBehaviorLearner:
         def clip(value):
             return float(min(1.0, max(0.0, value)))
 
+        # Personality sets how strongly the pet feels each of these
+        behavior = self.creature.behavior
         return {
-            'joy': clip(happiness * (0.5 + 0.5 * quality)),
+            'joy': clip(happiness * (0.5 + 0.5 * quality) * behavior.joy_scale),
             'excitement': clip(energy * (0.4 + 0.6 * play_share)),
             'contentment': clip((1.0 - hunger) * happiness),
-            'anxiety': clip(max(0.0, hunger - 0.5) * 1.5 + (1.0 - quality) * 0.3),
-            'loneliness': clip(hours_alone),
+            'anxiety': clip((max(0.0, hunger - 0.5) * 1.5 + (1.0 - quality) * 0.3) * behavior.anxiety_scale),
+            'loneliness': clip(hours_alone * behavior.loneliness_scale),
         }
 
     def _learn_from_previous_decision(self, state_after: Dict[str, Any], rl_state_after: np.ndarray):

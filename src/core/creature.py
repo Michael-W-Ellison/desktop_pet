@@ -22,6 +22,7 @@ from .config import (
     EvolutionStage, ElementType, HAPPINESS_NEGLECT_GRACE_SECONDS, HAPPINESS_NEGLECT_DECAY_RATE
 )
 from .memory_system import IntegratedMemorySystem
+from .personality_behavior import PersonalityBehavior
 from .training_system import TrainingSystem
 from .evolution_system import EvolutionSystem, EvolutionTrigger
 from .element_system import ElementSystem, create_element_system_for_species
@@ -72,8 +73,9 @@ class Creature:
         self.learned_behaviors = {}
         self.interaction_history = []
 
-        # Personality trait modifiers
+        # Personality trait modifiers, and the behavior they produce
         self.trait_modifiers = PERSONALITY_TRAITS[self.personality]
+        self.behavior = PersonalityBehavior(self.trait_modifiers)
 
         # Phase 2: Enhanced Memory System
         self.memory = IntegratedMemorySystem(
@@ -194,12 +196,14 @@ class Creature:
         time_since_interaction = time.time() - self.last_interaction_time
         neglected_seconds = min(delta_time, time_since_interaction - HAPPINESS_NEGLECT_GRACE_SECONDS)
         if neglected_seconds > 0:
-            happiness_decay = HAPPINESS_NEGLECT_DECAY_RATE * neglected_seconds
+            happiness_decay = (HAPPINESS_NEGLECT_DECAY_RATE * neglected_seconds
+                               * self.behavior.neglect_happiness_multiplier)
             self.happiness = max(0, self.happiness - happiness_decay)
 
-        # Hunger affects happiness (half the neglect rate, scaled by hunger)
+        # Hunger affects happiness (half the neglect rate, scaled by hunger and irritability)
         if self.hunger > 50:
-            happiness_decay = HAPPINESS_NEGLECT_DECAY_RATE * 0.5 * delta_time * (self.hunger / 50)
+            happiness_decay = (HAPPINESS_NEGLECT_DECAY_RATE * 0.5 * delta_time * (self.hunger / 50)
+                               * self.behavior.hunger_unhappiness_multiplier)
             self.happiness = max(0, self.happiness - happiness_decay)
 
         # Phase 5: Update emotional states
@@ -300,9 +304,16 @@ class Creature:
             positive: Whether the interaction was positive (enjoyed) or negative
             item: Specific item involved (toy name, food type, etc.)
             gentle: Whether interaction was gentle (affects trust)
+
+        Returns:
+            Whether the creature received the interaction well (cranky
+            personalities sometimes react badly to positive interactions)
         """
         self.last_interaction_time = time.time()
         self.total_interactions += 1  # Phase 4: Track for evolution
+
+        if positive and random.random() < self.behavior.negative_reaction_chance:
+            positive = False
 
         # Phase 5: Determine quality of interaction
         quality = 1.0
@@ -317,6 +328,11 @@ class Creature:
             positive=positive,
             quality=quality
         )
+        # Some personalities bond faster
+        extra_bond = bond_gain * (self.behavior.bond_gain_multiplier - 1.0)
+        if extra_bond > 0:
+            self.bonding.add_bond(extra_bond, 'personality')
+            bond_gain += extra_bond
 
         # Phase 5: Process trust based on interaction quality
         self.trust.process_interaction_quality(gentle=gentle)
@@ -394,13 +410,15 @@ class Creature:
             emotional_intensity=emotional_intensity
         )
 
+        return positive
+
     def is_starving(self) -> bool:
         """Check if the creature is starving (will die)."""
         return self.hunger >= STARVATION_THRESHOLD
 
     def should_sleep(self) -> bool:
-        """Determine if creature should sleep based on energy."""
-        return self.energy < 20
+        """Determine if creature should sleep based on energy (sleepy personalities sooner)."""
+        return self.energy < self.behavior.sleep_energy_threshold
 
     def get_preferred_activity(self) -> str:
         """Get the creature's currently most preferred activity."""

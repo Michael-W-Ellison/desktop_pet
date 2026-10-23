@@ -332,11 +332,16 @@ class BehaviorLearner:
         # Train the network
         self.network.train(state, target, epochs=1)
 
+    ACTIVITIES = ['ball_play', 'mouse_chase', 'hide_and_seek', 'icon_interaction']
+
+    def get_activity_scores(self) -> dict:
+        """Predicted enjoyment of each activity in the current state."""
+        return {activity: self.predict_enjoyment(activity) for activity in self.ACTIVITIES}
+
     def get_best_activity(self) -> str:
         """Get the activity with highest predicted enjoyment."""
-        activities = ['ball_play', 'mouse_chase', 'hide_and_seek', 'icon_interaction']
-        predictions = [(activity, self.predict_enjoyment(activity)) for activity in activities]
-        return max(predictions, key=lambda x: x[1])[0]
+        scores = self.get_activity_scores()
+        return max(scores, key=scores.get)
 
     def to_dict(self):
         """Convert learner to dictionary for saving."""
