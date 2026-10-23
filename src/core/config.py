@@ -40,6 +40,8 @@ HAPPINESS_NEGLECT_GRACE_SECONDS = 300  # Happiness starts falling after 5 minute
 HAPPINESS_NEGLECT_ZERO_SECONDS = 3600  # Full happiness reaches 0 after 1 hour without interaction
 HAPPINESS_NEGLECT_DECAY_RATE = 100 / (HAPPINESS_NEGLECT_ZERO_SECONDS - HAPPINESS_NEGLECT_GRACE_SECONDS)  # Per second
 SLEEP_ENERGY_THRESHOLD = 20  # Energy below which the pet sleeps (scaled by the sleep_frequency trait)
+AWAKE_AFTER_INTERACTION_SECONDS = 30 * 60  # A pet woken by its player stays up this long
+MAX_SLEEP_DRIVE_AWAKE = 95  # Sleep drive above which the pet sleeps even when woken or expecting the player
 
 # Personality-driven activity choice (see personality_behavior.py)
 ACTIVITY_CHOICE_TEMPERATURE = 0.1  # Lower = learned scores matter more relative to frequency traits

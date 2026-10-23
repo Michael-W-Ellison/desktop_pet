@@ -293,8 +293,8 @@ class PetManager:
         if not self.creature or not self.pet_window or not self.learner:
             return
 
-        # Simple sleep check (all AI levels)
-        if self.creature.should_sleep():
+        # Sleep check (all AI levels); pets that expect their player soon stay awake
+        if self.creature.should_sleep(self.learner.expects_player()):
             self.creature.set_state(BehaviorState.SLEEPING)
             self.creature.velocity = [0, 0]
             return

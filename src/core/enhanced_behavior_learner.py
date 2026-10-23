@@ -16,7 +16,8 @@ import numpy as np
 from typing import Dict, Any, Optional
 from .config import (
     AIComplexity, DEFAULT_AI_COMPLEXITY, DECISION_STABILITY_WINDOW, DECISION_STABILITY_SMOOTHING,
-    LEARNING_RATE, SEQUENCE_LENGTH, RL_STATE_SIZE, BehaviorState, PLANNER_MIN_EXPERIENCE
+    LEARNING_RATE, SEQUENCE_LENGTH, RL_STATE_SIZE, BehaviorState, PLANNER_MIN_EXPERIENCE,
+    ANTICIPATION_THRESHOLD
 )
 from .neural_network import BehaviorLearner as SimpleBehaviorLearner
 from .lstm_network import LSTMNetwork
@@ -633,6 +634,12 @@ class EnhancedBehaviorLearner:
                              f"{entry['activity']} via {entry['decided_by']} (goal {entry['goal']})")
 
         return "\n".join(lines)
+
+    def expects_player(self) -> bool:
+        """Whether the pet expects the player within the next half hour (ADVANCED/EXPERT)."""
+        if self.complexity not in (AIComplexity.ADVANCED, AIComplexity.EXPERT):
+            return False
+        return self._forecast_player(time.time()) > ANTICIPATION_THRESHOLD
 
     def _forecast_player(self, when: float) -> float:
         """Forecast P(player interacts within 30 minutes) at a future time, for the planner."""

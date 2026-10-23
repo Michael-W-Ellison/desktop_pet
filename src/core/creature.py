@@ -21,7 +21,8 @@ from .config import (
     PersonalityType, BehaviorState, CREATURE_TYPES, COLOR_PALETTES,
     PERSONALITY_TRAITS, MAX_HUNGER, HUNGER_DECAY_RATE, STARVATION_THRESHOLD,
     EvolutionStage, ElementType, HAPPINESS_NEGLECT_GRACE_SECONDS, HAPPINESS_NEGLECT_DECAY_RATE,
-    INTERACTION_MEMORY_DAYS, INTERACTION_MEMORY_WINDOW
+    INTERACTION_MEMORY_DAYS, INTERACTION_MEMORY_WINDOW, AWAKE_AFTER_INTERACTION_SECONDS,
+    MAX_SLEEP_DRIVE_AWAKE
 )
 from .memory_system import IntegratedMemorySystem
 from .personality_behavior import PersonalityBehavior
@@ -106,6 +107,8 @@ class Creature:
         self.decision_stability = 0.0
         # Energy use set by the emotion network (contentment lowers it, excitement raises it)
         self.emotional_energy_modifier = 1.0
+        # A pet woken by its player stays awake until this time
+        self.awake_until = 0.0
 
         # Phase 4: Element System
         self.element = create_element_system_for_species(self.creature_type)
@@ -295,6 +298,7 @@ class Creature:
             emotional_intensity=0.7 if old_hunger > 70 else 0.5
         )
 
+        self.wake_for_player()
         self.remember_interaction_time()
 
         # Record in history for neural network learning
@@ -332,6 +336,7 @@ class Creature:
         if positive and random.random() < self.behavior.negative_reaction_chance:
             positive = False
 
+        self.wake_for_player()
         self.remember_interaction_time()
 
         # Phase 5: Determine quality of interaction
@@ -430,6 +435,12 @@ class Creature:
 
         return positive
 
+    def wake_for_player(self):
+        """The player's attention wakes a sleeping pet, which then stays up for a while."""
+        if self.current_state == BehaviorState.SLEEPING:
+            self.set_state(BehaviorState.IDLE)
+        self.awake_until = time.time() + AWAKE_AFTER_INTERACTION_SECONDS
+
     def remember_interaction_time(self):
         """Remember that the player interacted now, forgetting interactions older than the memory span."""
         now = time.time()
@@ -466,16 +477,23 @@ class Creature:
         """Check if the creature is starving (will die)."""
         return self.hunger >= STARVATION_THRESHOLD
 
-    def should_sleep(self) -> bool:
+    def should_sleep(self, expecting_player: bool = False) -> bool:
         """
         Determine if creature should sleep, based on energy and its day/night cycle.
 
         Low energy always means sleep (sooner for sleepy personalities). Otherwise the
         sleep drive decides: bedtime, night, exhaustion or sleep debt send it to sleep,
-        and once asleep it sleeps through the night or until rested.
+        and once asleep it sleeps through the night or until rested. A pet that was just
+        woken by its player, or expects the player soon, stays awake unless its sleep
+        drive is at its maximum.
+
+        Args:
+            expecting_player: Whether the pet expects the player within the next half hour
         """
         if self.energy < self.behavior.sleep_energy_threshold:
             return True
+        if (time.time() < self.awake_until or expecting_player) and self.circadian.sleep_drive < MAX_SLEEP_DRIVE_AWAKE:
+            return False
         hour = self.current_hour()
         if self.current_state == BehaviorState.SLEEPING:
             return self.circadian.should_stay_asleep(hour)
