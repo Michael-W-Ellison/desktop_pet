@@ -2,7 +2,7 @@
 LSTM (Long Short-Term Memory) network for temporal pattern learning and memory.
 """
 import numpy as np
-from typing import List
+from typing import List, Optional
 from collections import deque
 from .optimizers import AdamOptimizer, clip_gradients, make_adam_optimizer, make_lr_scheduler, LearningRateScheduler
 from .config import GRADIENT_CLIP_NORM
@@ -296,7 +296,8 @@ class LSTMNetwork:
         return outputs, all_caches
 
     def backward_sequence(self, sequence: List[np.ndarray], targets: List[np.ndarray],
-                          outputs: List[np.ndarray], all_caches: List):
+                          outputs: List[np.ndarray], all_caches: List,
+                          output_mask: Optional[np.ndarray] = None):
         """
         Backward pass through time (BPTT).
 
@@ -305,6 +306,8 @@ class LSTMNetwork:
             targets: List of target outputs
             outputs: List of predicted outputs
             all_caches: Cached values from forward pass
+            output_mask: 1 for outputs that have a target, 0 for outputs to leave
+                untrained (all outputs are trained if omitted)
 
         Returns:
             Dictionary of gradients
@@ -326,6 +329,8 @@ class LSTMNetwork:
         for t in reversed(range(len(sequence))):
             # Output layer gradient, using the top layer's hidden state at this timestep
             dy = outputs[t] - targets[t]
+            if output_mask is not None:
+                dy = dy * output_mask
             _, _, _, _, _, _, _, c_top, o_top = all_caches[t][-1]
             h_top = o_top * np.tanh(c_top)
             dWy += np.dot(h_top.T, dy)
@@ -361,19 +366,21 @@ class LSTMNetwork:
 
         return grads
 
-    def train_sequence(self, sequence: List[np.ndarray], targets: List[np.ndarray]):
+    def train_sequence(self, sequence: List[np.ndarray], targets: List[np.ndarray],
+                       output_mask: Optional[np.ndarray] = None):
         """
         Train on a sequence of inputs and targets.
 
         Args:
             sequence: List of input vectors
             targets: List of target outputs
+            output_mask: 1 for outputs that have a target, 0 for outputs to leave untrained
         """
         # Forward pass
         outputs, all_caches = self.forward_sequence(sequence, reset_state=True)
 
         # Backward pass
-        grads = self.backward_sequence(sequence, targets, outputs, all_caches)
+        grads = self.backward_sequence(sequence, targets, outputs, all_caches, output_mask)
 
         # Order gradients to match _parameters()
         weight_grads, bias_grads = [], []

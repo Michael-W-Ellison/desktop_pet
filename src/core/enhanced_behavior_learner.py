@@ -341,25 +341,28 @@ class EnhancedBehaviorLearner:
             return
 
         if self.complexity == AIComplexity.SIMPLE:
-            # Simple learning
-            self.simple_learner.learn_from_interaction(activity_type, enjoyed)
+            # Interactions that are not themselves activities (petting, feeding)
+            # are credited to what the pet was doing at the time
+            activities = self.simple_learner.ACTIVITIES
+            activity = activity_type if activity_type in activities else self.last_activity
+            if activity in activities:
+                self.simple_learner.learn_from_interaction(activity, enjoyed)
 
         elif self.complexity == AIComplexity.MEDIUM:
-            # LSTM learning
-            state = self.get_state_vector()
-            target = np.zeros((1, 5))
-
+            # LSTM learning; non-activity interactions credit the current activity
             activities = ['ball_play', 'mouse_chase', 'hide_and_seek', 'explore', 'idle']
-            if activity_type in activities:
-                idx = activities.index(activity_type)
+            activity = activity_type if activity_type in activities else self.last_activity
+            self.activity_network.add_to_sequence(self.get_state_vector())
+
+            if activity in activities and len(self.activity_network.sequence_buffer) >= 3:
+                # Only that activity's score is trained, so no activity crowds out the rest
+                idx = activities.index(activity)
+                target = np.zeros((1, 5))
+                mask = np.zeros((1, 5))
                 target[0, idx] = 1.0 if enjoyed else 0.2
-
-            self.activity_network.add_to_sequence(state)
-
-            if len(self.activity_network.sequence_buffer) >= 3:
+                mask[0, idx] = 1.0
                 sequence = list(self.activity_network.sequence_buffer)[-3:]
-                targets = [target] * len(sequence)
-                self.activity_network.train_sequence(sequence, targets)
+                self.activity_network.train_sequence(sequence, [target] * len(sequence), output_mask=mask)
 
         else:  # ADVANCED or EXPERT
             # The interaction is credited to the current decision at the next decision

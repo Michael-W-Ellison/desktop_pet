@@ -218,10 +218,13 @@ class ActivityNetwork:
 
         input_vector = self._encode_state(state)
 
-        # Target: High score for chosen activity if enjoyed, low if not
+        # Only the chosen activity's score is trained (toward how much it was
+        # enjoyed); the others are left alone so no activity crowds out the rest
         target = np.zeros((1, 6))
+        mask = np.zeros((1, 6))
         activity_idx = self.activity_names.index(activity)
         target[0, activity_idx] = enjoyment
+        mask[0, activity_idx] = 1.0
 
         # Add to sequence
         self.network.add_to_sequence(input_vector)
@@ -230,7 +233,7 @@ class ActivityNetwork:
         if len(self.network.sequence_buffer) >= 3:
             sequence = list(self.network.sequence_buffer)[-3:]
             targets = [target] * len(sequence)  # Simplified
-            self.network.train_sequence(sequence, targets)
+            self.network.train_sequence(sequence, targets, output_mask=mask)
 
     def _encode_state(self, state: Dict[str, Any]) -> np.ndarray:
         """Encode state into input vector."""
