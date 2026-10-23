@@ -20,7 +20,7 @@ from .advanced_network import AdvancedNeuralNetwork
 from .lstm_network import LSTMNetwork
 from .config import (
     PersonalityType, ENHANCED_NETWORK_LAYERS, LEARNING_RATE, SEQUENCE_LENGTH, TRAINING_BATCH_SIZE,
-    SOCIAL_PREDICTION_HORIZON
+    SOCIAL_PREDICTION_HORIZON, SOCIAL_LEARNING_RATE
 )
 
 # Length of the one-hot personality encoding supplied in 'personality_vector'
@@ -346,13 +346,14 @@ class SocialNetwork:
 
     INTERACTION_TYPES = ['feed', 'play_ball', 'pet', 'talk', 'ignore']
 
-    def __init__(self, learning_rate: float = LEARNING_RATE):
+    def __init__(self, learning_rate: float = SOCIAL_LEARNING_RATE):
         """Initialize social network."""
         # Input: [time_of_day (sin, cos), day_of_week (sin, cos), is_weekend,
-        #         time_since_last_interaction, recent_interaction_types (5), player_mood_estimate]
+        #         time_since_last_interaction, recent_interaction_types (5), player_mood_estimate,
+        #         interacted at this time yesterday, share of last 7 days with an interaction now]
         # Output: [interaction_probability, predicted_interaction_type (5)]
         self.network = LSTMNetwork(
-            input_size=12,
+            input_size=14,
             hidden_size=24,
             output_size=6,
             num_layers=1,
@@ -377,7 +378,9 @@ class SocialNetwork:
             1.0 if now.weekday() >= 5 else 0.0,
             min(1.0, state.get('time_since_interaction', 0) / 3600),  # Hours
             *state.get('recent_interaction_types', [0, 0, 0, 0, 0]),
-            state.get('player_mood_estimate', 0.5)
+            state.get('player_mood_estimate', 0.5),
+            state.get('yesterday_same_time', 0.0),
+            state.get('week_same_time', 0.0)
         ])
 
     def predict_player_behavior(self, state: Dict[str, Any]) -> Dict[str, Any]:

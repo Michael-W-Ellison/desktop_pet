@@ -284,6 +284,8 @@ class EnhancedBehaviorLearner:
             'recent_activities': self.creature.get_recent_activities(5),
             'recent_interaction_types': self.creature.get_recent_interaction_types(5),
             'player_mood_estimate': float(np.mean(quality)),
+            # Memory of previous days at this time
+            **self.creature.recall_same_time(),
         }
 
         # Add sensory information and movement targets
@@ -444,7 +446,8 @@ class EnhancedBehaviorLearner:
                            for hunger, energy, happiness, hours in probes]
         social_inputs = [np.array([math.sin(2 * math.pi * hunger), math.cos(2 * math.pi * hunger),
                                    math.sin(2 * math.pi * energy), math.cos(2 * math.pi * energy),
-                                   1.0 if happiness > 0.5 else 0.0, hours] + [happiness] * 5 + [happiness])
+                                   1.0 if happiness > 0.5 else 0.0, hours] + [happiness] * 5 + [happiness]
+                                  + [hours, energy])
                          for hunger, energy, happiness, hours in probes]
         rl_inputs = np.array([[hunger, energy, happiness, hours, 0.5, 0.5, 0.0] + [0.0] * (RL_STATE_SIZE - 7)
                               for hunger, energy, happiness, hours in probes])

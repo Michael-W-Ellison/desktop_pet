@@ -13,13 +13,15 @@ Enhanced with:
 - Preference System (individual likes/dislikes for toys, foods, activities)
 - Name Calling System (responds to being called by name)
 """
+import bisect
 import random
 import time
 from typing import Dict, Any, Optional, Tuple, List
 from .config import (
     PersonalityType, BehaviorState, CREATURE_TYPES, COLOR_PALETTES,
     PERSONALITY_TRAITS, MAX_HUNGER, HUNGER_DECAY_RATE, STARVATION_THRESHOLD,
-    EvolutionStage, ElementType, HAPPINESS_NEGLECT_GRACE_SECONDS, HAPPINESS_NEGLECT_DECAY_RATE
+    EvolutionStage, ElementType, HAPPINESS_NEGLECT_GRACE_SECONDS, HAPPINESS_NEGLECT_DECAY_RATE,
+    INTERACTION_MEMORY_DAYS, INTERACTION_MEMORY_WINDOW
 )
 from .memory_system import IntegratedMemorySystem
 from .personality_behavior import PersonalityBehavior
@@ -73,6 +75,8 @@ class Creature:
         # Learning and behavior
         self.learned_behaviors = {}
         self.interaction_history = []
+        # When the player interacted, kept for INTERACTION_MEMORY_DAYS (memory of past days)
+        self.interaction_times = []
 
         # Personality trait modifiers, and the behavior they produce
         self.trait_modifiers = PERSONALITY_TRAITS[self.personality]
@@ -293,6 +297,8 @@ class Creature:
             emotional_intensity=0.7 if old_hunger > 70 else 0.5
         )
 
+        self.remember_interaction_time()
+
         # Record in history for neural network learning
         self.interaction_history.append({
             'type': 'feed',
@@ -327,6 +333,8 @@ class Creature:
 
         if positive and random.random() < self.behavior.negative_reaction_chance:
             positive = False
+
+        self.remember_interaction_time()
 
         # Phase 5: Determine quality of interaction
         quality = 1.0
@@ -424,6 +432,35 @@ class Creature:
         )
 
         return positive
+
+    def remember_interaction_time(self):
+        """Remember that the player interacted now, forgetting interactions older than the memory span."""
+        now = time.time()
+        self.interaction_times.append(now)
+        cutoff = now - INTERACTION_MEMORY_DAYS * 24 * 3600
+        if self.interaction_times[0] < cutoff:
+            self.interaction_times = [t for t in self.interaction_times if t >= cutoff]
+
+    def interacted_around(self, moment: float, window: float = INTERACTION_MEMORY_WINDOW) -> bool:
+        """Whether the player interacted within `window` seconds of a past moment."""
+        # interaction_times is in time order
+        i = bisect.bisect_left(self.interaction_times, moment - window)
+        return i < len(self.interaction_times) and self.interaction_times[i] <= moment + window
+
+    def recall_same_time(self) -> Dict[str, float]:
+        """
+        What the pet remembers about this time of day on previous days.
+
+        Returns:
+            yesterday_same_time: 1.0 if the player interacted around this time yesterday
+            week_same_time: share of the last 7 days with an interaction around this time
+        """
+        now = time.time()
+        days = [self.interacted_around(now - d * 24 * 3600) for d in range(1, 8)]
+        return {
+            'yesterday_same_time': 1.0 if days[0] else 0.0,
+            'week_same_time': sum(days) / len(days),
+        }
 
     def is_starving(self) -> bool:
         """Check if the creature is starving (will die)."""
@@ -1452,6 +1489,7 @@ class Creature:
             'last_interaction_time': self.last_interaction_time,
             'position': self.position,
             'interaction_history': self.interaction_history,
+            'interaction_times': self.interaction_times,
             # Phase 2: Memory and Training
             'memory_system': self.memory.to_dict(),
             'training_system': self.training.to_dict(),
@@ -1507,6 +1545,7 @@ class Creature:
         creature.last_interaction_time = data['last_interaction_time']
         creature.position = data['position']
         creature.interaction_history = data['interaction_history']
+        creature.interaction_times = data.get('interaction_times', [])
 
         # Phase 2: Restore memory and training if present
         if 'memory_system' in data:

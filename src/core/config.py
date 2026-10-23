@@ -66,7 +66,7 @@ USE_RESIDUAL_CONNECTIONS = True  # Skip connections between equal-sized layers
 TRAINING_BATCH_SIZE = 16  # Mini-batch size for feedforward networks (batch norm needs > 1)
 
 # Learning rate scheduling (exponential decay per training step, with a floor)
-LEARNING_RATE_DECAY = 0.0001
+LEARNING_RATE_DECAY = 0.00001  # Reaches the floor after about 230,000 updates
 MIN_LEARNING_RATE_FRACTION = 0.1  # Learning rate never drops below this fraction of its start
 
 # LSTM memory
@@ -74,6 +74,11 @@ SEQUENCE_LENGTH = 50  # How many interactions to remember
 
 # Social network: predicts whether the player will interact within this many seconds
 SOCIAL_PREDICTION_HORIZON = 30 * 60
+SOCIAL_LEARNING_RATE = 0.003  # Higher than LEARNING_RATE so the schedule is learned within days
+
+# Memory of when the player interacted on previous days
+INTERACTION_MEMORY_DAYS = 14
+INTERACTION_MEMORY_WINDOW = 30 * 60  # "Around this time" means within 30 minutes
 
 # Expected player interaction above which a content pet goes to meet the player
 ANTICIPATION_THRESHOLD = 0.5

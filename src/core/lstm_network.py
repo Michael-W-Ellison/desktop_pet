@@ -28,22 +28,25 @@ class LSTMCell:
         self.hidden_size = hidden_size
 
         # Initialize weights for gates (input, forget, cell, output)
-        # Concatenate input and hidden, so weight matrix is (input_size + hidden_size, hidden_size)
+        # Concatenate input and hidden, so weight matrix is (input_size + hidden_size, hidden_size).
+        # Xavier-scaled weights keep signals a useful size from the start; a forget-gate
+        # bias of 1 lets the cell remember by default
+        scale = np.sqrt(1.0 / (input_size + hidden_size))
 
         # Forget gate weights
-        self.Wf = np.random.randn(input_size + hidden_size, hidden_size) * 0.01
-        self.bf = np.zeros((1, hidden_size))
+        self.Wf = np.random.randn(input_size + hidden_size, hidden_size) * scale
+        self.bf = np.ones((1, hidden_size))
 
         # Input gate weights
-        self.Wi = np.random.randn(input_size + hidden_size, hidden_size) * 0.01
+        self.Wi = np.random.randn(input_size + hidden_size, hidden_size) * scale
         self.bi = np.zeros((1, hidden_size))
 
         # Cell gate weights (candidate values)
-        self.Wc = np.random.randn(input_size + hidden_size, hidden_size) * 0.01
+        self.Wc = np.random.randn(input_size + hidden_size, hidden_size) * scale
         self.bc = np.zeros((1, hidden_size))
 
         # Output gate weights
-        self.Wo = np.random.randn(input_size + hidden_size, hidden_size) * 0.01
+        self.Wo = np.random.randn(input_size + hidden_size, hidden_size) * scale
         self.bo = np.zeros((1, hidden_size))
 
     @staticmethod
@@ -204,7 +207,7 @@ class LSTMNetwork:
             self.lstm_layers.append(LSTMCell(layer_input_size, hidden_size))
 
         # Output layer (hidden_size -> output_size)
-        self.Wy = np.random.randn(hidden_size, output_size) * 0.01
+        self.Wy = np.random.randn(hidden_size, output_size) * np.sqrt(1.0 / hidden_size)
         self.by = np.zeros((1, output_size))
 
         # Hidden and cell states for each layer
