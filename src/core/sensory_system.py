@@ -396,7 +396,8 @@ class ScreenLayoutAnalyzer:
             max_distance: Maximum distance for hiding spot
 
         Returns:
-            List of nearby hiding spots
+            Hiding spots within max_distance, nearest first; if there are none,
+            the nearest icon at any distance (empty only when there are no icons)
         """
         self.refresh_icons()
 
@@ -410,19 +411,19 @@ class ScreenLayoutAnalyzer:
                 creature_x, creature_y, icon_center_x, icon_center_y
             )
 
-            if distance <= max_distance:
-                hiding_spots.append({
-                    'x': icon['x'],
-                    'y': icon['y'],
-                    'width': icon['width'],
-                    'height': icon['height'],
-                    'distance': distance
-                })
+            hiding_spots.append({
+                'x': icon['x'],
+                'y': icon['y'],
+                'width': icon['width'],
+                'height': icon['height'],
+                'distance': distance
+            })
 
         # Sort by distance
         hiding_spots.sort(key=lambda spot: spot['distance'])
 
-        return hiding_spots
+        nearby = [spot for spot in hiding_spots if spot['distance'] <= max_distance]
+        return nearby or hiding_spots[:1]
 
 
 class ProximitySensor:

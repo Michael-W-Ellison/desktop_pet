@@ -16,6 +16,7 @@ import numpy as np
 from typing import Dict, Any, Optional
 from .config import (
     AIComplexity, DEFAULT_AI_COMPLEXITY, DECISION_STABILITY_WINDOW, DECISION_STABILITY_SMOOTHING,
+    DECISION_STABILITY_MIN_CHANGE,
     LEARNING_RATE, SEQUENCE_LENGTH, RL_STATE_SIZE, BehaviorState, PLANNER_MIN_EXPERIENCE,
     ANTICIPATION_THRESHOLD
 )
@@ -481,6 +482,9 @@ class EnhancedBehaviorLearner:
             path = sum(np.linalg.norm(b - a) for a, b in zip(history, history[1:]))
             if path == 0:
                 continue  # Network has not changed during the window
+            # A network creeping toward a limit (e.g. an output approaching 1.0) moves
+            # in one direction forever; changes too small to alter behavior count as settled
+            path = max(path, DECISION_STABILITY_MIN_CHANGE * math.sqrt(scores.size))
             settled = 1.0 - np.linalg.norm(history[-1] - history[0]) / path
 
             stability = stabilities.get(name, 0.0)

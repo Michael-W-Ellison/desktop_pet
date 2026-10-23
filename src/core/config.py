@@ -284,6 +284,9 @@ EVOLUTION_REQUIREMENTS = {
 # Decision stability measurement (EnhancedBehaviorLearner)
 DECISION_STABILITY_WINDOW = 200       # Player interactions compared per measurement
 DECISION_STABILITY_SMOOTHING = 0.005  # Moving-average weight of each new measurement
+# Change in a network's outputs (root-mean-square per output, over one window) below which
+# the network counts as settled even if it still moves steadily in one direction
+DECISION_STABILITY_MIN_CHANGE = 0.01
 
 # Phase 4: Stage size multipliers (how big the creature is at each stage)
 STAGE_SIZE_MULTIPLIERS = {

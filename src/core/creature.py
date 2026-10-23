@@ -38,6 +38,15 @@ from .preference_system import PreferenceSystem
 from .name_calling import NameCallingSystem
 
 
+
+def _snap_to_limits(value: float, low: float = 0.0, high: float = 100.0) -> float:
+    """Return a limit when value is within 1e-6 of it, otherwise value."""
+    if abs(value - low) < 1e-6:
+        return low
+    if abs(value - high) < 1e-6:
+        return high
+    return value
+
 class Creature:
     """Represents a desktop pal creature with personality, stats, and learning capabilities."""
 
@@ -225,6 +234,12 @@ class Creature:
             happiness_decay = (HAPPINESS_NEGLECT_DECAY_RATE * 0.5 * delta_time * (self.hunger / 50)
                                * self.behavior.hunger_unhappiness_multiplier)
             self.happiness = max(0, self.happiness - happiness_decay)
+
+        # Floating-point error accumulated over many small updates can leave a stat a
+        # hair short of its limit (e.g. hunger 99.9999999), so snap values within 1e-6
+        self.hunger = _snap_to_limits(self.hunger)
+        self.energy = _snap_to_limits(self.energy)
+        self.happiness = _snap_to_limits(self.happiness)
 
         # Phase 5: Update emotional states
         self.emotional_states.update(delta_time)

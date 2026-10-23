@@ -37,10 +37,8 @@ class PetManager:
         self.ai_complexity = ai_complexity
 
         # Enhanced AI systems
-        self.sensory_system = None
-        if ai_complexity != AIComplexity.SIMPLE:
-            # Initialize sensory system for all non-simple modes
-            self.sensory_system = CompleteSensorySystem()
+        # Desktop layout (icons to hide behind); every level uses it
+        self.sensory_system = CompleteSensorySystem()
 
         # Data manager
         self.data_manager = PetDataManager()
@@ -86,10 +84,6 @@ class PetManager:
                         self.ai_complexity
                     )
 
-                # Reinitialize sensory system if needed
-                if self.ai_complexity != AIComplexity.SIMPLE and self.sensory_system is None:
-                    self.sensory_system = CompleteSensorySystem()
-
                 # Check if creature died from starvation
                 current_time = time.time()
                 time_elapsed = current_time - self.creature.last_fed_time
@@ -133,10 +127,6 @@ class PetManager:
         )
 
         self.is_egg = False
-
-        # Initialize sensory system if needed
-        if self.ai_complexity != AIComplexity.SIMPLE and self.sensory_system is None:
-            self.sensory_system = CompleteSensorySystem()
 
         # Start timers
         self.start_timers()
@@ -201,8 +191,8 @@ class PetManager:
         self.mouse_chase_timer.timeout.connect(self.check_mouse_chase)
         self.mouse_chase_timer.start(500)  # Check twice per second
 
-        # Sensory update timer (for advanced AI modes)
-        if self.sensory_system:
+        # Sensory update timer (SIMPLE only reads the desktop layout when hiding)
+        if self.ai_complexity != AIComplexity.SIMPLE:
             self.sensory_update_timer = QTimer()
             self.sensory_update_timer.timeout.connect(self.update_sensory_inputs)
             self.sensory_update_timer.start(100)  # Update 10 times per second
@@ -319,11 +309,12 @@ class PetManager:
             self._fallback_behavior()
 
     def _sync_learner_screen_size(self):
-        """Give the learner's sensory system the real screen size."""
+        """Give the learner's and the pet manager's sensory systems the real screen size."""
         screen = QApplication.desktop().screenGeometry()
         size = (screen.width(), screen.height())
         if getattr(self, '_learner_screen_size', None) != (self.learner, size):
             self.learner.set_screen_size(*size)
+            self.sensory_system.set_screen_size(*size)
             self._learner_screen_size = (self.learner, size)
 
     def _apply_activity_decision(self, activity: str, decision: dict):
