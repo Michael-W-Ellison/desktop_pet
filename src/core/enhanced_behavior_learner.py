@@ -460,13 +460,18 @@ class EnhancedBehaviorLearner:
                          for hunger, energy, happiness, hours in probes]
         rl_inputs = np.array([[hunger, energy, happiness, hours, 0.5, 0.5, 0.0] + [0.0] * (RL_STATE_SIZE - 7)
                               for hunger, energy, happiness, hours in probes])
+        # The pet picks the action with the highest Q-value, so only how actions compare
+        # in each state matters; a shift of every action's value (e.g. all worse while
+        # the pet is hungry and alone) changes no decision and is not counted
+        q_values = self.rl_system.rl_agent.q_network.forward(rl_inputs)[0]
+        q_values_relative = q_values - q_values.mean(axis=1, keepdims=True)
 
         return {
             'movement': coordinator.movement_net.network.predict(movement_inputs).ravel(),
             'activity': self._probe_lstm(coordinator.activity_net.network, activity_inputs),
             'emotion': coordinator.emotion_net.network.predict(emotion_inputs).ravel(),
             'social': self._probe_lstm(coordinator.social_net.network, social_inputs),
-            'rl': self.rl_system.rl_agent.q_network.forward(rl_inputs)[0].ravel(),
+            'rl': q_values_relative.ravel(),
         }
 
     def _update_decision_stability(self):
