@@ -88,6 +88,7 @@ hidden_imports = [
     'src.core.enhanced_training',
     # UI modules
     'src.ui.sprite_generator',
+    'src.ui.creature_art',
     'src.ui.pet_window',
     'src.ui.particle_effects',
     'src.ui.emotion_particles',

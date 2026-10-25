@@ -20,7 +20,7 @@ APP_DIR = _get_app_dir()
 DATA_FILE = os.path.join(APP_DIR, "pet_data.json")
 
 # Window settings
-PET_SIZE = (128, 128)
+PET_SIZE = (192, 192)
 TOY_SIZE = (64, 64)
 FPS = 30
 ANIMATION_SPEED = 150  # milliseconds per frame
