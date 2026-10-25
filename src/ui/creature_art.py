@@ -97,6 +97,25 @@ def _value_noise(shape, scale, seed) -> np.ndarray:
     return np.asarray(img.resize((shape[1], shape[0]), Image.BICUBIC), dtype=np.float32) / 255.0
 
 
+def _box_blur(a: np.ndarray, r: int, axis: int) -> np.ndarray:
+    """Mean over a window of 2r+1 along one axis (edges padded with zeros)."""
+    pad = [(0, 0), (0, 0)]
+    pad[axis] = (r + 1, r)
+    c = np.cumsum(np.pad(a, pad), axis=axis, dtype=np.float64)
+    hi = np.take(c, np.arange(2 * r + 1, c.shape[axis]), axis=axis)
+    lo = np.take(c, np.arange(0, c.shape[axis] - 2 * r - 1), axis=axis)
+    return ((hi - lo) / (2 * r + 1)).astype(np.float32)
+
+
+def blur(a: np.ndarray, sigma: float) -> np.ndarray:
+    """Gaussian-like blur in floating point (three box passes per axis), free of 8-bit banding."""
+    r = max(1, int(round((math.sqrt(4 * sigma * sigma + 1) - 1) / 2)))
+    for axis in (0, 1):
+        for _ in range(3):
+            a = _box_blur(a, r, axis)
+    return a
+
+
 class Painter:
     """Builds one creature picture from shaded parts."""
 
@@ -141,7 +160,10 @@ class Painter:
     def limb_mask(self, points: Sequence[Point], widths: Sequence[float]) -> Image.Image:
         """Tapered tube along a smooth path; widths are radii at each control point."""
         m, d = self._blank()
-        path = catmull_rom(points, closed=False, steps=16)
+        # Stamp circles no further apart than half the thinnest radius, so long thin limbs stay smooth
+        length = sum(math.dist(a, b) for a, b in zip(points, points[1:]))
+        steps = max(16, int(length / max(1e-4, min(widths) * 0.5) / max(1, len(points) - 1)) + 1)
+        path = catmull_rom(points, closed=False, steps=steps)
         k = len(path) - 1
         for i, (x, y) in enumerate(path):
             t = i / k * (len(widths) - 1)
@@ -253,9 +275,7 @@ class Painter:
             area = m.sum()
             r_eq = math.sqrt(area / math.pi)
             sigma = max(2.0, 0.42 * r_eq)
-            h = np.asarray(Image.fromarray((m * 255).astype(np.uint8)).filter(
-                ImageFilter.GaussianBlur(sigma)), dtype=np.float32) / 255.0
-            h = np.sqrt(np.clip(h, 0, 1))
+            h = np.sqrt(np.clip(blur(m, sigma), 0, 1))
             gy, gx = np.gradient(h)
             k = r_eq * 0.55 * roundness
             nx, ny, nz = -gx * k, -gy * k, np.ones_like(h)
@@ -1469,7 +1489,94 @@ def render_creature(name: str, palette: Sequence, size: int, palette_index: Opti
     return p.finish()
 
 
-def render_egg(size: int) -> Image.Image:
-    p = Painter(size, seed=1)
-    draw_egg(p)
+# Items
+
+def draw_ball(p: Painter):
+    """Rubber ball with a white band; no ground shadow (it bounces in its own window)."""
+    ball = p.ellipse_mask(0.5, 0.5, 0.42, 0.42)
+    p.part(ball, (220, 64, 64), gloss=0.7, roundness=1.3)
+    band = p.intersect(p.subtract(p.ellipse_mask(0.5, 0.5, 0.5, 0.2, -0.5), p.ellipse_mask(0.5, 0.5, 0.5, 0.11, -0.5)),
+                       ball)
+    p.part(band, (246, 244, 238), gloss=0.7, roundness=0.5, flat=True, opacity=0.95)
+    p.dot(0.36, 0.33, 0.08, (255, 255, 255), opacity=0.45, blur=0.04)
+    p.dot(0.34, 0.31, 0.03, (255, 255, 255), opacity=0.8, blur=0.01)
+    # Shade the lower right so the band sits on a sphere
+    shade = Image.new('RGBA', (p.n, p.n), (40, 10, 20, 0))
+    m = np.asarray(ball, dtype=np.float32) / 255.0
+    d = np.clip(((p._xx - p.px(0.32)) ** 2 + (p._yy - p.px(0.3)) ** 2) ** 0.5 / p.px(0.75), 0, 1)
+    shade.putalpha(Image.fromarray((m * d ** 2 * 150).astype(np.uint8)).filter(ImageFilter.GaussianBlur(2)))
+    p.image = Image.alpha_composite(p.image, shade)
+
+
+def draw_food(p: Painter):
+    """Ceramic bowl heaped with kibble."""
+    p.shadow(0.5, 0.36, y=0.86)
+    rim_back = p.ellipse_mask(0.5, 0.5, 0.38, 0.1)
+    p.part(rim_back, (196, 84, 84), roundness=0.4, gloss=0.3)
+    rng = np.random.default_rng(3)
+    for _ in range(26):
+        x, y = rng.uniform(0.2, 0.8), rng.uniform(0.36, 0.52)
+        if ((x - 0.5) / 0.34) ** 2 + ((y - 0.52) / 0.14) ** 2 > 1:
+            continue
+        c = mix((150, 92, 52), (196, 136, 80), rng.random())
+        p.part(p.ellipse_mask(x, y, 0.035, 0.026, rng.uniform(0, 3)), c, gloss=0.35, roundness=0.9, texture='stone')
+    bowl = p.blob_mask([(0.12, 0.5), (0.88, 0.5), (0.8, 0.72), (0.66, 0.82), (0.34, 0.82), (0.2, 0.72)])
+    p.part(bowl, (214, 96, 96), color2=(170, 60, 64), gradient=0.7, gloss=0.6, roundness=0.9)
+    p.part(p.subtract(p.ellipse_mask(0.5, 0.5, 0.38, 0.1), p.ellipse_mask(0.5, 0.47, 0.35, 0.08)),
+           (236, 140, 136), gloss=0.7, roundness=0.4)
+    p.part(p.ellipse_mask(0.5, 0.83, 0.2, 0.03), (150, 50, 56), roundness=0.4)
+    p.dot(0.27, 0.6, 0.03, (255, 236, 230), opacity=0.5, blur=0.015)
+
+
+def draw_shelter(p: Painter):
+    """Small wooden house with a tiled roof, round door and lit window."""
+    p.shadow(0.5, 0.4)
+    wood = (160, 108, 66)
+    walls = p.poly_mask([(0.18, 0.5), (0.82, 0.5), (0.82, 0.92), (0.18, 0.92)])
+    p.part(walls, wood, roundness=0.25, gloss=0.1, texture='fur', texture_angle=0.0, texture_scale=1.5)
+    for y in np.linspace(0.56, 0.88, 6):
+        p.stroke([(0.18, y), (0.82, y)], 0.004, darken(wood, 0.35), opacity=0.6, smooth=False)
+    # Window with warm light
+    win = p.poly_mask([(0.26, 0.6), (0.4, 0.6), (0.4, 0.73), (0.26, 0.73)])
+    p.glow(win, (255, 200, 110), 0.03, 0.5)
+    p.part(win, (255, 214, 130), glow=0.8, roundness=0.3)
+    p.stroke([(0.33, 0.6), (0.33, 0.73)], 0.008, darken(wood, 0.4), smooth=False)
+    p.stroke([(0.26, 0.665), (0.4, 0.665)], 0.008, darken(wood, 0.4), smooth=False)
+    p.part(p.subtract(p.poly_mask([(0.245, 0.585), (0.415, 0.585), (0.415, 0.745), (0.245, 0.745)]), win),
+           darken(wood, 0.25), roundness=0.4)
+    # Arched door
+    door = p.union(p.poly_mask([(0.52, 0.7), (0.7, 0.7), (0.7, 0.92), (0.52, 0.92)]), p.ellipse_mask(0.61, 0.7, 0.09, 0.08))
+    p.part(door, (96, 60, 40), roundness=0.35, texture='fur', texture_angle=1.57)
+    p.dot(0.675, 0.81, 0.012, (220, 190, 90))
+    # Chimney, then a roof of overlapping tiles
+    p.part(p.poly_mask([(0.64, 0.2), (0.74, 0.2), (0.74, 0.42), (0.64, 0.36)]), (150, 140, 130), texture='stone',
+           roundness=0.4)
+    p.part(p.poly_mask([(0.625, 0.18), (0.755, 0.18), (0.755, 0.215), (0.625, 0.215)]), (120, 112, 106), roundness=0.4)
+    roof = p.poly_mask([(0.06, 0.57), (0.5, 0.15), (0.94, 0.57)])
+    p.part(roof, (176, 70, 56), color2=(140, 52, 42), gradient=0.5, gloss=0.25, roundness=0.5,
+           texture='scales', texture_scale=2.4)
+    p.part(p.limb_mask([(0.06, 0.57), (0.5, 0.15), (0.94, 0.57)], [0.016, 0.018, 0.016]), (120, 44, 36), gloss=0.4)
+
+
+def render_item(name: str, size: int) -> Image.Image:
+    """Picture of an item: 'ball', 'food', 'shelter' or 'egg'."""
+    draw = {'ball': draw_ball, 'food': draw_food, 'shelter': draw_shelter, 'egg': draw_egg}[name]
+    p = Painter(size, seed=len(name))
+    draw(p)
     return p.finish()
+
+
+def render_icon(size: int) -> Image.Image:
+    """Application icon: portrait of an orange tabby cat."""
+    n = size * 4
+    big = render_creature('cat', ['#FF6B6B', '#FFE66D', '#4ECDC4'], n, palette_index=0)
+    head = big.crop((int(n * 0.62), int(n * 0.2), int(n * 1.0), int(n * 0.58))).resize((n, n), Image.Resampling.LANCZOS)
+    # Round badge with a soft gradient behind the portrait
+    yy, xx = np.mgrid[0:n, 0:n].astype(np.float32) / n
+    bg = np.dstack([90 + 60 * (1 - yy), 150 + 50 * (1 - yy), 170 + 40 * (1 - yy)])
+    badge = Image.fromarray(np.dstack([bg, np.full((n, n), 255)]).astype(np.uint8), 'RGBA')
+    badge = Image.alpha_composite(badge, head)
+    circle = Image.new('L', (n, n), 0)
+    ImageDraw.Draw(circle).ellipse([n * 0.02, n * 0.02, n * 0.98, n * 0.98], fill=255)
+    badge.putalpha(circle)
+    return badge.resize((size, size), Image.Resampling.LANCZOS)
