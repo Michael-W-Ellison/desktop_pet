@@ -27,7 +27,8 @@ class SpriteGenerator:
             color_palette: List of color hex codes
             size: Size of the sprite (width, height)
             facing_right: Whether the creature is facing right
-            stage_multiplier: Size multiplier for evolution stage (0.6-1.2)
+            stage_multiplier: Size multiplier for evolution stage; the returned image
+                is size scaled by this
             variant_colors: Optional color overrides for variants
 
         Returns:
@@ -36,13 +37,11 @@ class SpriteGenerator:
         # Use variant colors if provided
         colors = variant_colors if variant_colors else color_palette
 
-        # Scale size based on evolution stage
-        scaled_size = (int(size[0] * stage_multiplier), int(size[1] * stage_multiplier))
-
-        img = Image.new('RGBA', scaled_size, (0, 0, 0, 0))
+        # Draw at full size (the drawing functions use fixed pixel sizes), then scale
+        img = Image.new('RGBA', size, (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
-        center_x, center_y = scaled_size[0] // 2, scaled_size[1] // 2
+        center_x, center_y = size[0] // 2, size[1] // 2
         primary_color = colors[0]
         secondary_color = colors[1] if len(colors) > 1 else colors[0]
         accent_color = colors[2] if len(colors) > 2 else primary_color
@@ -85,10 +84,10 @@ class SpriteGenerator:
         if not facing_right:
             img = img.transpose(Image.FLIP_LEFT_RIGHT)
 
-        # Resize back to target size if needed
+        # Scale for the evolution stage
+        scaled_size = (max(1, int(size[0] * stage_multiplier)), max(1, int(size[1] * stage_multiplier)))
         if scaled_size != size:
-            # Resize with high-quality resampling
-            img = img.resize(size, Image.Resampling.LANCZOS)
+            img = img.resize(scaled_size, Image.Resampling.LANCZOS)
 
         return img
 
