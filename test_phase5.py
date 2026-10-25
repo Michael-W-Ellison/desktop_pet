@@ -249,7 +249,7 @@ result = name_calling.call_pet(
 print(f"  Responded: {result['responded']}")
 
 # Test response rate
-print(f"\nResponse statistics:")
+print("\nResponse statistics:")
 stats = name_calling.get_stats()
 print(f"  Times called: {stats['times_called']}")
 print(f"  Times responded: {stats['times_responded']}")
@@ -266,7 +266,7 @@ print(f"Created {creature.name} the {creature.personality.value} {creature.creat
 
 # Test initial bonding stats
 stats = creature.get_bonding_stats()
-print(f"\nInitial bonding stats:")
+print("\nInitial bonding stats:")
 print(f"  Bond: {stats['bond']:.1f} ({stats['bond_level']})")
 print(f"  Trust: {stats['trust']:.1f}")
 print(f"  Emotional states: {len(stats['emotional_states'])} active")
@@ -300,18 +300,18 @@ if result['responded']:
     print(f"  Message: {result.get('message')}")
 
 # Simulate owner leaving and returning
-print(f"\nSimulating owner departure and return:")
+print("\nSimulating owner departure and return:")
 creature.process_owner_departure()
-print(f"  Owner left")
+print("  Owner left")
 time.sleep(0.1)
 creature.bonding.bond = 85  # Ensure high bond
 creature.process_owner_return(hours_away=3.0)
 has_anxiety, anxiety_info = creature.check_separation_anxiety()
-print(f"  Owner returned after 3 hours")
+print("  Owner returned after 3 hours")
 print(f"  Reunion excitement: {creature.emotional_states.reunion_excitement_level:.2f}")
 
 # Test jealousy
-print(f"\nTriggering jealousy:")
+print("\nTriggering jealousy:")
 creature.trigger_jealousy(attention_amount=0.5)
 emotions_active = creature.emotional_states.get_current_states()
 print(f"  Active emotional states: {list(emotions_active.keys())}")
@@ -389,7 +389,7 @@ for target, level_name in target_bonds:
     print(f"    - {stats['bond_description'][:60]}...")
 
 # Test separation anxiety at best friend level
-print(f"\nTesting separation anxiety at best friend level:")
+print("\nTesting separation anxiety at best friend level:")
 should_show = progression_creature.bonding.should_show_separation_anxiety(hours_away=2.0)
 print(f"  Should show separation anxiety after 2 hours: {should_show}")
 

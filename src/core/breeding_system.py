@@ -5,7 +5,7 @@ Manages pet breeding, pregnancy, and genetic inheritance.
 """
 import time
 import random
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 from enum import Enum
 

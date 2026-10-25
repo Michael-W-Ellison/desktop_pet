@@ -5,7 +5,7 @@ Manages mood-based background music with smooth transitions.
 """
 import time
 import random
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from enum import Enum
 
 

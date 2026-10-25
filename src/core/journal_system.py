@@ -4,7 +4,6 @@ Phase 11: Journal System
 Allows users (kids) to write diary entries about their pet's life and adventures.
 """
 import time
-import json
 from typing import Dict, Any, List, Optional, Set
 from enum import Enum
 from datetime import datetime

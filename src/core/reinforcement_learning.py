@@ -8,9 +8,16 @@ Implements Q-learning and experience replay for creatures to learn:
 - Exploration vs exploitation balance
 """
 import numpy as np
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Optional, Tuple
 from collections import deque
 import random
+from .config import (
+    LEARNING_RATE, GAMMA, EPSILON_DECAY, EPSILON_MIN, RL_REPLAY_CAPACITY, RL_STATE_SIZE,
+    GRADIENT_CLIP_NORM, ANTICIPATION_THRESHOLD
+)
+from .optimizers import (
+    AdamOptimizer, LearningRateScheduler, clip_gradients, make_adam_optimizer, make_lr_scheduler
+)
 
 
 class ExperienceReplayBuffer:
@@ -74,7 +81,7 @@ class QNetwork:
     Predicts expected reward for each action in a given state.
     """
 
-    def __init__(self, state_size: int, action_size: int, learning_rate: float = 0.001):
+    def __init__(self, state_size: int, action_size: int, learning_rate: float = LEARNING_RATE):
         """
         Initialize Q-Network.
 
@@ -99,6 +106,10 @@ class QNetwork:
             bias = np.zeros((1, self.layers[i + 1]))
             self.weights.append(weight)
             self.biases.append(bias)
+
+        # Optimizer and learning rate schedule
+        self.optimizer = make_adam_optimizer(learning_rate)
+        self.lr_scheduler = make_lr_scheduler(learning_rate)
 
     @staticmethod
     def relu(x):
@@ -150,23 +161,25 @@ class QNetwork:
         # Forward pass
         predictions, activations = self.forward(states)
 
-        # Backward pass (simplified)
-        m = states.shape[0]
+        # Backward pass: compute all gradients before changing any weights
+        m = predictions.shape[0]
         delta = predictions - targets
+        weight_grads = [None] * len(self.weights)
+        bias_grads = [None] * len(self.weights)
 
-        # Update weights (gradient descent)
         for i in reversed(range(len(self.weights))):
-            # Gradient for weights and biases
-            weight_grad = np.dot(activations[i].T, delta) / m
-            bias_grad = np.sum(delta, axis=0, keepdims=True) / m
+            weight_grads[i] = np.dot(activations[i].T, delta) / m
+            bias_grads[i] = np.sum(delta, axis=0, keepdims=True) / m
 
-            # Update
-            self.weights[i] -= self.learning_rate * weight_grad
-            self.biases[i] -= self.learning_rate * bias_grad
-
-            # Backpropagate error
             if i > 0:
                 delta = np.dot(delta, self.weights[i].T) * self.relu_derivative(activations[i])
+
+        # Clip by global norm, then Adam update with the scheduled learning rate
+        clipped = clip_gradients(weight_grads + bias_grads, max_norm=GRADIENT_CLIP_NORM)
+        weight_grads, bias_grads = clipped[:len(weight_grads)], clipped[len(weight_grads):]
+        self.optimizer.learning_rate = self.lr_scheduler.get_lr()
+        self.lr_scheduler.step()
+        self.optimizer.update(self.weights, self.biases, weight_grads, bias_grads)
 
 
 class ReinforcementLearningAgent:
@@ -176,10 +189,10 @@ class ReinforcementLearningAgent:
     Uses Q-learning with experience replay and epsilon-greedy exploration.
     """
 
-    def __init__(self, state_size: int = 35, action_size: int = 10,
-                 learning_rate: float = 0.001, gamma: float = 0.95,
-                 epsilon: float = 1.0, epsilon_decay: float = 0.995,
-                 epsilon_min: float = 0.1):
+    def __init__(self, state_size: int = RL_STATE_SIZE, action_size: int = 10,
+                 learning_rate: float = LEARNING_RATE, gamma: float = GAMMA,
+                 epsilon: float = 1.0, epsilon_decay: float = EPSILON_DECAY,
+                 epsilon_min: float = EPSILON_MIN):
         """
         Initialize RL agent.
 
@@ -205,7 +218,7 @@ class ReinforcementLearningAgent:
         self._copy_weights()
 
         # Experience replay
-        self.replay_buffer = ExperienceReplayBuffer(capacity=10000)
+        self.replay_buffer = ExperienceReplayBuffer(capacity=RL_REPLAY_CAPACITY)
 
         # Action mapping (discrete actions)
         self.action_map = self._create_action_map()
@@ -240,34 +253,38 @@ class ReinforcementLearningAgent:
             self.target_network.weights[i] = self.q_network.weights[i].copy()
             self.target_network.biases[i] = self.q_network.biases[i].copy()
 
-    def choose_action(self, state: np.ndarray, explore: bool = True) -> int:
+    def choose_action(self, state: np.ndarray, explore: bool = True,
+                      allowed: Optional[List[int]] = None) -> int:
         """
         Choose action using epsilon-greedy policy.
 
         Args:
             state: Current state
             explore: Whether to use exploration
+            allowed: Indices of the actions to choose from (all actions if omitted)
 
         Returns:
             Action index
         """
+        candidates = np.array(allowed if allowed else range(self.action_size))
+
         # Exploration vs exploitation
         if explore and random.random() < self.epsilon:
             # Explore: choose random action (with curiosity bias)
             # Actions that have been tried less get higher probability
-            action_probs = 1.0 / (self.action_counts + 1)  # Inverse frequency
+            action_probs = 1.0 / (self.action_counts[candidates] + 1)  # Inverse frequency
             action_probs /= action_probs.sum()  # Normalize
-            return np.random.choice(self.action_size, p=action_probs)
+            return int(np.random.choice(candidates, p=action_probs))
         else:
             # Exploit: choose action with highest Q-value
             q_values, _ = self.q_network.forward(state)
+            q_values = q_values[0]
 
             # Add small curiosity bonus to Q-values
             if explore:
-                curiosity_bonus = self.curiosity_weight / (self.action_counts + 1)
-                q_values = q_values + curiosity_bonus
+                q_values = q_values + self.curiosity_weight / (self.action_counts + 1)
 
-            return int(np.argmax(q_values[0]))
+            return int(candidates[np.argmax(q_values[candidates])])
 
     def get_action_description(self, action_idx: int) -> Dict[str, Any]:
         """Get description of action."""
@@ -318,6 +335,7 @@ class ReinforcementLearningAgent:
         reward += happiness_delta * 0.1  # Scale to reasonable range
 
         # Hunger penalty (encourage eating before starving)
+        hunger_before = state_before.get('hunger', 0)
         hunger_after = state_after.get('hunger', 0)
         if hunger_after > 80:
             reward -= 2.0  # Strong penalty for high hunger
@@ -413,28 +431,40 @@ class ReinforcementLearningAgent:
             'action_counts': self.action_counts.tolist(),
             'q_network_weights': [w.tolist() for w in self.q_network.weights],
             'q_network_biases': [b.tolist() for b in self.q_network.biases],
-            'replay_buffer': list(self.replay_buffer.buffer)[:100]  # Save recent experiences only
+            'q_optimizer': self.q_network.optimizer.to_dict(),
+            'q_lr_scheduler': self.q_network.lr_scheduler.to_dict(),
+            # Save recent experiences only, as JSON-compatible values
+            'replay_buffer': [
+                [np.asarray(state).tolist(), int(action), float(reward),
+                 np.asarray(next_state).tolist(), bool(done)]
+                for state, action, reward, next_state, done in list(self.replay_buffer.buffer)[-100:]
+            ]
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'ReinforcementLearningAgent':
         """Load agent state."""
-        agent = cls()
+        # The first weight matrix has one row per state input
+        agent = cls(state_size=len(data['q_network_weights'][0]))
 
         agent.epsilon = data['epsilon']
         agent.action_counts = np.array(data['action_counts'])
 
         # Restore Q-network weights
         agent.q_network.weights = [np.array(w) for w in data['q_network_weights']]
-        agent.q_network.biases = [np.array(b) for w in data['q_network_biases']]
+        agent.q_network.biases = [np.array(b) for b in data['q_network_biases']]
+        if data.get('q_optimizer'):
+            agent.q_network.optimizer = AdamOptimizer.from_dict(data['q_optimizer'])
+        if data.get('q_lr_scheduler'):
+            agent.q_network.lr_scheduler = LearningRateScheduler.from_dict(data['q_lr_scheduler'])
 
         # Copy to target network
         agent._copy_weights()
 
         # Restore some replay buffer experiences (if saved)
         if 'replay_buffer' in data:
-            for exp in data['replay_buffer']:
-                agent.replay_buffer.add(*exp)
+            for state, action, reward, next_state, done in data['replay_buffer']:
+                agent.replay_buffer.add(np.array(state), action, reward, np.array(next_state), done)
 
         return agent
 
@@ -446,12 +476,32 @@ class GoalOrientedBehaviorSystem:
     Manages creature goals and uses RL to achieve them.
     """
 
-    def __init__(self):
-        """Initialize goal-oriented system."""
-        self.rl_agent = ReinforcementLearningAgent()
+    # RL action types that work toward each goal
+    GOAL_ACTIONS = {
+        'seek_food': {'seek_food'},
+        'rest': {'sleep', 'stay_still'},
+        'seek_interaction': {'seek_interaction', 'move_to_mouse', 'move_to_center'},
+        'play': {'play_ball', 'move_to_mouse', 'hide'},
+        'explore': {'explore', 'random_wander', 'hide', 'move_to_center'},
+    }
+
+    # Goals driven by a need: the agent only considers actions that serve them
+    NEED_GOALS = {'seek_food', 'rest', 'seek_interaction'}
+
+    # Learning updates between copies of the Q-network into the target network
+    TARGET_UPDATE_INTERVAL = 100
+
+    def __init__(self, state_size: int = RL_STATE_SIZE):
+        """
+        Initialize goal-oriented system.
+
+        Args:
+            state_size: Length of the encoded state vector passed to the agent
+        """
+        self.rl_agent = ReinforcementLearningAgent(state_size=state_size)
         self.current_goal = None
         self.goal_progress = 0.0
-        self.steps_since_goal_update = 0
+        self.learning_steps = 0
 
     def set_goal_based_on_state(self, state: Dict[str, Any]) -> str:
         """
@@ -463,23 +513,42 @@ class GoalOrientedBehaviorSystem:
         Returns:
             Goal description
         """
+        # A strategic plan, when there is one, sets the goal
+        if state.get('planned_goal'):
+            self.current_goal = state['planned_goal']
+        else:
+            self.current_goal = self.rule_goal(state)
+        return self.current_goal
+
+    def rule_goal(self, state: Dict[str, Any]) -> str:
+        """
+        Goal from fixed priority rules on the creature's needs.
+
+        Args:
+            state: Current creature state
+
+        Returns:
+            Goal name
+        """
         hunger = state.get('hunger', 0)
         energy = state.get('energy', 100)
         happiness = state.get('happiness', 100)
 
         # Priority-based goal setting
         if hunger > 70:
-            self.current_goal = 'seek_food'
+            return 'seek_food'
         elif energy < 25:
-            self.current_goal = 'rest'
-        elif happiness < 40:
-            self.current_goal = 'seek_interaction'
+            return 'rest'
+        elif happiness < 40 or state.get('interaction_desire', 0) > 0.8:
+            # Unhappy or lonely pets look for their player
+            return 'seek_interaction'
         elif state.get('player_nearby', False):
-            self.current_goal = 'play'
+            return 'play'
+        elif state.get('player_interaction_likely', 0) > ANTICIPATION_THRESHOLD:
+            # The player usually turns up about now: go and meet them
+            return 'seek_interaction'
         else:
-            self.current_goal = 'explore'
-
-        return self.current_goal
+            return 'explore'
 
     def execute_goal(self, state: np.ndarray, full_state: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -490,50 +559,60 @@ class GoalOrientedBehaviorSystem:
             full_state: Complete state dictionary
 
         Returns:
-            Action to take
+            Action to take, the current goal, and whether the action serves it
         """
-        # Choose action using RL
-        action_idx = self.rl_agent.choose_action(state)
+        # Re-evaluate the goal every step so needs are acted on as soon as they arise
+        self.set_goal_based_on_state(full_state)
+
+        # For a need, choose among the actions that serve it (the agent learns which
+        # works best); otherwise any action, used only if it suits the goal
+        allowed = None
+        if self.current_goal in self.NEED_GOALS:
+            allowed = [i for i, action in self.rl_agent.action_map.items()
+                       if action['type'] in self.GOAL_ACTIONS[self.current_goal]]
+        action_idx = self.rl_agent.choose_action(state, allowed=allowed)
         action = self.rl_agent.get_action_description(action_idx)
-
-        self.steps_since_goal_update += 1
-
-        # Update goal if needed (every 10 steps)
-        if self.steps_since_goal_update > 10:
-            self.set_goal_based_on_state(full_state)
-            self.steps_since_goal_update = 0
+        q_values, _ = self.rl_agent.q_network.forward(state)
 
         return {
-            'action_idx': action_idx,
+            'action_idx': int(action_idx),
             'action': action,
-            'goal': self.current_goal
+            'goal': self.current_goal,
+            'serves_goal': action['type'] in self.GOAL_ACTIONS.get(self.current_goal, set()),
+            'q_value': float(q_values[0][action_idx])
         }
 
     def learn_from_outcome(self, state_before: np.ndarray, action_idx: int,
-                          state_after: np.ndarray, outcome: Dict[str, Any]):
+                           state_after: np.ndarray, before_dict: Dict[str, Any],
+                           after_dict: Dict[str, Any]) -> float:
         """
-        Learn from action outcome.
+        Learn from the outcome of an executed action.
 
         Args:
-            state_before: State before action
+            state_before: Encoded state when the action was chosen
             action_idx: Action taken
-            state_after: State after action
-            outcome: Outcome information
+            state_after: Encoded state afterwards
+            before_dict: Creature stats when the action was chosen
+            after_dict: Creature stats afterwards, plus what happened in between
+                (alive, player_interacted, interaction_positive, ball_caught)
+
+        Returns:
+            The reward received
         """
-        # Calculate reward
         reward = self.rl_agent.calculate_reward(
-            outcome.get('state_before_dict', {}),
-            outcome.get('state_after_dict', {}),
-            self.rl_agent.get_action_description(action_idx)
+            before_dict, after_dict, self.rl_agent.get_action_description(action_idx)
         )
 
         # Store experience
-        done = not outcome.get('state_after_dict', {}).get('alive', True)
+        done = not after_dict.get('alive', True)
         self.rl_agent.store_experience(state_before, action_idx, reward, state_after, done)
 
         # Learn from experiences
         self.rl_agent.learn(batch_size=32)
 
         # Periodically update target network
-        if len(self.rl_agent.replay_buffer) % 100 == 0:
+        self.learning_steps += 1
+        if self.learning_steps % self.TARGET_UPDATE_INTERVAL == 0:
             self.rl_agent.update_target_network()
+
+        return reward

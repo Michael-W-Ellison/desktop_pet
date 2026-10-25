@@ -5,7 +5,7 @@ Automated build script for Desktop Pet executable.
 This script:
 1. Checks and installs required dependencies
 2. Verifies PyInstaller is available
-3. Creates a placeholder icon if needed
+3. Generates the application icon if needed
 4. Builds the standalone executable
 5. Cleans up build artifacts
 """
@@ -91,7 +91,7 @@ def check_and_install_dependencies():
 
 
 def create_placeholder_icon():
-    """Create a placeholder icon if one doesn't exist."""
+    """Generate the application icon if one doesn't exist."""
     print_header("Checking Icon File")
 
     icon_dir = Path('assets')
@@ -101,26 +101,16 @@ def create_placeholder_icon():
         print(f"✓ Icon file exists: {icon_path}")
         return True
 
-    print("⚠ No icon file found, creating placeholder...")
+    print("⚠ No icon file found, generating one...")
 
     # Create assets directory
     icon_dir.mkdir(exist_ok=True)
 
-    # Create a simple icon using PIL
+    # Generate the shaded pet icon (generate_icon.py)
     try:
-        from PIL import Image, ImageDraw
-
-        # Create a 256x256 image
-        size = 256
-        img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(img)
-
-        # Draw a simple egg shape
-        draw.ellipse([40, 30, 216, 226], fill='#FFE66D', outline='#FF6B6B', width=4)
-
-        # Save as ICO (Windows icon format)
-        img.save(str(icon_path), format='ICO', sizes=[(256, 256), (128, 128), (64, 64), (32, 32), (16, 16)])
-        print(f"✓ Created placeholder icon: {icon_path}")
+        from generate_icon import generate_ico_file
+        generate_ico_file(str(icon_path))
+        print(f"✓ Created icon: {icon_path}")
         return True
 
     except Exception as e:
@@ -134,7 +124,6 @@ def clean_build_artifacts():
     print_header("Cleaning Old Build Artifacts")
 
     dirs_to_clean = ['build', 'dist', '__pycache__']
-    files_to_clean = ['*.spec~']
 
     for dir_name in dirs_to_clean:
         if os.path.exists(dir_name):
@@ -199,8 +188,8 @@ def print_success_message():
     print(f"\n📁 Location: dist/{exe_name}\n")
     print("What you can do now:")
     print(f"  1. Run the executable: .\\dist\\{exe_name}")
-    print(f"  2. Move it anywhere on your computer")
-    print(f"  3. Share it with others (no Python installation needed!)")
+    print("  2. Move it anywhere on your computer")
+    print("  3. Share it with others (no Python installation needed!)")
     print("\nNote: The executable includes all dependencies and can run")
     print("      on any compatible system without requiring Python.")
     print("\n" + "=" * 70 + "\n")

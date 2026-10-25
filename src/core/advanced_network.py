@@ -2,8 +2,14 @@
 Advanced neural network with dropout, batch normalization, and residual connections.
 """
 import numpy as np
-from typing import List, Optional
-from .optimizers import AdamOptimizer, clip_gradients, LearningRateScheduler
+from typing import List
+from .optimizers import (
+    AdamOptimizer, clip_gradients, LearningRateScheduler, make_adam_optimizer, make_lr_scheduler
+)
+from .config import (
+    LEARNING_RATE, DROPOUT_RATE, USE_DROPOUT, USE_BATCH_NORMALIZATION, USE_RESIDUAL_CONNECTIONS,
+    GRADIENT_CLIP_NORM
+)
 
 
 class BatchNormalization:
@@ -65,23 +71,34 @@ class BatchNormalization:
         else:
             # Use running statistics for inference
             x_normalized = (x - self.running_mean) / np.sqrt(self.running_var + self.epsilon)
+            self.cache = (None, x_normalized, None, None)
 
         # Scale and shift
         out = self.gamma * x_normalized + self.beta
 
         return out
 
-    def backward(self, dout):
+    def backward(self, dout, cache=None):
         """
         Backward pass through batch normalization.
 
         Args:
             dout: Gradient from next layer
+            cache: Values saved by forward() (defaults to the most recent forward pass)
 
         Returns:
-            Gradient for previous layer
+            Gradient for previous layer, and gradients for gamma and beta
         """
-        x, x_normalized, mean, var = self.cache
+        cache = cache if cache is not None else self.cache
+        if cache[0] is None:
+            # Forward pass used the running statistics (inference mode or a batch of one)
+            _, x_normalized, _, _ = cache
+            dgamma = np.sum(dout * x_normalized, axis=0, keepdims=True)
+            dbeta = np.sum(dout, axis=0, keepdims=True)
+            dx = dout * self.gamma / np.sqrt(self.running_var + self.epsilon)
+            return dx, dgamma, dbeta
+
+        x, x_normalized, mean, var = cache
         m = x.shape[0]
 
         # Gradients for gamma and beta
@@ -116,9 +133,11 @@ class AdvancedNeuralNetwork:
     """
 
     def __init__(self, input_size: int, hidden_layers: List[int], output_size: int,
-                 learning_rate: float = 0.001, dropout_rate: float = 0.25,
-                 use_batch_norm: bool = True, use_residual: bool = True,
-                 gradient_clip_norm: float = 5.0):
+                 learning_rate: float = LEARNING_RATE,
+                 dropout_rate: float = DROPOUT_RATE if USE_DROPOUT else 0.0,
+                 use_batch_norm: bool = USE_BATCH_NORMALIZATION,
+                 use_residual: bool = USE_RESIDUAL_CONNECTIONS,
+                 gradient_clip_norm: float = GRADIENT_CLIP_NORM):
         """
         Initialize advanced neural network.
 
@@ -156,16 +175,21 @@ class AdvancedNeuralNetwork:
             for i in range(len(hidden_layers)):
                 self.batch_norms.append(BatchNormalization(hidden_layers[i]))
 
-        # Initialize optimizer
-        self.optimizer = AdamOptimizer(learning_rate=learning_rate)
+        # Residual shortcuts into every hidden layer after the first. Equal-sized
+        # layers use the identity; otherwise a learned projection matches the sizes.
+        self.shortcut_weights = {}
+        if use_residual:
+            for i in range(1, len(hidden_layers)):
+                if self.layers[i] != self.layers[i + 1]:
+                    self.shortcut_weights[i] = (np.random.randn(self.layers[i], self.layers[i + 1])
+                                                * np.sqrt(1.0 / self.layers[i]))
+
+        # Optimizers (weights/biases/shortcuts, and batch norm scale/shift)
+        self.optimizer = make_adam_optimizer(learning_rate)
+        self.bn_optimizer = make_adam_optimizer(learning_rate)
 
         # Learning rate scheduler
-        self.lr_scheduler = LearningRateScheduler(
-            initial_lr=learning_rate,
-            schedule_type='exponential',
-            decay_rate=0.0001,
-            decay_steps=1000
-        )
+        self.lr_scheduler = make_lr_scheduler(learning_rate)
 
         # Training state
         self.training = True
@@ -209,44 +233,51 @@ class AdvancedNeuralNetwork:
         mask = np.random.binomial(1, 1 - rate, size=x.shape) / (1 - rate)
         return x * mask, mask
 
+    def _shortcut(self, i, a_prev):
+        """Residual input to hidden layer i from the previous layer's activations."""
+        if i in self.shortcut_weights:
+            return np.dot(a_prev, self.shortcut_weights[i])
+        return a_prev
+
+    def _has_shortcut(self, i):
+        """Whether hidden layer i receives a residual connection."""
+        return self.use_residual and 0 < i < len(self.weights) - 1
+
     def forward(self, X, training=True):
         """
         Forward pass through the network.
+
+        Hidden layer i: a = dropout(relu(batch_norm(a_prev @ W + b))) + shortcut(a_prev)
 
         Args:
             X: Input data (numpy array)
             training: Whether in training mode (affects dropout and batch norm)
 
         Returns:
-            List of activations for each layer, and caches
+            List of activations for each layer, and caches for backprop
         """
         activations = [X]
         dropout_masks = []
         batch_norm_caches = []
-        pre_activations = []
+        relu_inputs = []
 
         for i in range(len(self.weights)):
-            # Linear transformation
             z = np.dot(activations[-1], self.weights[i]) + self.biases[i]
-            pre_activations.append(z)
 
-            # Apply batch normalization (before activation)
-            if self.use_batch_norm and i < len(self.weights) - 1:
-                z = self.batch_norms[i].forward(z, training=training)
-                batch_norm_caches.append(self.batch_norms[i].cache)
-
-            # Apply activation function
             if i < len(self.weights) - 1:
-                # Hidden layers: ReLU
-                a = self.relu(z)
+                # Batch normalization before the activation
+                if self.use_batch_norm:
+                    # Batch statistics need more than one sample
+                    z = self.batch_norms[i].forward(z, training=training and z.shape[0] > 1)
+                    batch_norm_caches.append(self.batch_norms[i].cache)
+                relu_inputs.append(z)
 
-                # Apply dropout
+                a = self.relu(z)
                 a, mask = self.dropout(a, self.dropout_rate, training=training)
                 dropout_masks.append(mask)
 
-                # Residual connection (if dimensions match)
-                if self.use_residual and i > 0 and activations[-1].shape == a.shape:
-                    a = a + activations[-1]  # Skip connection
+                if self._has_shortcut(i):
+                    a = a + self._shortcut(i, activations[-1])
             else:
                 # Output layer: Sigmoid
                 a = self.sigmoid(z)
@@ -256,92 +287,108 @@ class AdvancedNeuralNetwork:
         return activations, {
             'dropout_masks': dropout_masks,
             'batch_norm_caches': batch_norm_caches,
-            'pre_activations': pre_activations
+            'relu_inputs': relu_inputs
         }
 
-    def backward(self, X, y, activations, caches):
+    def compute_gradients(self, X, y, activations, caches):
         """
-        Backward pass (backpropagation) with advanced features.
+        Backpropagate the mean squared error over the batch.
 
         Args:
             X: Input data
             y: Target output
             activations: Activations from forward pass
-            caches: Caches from forward pass (dropout masks, etc.)
+            caches: Caches from forward pass
+
+        Returns:
+            Dictionary with weight, bias, shortcut, gamma and beta gradients
         """
         m = X.shape[0]
-        deltas = [None] * len(self.weights)
-        dropout_masks = caches['dropout_masks']
-        batch_norm_caches = caches['batch_norm_caches']
-        pre_activations = caches['pre_activations']
+        num_layers = len(self.weights)
+        weight_grads = [None] * num_layers
+        bias_grads = [None] * num_layers
+        shortcut_grads = {}
+        gamma_grads = [None] * len(self.batch_norms)
+        beta_grads = [None] * len(self.batch_norms)
 
-        # Calculate output layer delta
-        output_error = activations[-1] - y
-        deltas[-1] = output_error * self.sigmoid_derivative(activations[-1])
+        # Output layer: loss = mean over the batch of 1/2 * ||a - y||^2 with sigmoid output
+        out = activations[-1]
+        dz = (out - y) * self.sigmoid_derivative(out) / m
+        weight_grads[-1] = np.dot(activations[-2].T, dz)
+        bias_grads[-1] = np.sum(dz, axis=0, keepdims=True)
+        da = np.dot(dz, self.weights[-1].T)
 
-        # Backpropagate through hidden layers
-        for i in range(len(deltas) - 2, -1, -1):
-            # Error from next layer
-            error = np.dot(deltas[i + 1], self.weights[i + 1].T)
+        # Hidden layer j maps activations[j] to activations[j + 1]; da is the
+        # gradient with respect to activations[j + 1]
+        for j in reversed(range(num_layers - 1)):
+            residual = 0
+            if self._has_shortcut(j):
+                if j in self.shortcut_weights:
+                    shortcut_grads[j] = np.dot(activations[j].T, da)
+                    residual = np.dot(da, self.shortcut_weights[j].T)
+                else:
+                    residual = da
 
-            # Residual connection gradient
-            if self.use_residual and i > 0 and i < len(deltas) - 1:
-                # Gradient flows through both paths
-                residual_error = error.copy()
+            mask = caches['dropout_masks'][j]
+            dz = (da * mask if mask is not None else da) * self.relu_derivative(caches['relu_inputs'][j])
 
-            # Dropout gradient
-            if dropout_masks and i < len(dropout_masks) and dropout_masks[i] is not None:
-                error = error * dropout_masks[i]
+            if self.use_batch_norm:
+                dz, gamma_grads[j], beta_grads[j] = self.batch_norms[j].backward(
+                    dz, caches['batch_norm_caches'][j]
+                )
 
-            # Batch normalization gradient
-            if self.use_batch_norm and i < len(batch_norm_caches):
-                # We need to apply the gradient before activation
-                # For now, we'll apply it after ReLU derivative
-                pass
+            weight_grads[j] = np.dot(activations[j].T, dz)
+            bias_grads[j] = np.sum(dz, axis=0, keepdims=True)
+            da = np.dot(dz, self.weights[j].T) + residual
 
-            # Activation derivative
-            deltas[i] = error * self.relu_derivative(activations[i + 1])
+        return {
+            'weights': weight_grads,
+            'biases': bias_grads,
+            'shortcuts': shortcut_grads,
+            'gammas': gamma_grads,
+            'betas': beta_grads
+        }
 
-            # Add residual gradient
-            if self.use_residual and i > 0 and i < len(deltas) - 1:
-                deltas[i] += residual_error * self.relu_derivative(activations[i])
+    def backward(self, X, y, activations, caches):
+        """
+        Backpropagate and update all parameters.
 
-        # Calculate gradients
-        weight_gradients = []
-        bias_gradients = []
-        bn_gamma_grads = []
-        bn_beta_grads = []
+        Args:
+            X: Input data
+            y: Target output
+            activations: Activations from forward pass
+            caches: Caches from forward pass
+        """
+        grads = self.compute_gradients(X, y, activations, caches)
+        shortcut_keys = sorted(self.shortcut_weights)
 
-        for i in range(len(self.weights)):
-            weight_grad = np.dot(activations[i].T, deltas[i]) / m
-            bias_grad = np.sum(deltas[i], axis=0, keepdims=True) / m
-            weight_gradients.append(weight_grad)
-            bias_gradients.append(bias_grad)
-
-            # Batch norm parameter gradients
-            if self.use_batch_norm and i < len(self.batch_norms):
-                # Simplified - in full implementation would backprop through batch norm
-                bn_gamma_grads.append(np.zeros_like(self.batch_norms[i].gamma))
-                bn_beta_grads.append(np.zeros_like(self.batch_norms[i].beta))
-
-        # Apply gradient clipping
+        # Clip by the global norm of every gradient
+        groups = [grads['weights'], [grads['shortcuts'][k] for k in shortcut_keys], grads['biases'],
+                  [g for g in grads['gammas'] if g is not None], [g for g in grads['betas'] if g is not None]]
+        flat = [g for group in groups for g in group]
         if self.gradient_clip_norm > 0:
-            weight_gradients = clip_gradients(weight_gradients, self.gradient_clip_norm)
-            bias_gradients = clip_gradients(bias_gradients, self.gradient_clip_norm)
+            flat = clip_gradients(flat, self.gradient_clip_norm)
+        sizes = [len(group) for group in groups]
+        split, start = [], 0
+        for size in sizes:
+            split.append(flat[start:start + size])
+            start += size
+        weight_grads, shortcut_grads, bias_grads, gamma_grads, beta_grads = split
 
-        # Update learning rate
-        self.optimizer.learning_rate = self.lr_scheduler.get_lr()
+        # Scheduled learning rate for both optimizers
+        lr = self.lr_scheduler.get_lr()
         self.lr_scheduler.step()
+        self.optimizer.learning_rate = lr
+        self.bn_optimizer.learning_rate = lr
 
-        # Update weights and biases
-        self.optimizer.update(self.weights, self.biases, weight_gradients, bias_gradients)
+        # Weights and shortcut projections share one optimizer (arrays updated in place)
+        self.optimizer.update(self.weights + [self.shortcut_weights[k] for k in shortcut_keys],
+                              self.biases, weight_grads + shortcut_grads, bias_grads)
 
-        # Update batch norm parameters (simplified)
-        if self.use_batch_norm:
-            for i, bn in enumerate(self.batch_norms):
-                if i < len(bn_gamma_grads):
-                    bn.gamma -= self.learning_rate * bn_gamma_grads[i]
-                    bn.beta -= self.learning_rate * bn_beta_grads[i]
+        if self.use_batch_norm and gamma_grads:
+            self.bn_optimizer.update([bn.gamma for bn in self.batch_norms],
+                                     [bn.beta for bn in self.batch_norms],
+                                     gamma_grads, beta_grads)
 
     def train_step(self, X, y):
         """
@@ -395,14 +442,10 @@ class AdvancedNeuralNetwork:
             'learning_rate': self.learning_rate,
             'weights': [w.tolist() for w in self.weights],
             'biases': [b.tolist() for b in self.biases],
+            'shortcut_weights': {str(k): w.tolist() for k, w in self.shortcut_weights.items()},
             'optimizer': self.optimizer.to_dict(),
-            'lr_scheduler': {
-                'initial_lr': self.lr_scheduler.initial_lr,
-                'schedule_type': self.lr_scheduler.schedule_type,
-                'decay_rate': self.lr_scheduler.decay_rate,
-                'decay_steps': self.lr_scheduler.decay_steps,
-                'current_step': self.lr_scheduler.current_step
-            }
+            'bn_optimizer': self.bn_optimizer.to_dict(),
+            'lr_scheduler': self.lr_scheduler.to_dict()
         }
 
         # Save batch norm parameters
@@ -436,18 +479,14 @@ class AdvancedNeuralNetwork:
         network.weights = [np.array(w) for w in data['weights']]
         network.biases = [np.array(b) for b in data['biases']]
 
-        # Restore optimizer
-        network.optimizer = AdamOptimizer.from_dict(data['optimizer'])
+        if 'shortcut_weights' in data:
+            network.shortcut_weights = {int(k): np.array(w) for k, w in data['shortcut_weights'].items()}
 
-        # Restore scheduler
-        sched_data = data['lr_scheduler']
-        network.lr_scheduler = LearningRateScheduler(
-            initial_lr=sched_data['initial_lr'],
-            schedule_type=sched_data['schedule_type'],
-            decay_rate=sched_data['decay_rate'],
-            decay_steps=sched_data['decay_steps']
-        )
-        network.lr_scheduler.current_step = sched_data['current_step']
+        # Restore optimizers and scheduler
+        network.optimizer = AdamOptimizer.from_dict(data['optimizer'])
+        if data.get('bn_optimizer'):
+            network.bn_optimizer = AdamOptimizer.from_dict(data['bn_optimizer'])
+        network.lr_scheduler = LearningRateScheduler.from_dict(data['lr_scheduler'])
 
         # Restore batch norm parameters
         if 'batch_norms' in data and data['batch_norms']:

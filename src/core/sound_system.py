@@ -5,7 +5,7 @@ Manages creature-specific sounds and sound effects.
 """
 import time
 import random
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 from enum import Enum
 
 

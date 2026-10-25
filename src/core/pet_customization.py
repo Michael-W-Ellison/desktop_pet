@@ -3,8 +3,7 @@ Phase 14: Pet Customization System
 
 Allows customization of pet appearance, colors, and accessories.
 """
-import time
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 from enum import Enum
 
 

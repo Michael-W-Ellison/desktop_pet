@@ -15,8 +15,6 @@ from core.creature import Creature
 from core.config import (
     PersonalityType, CREATURE_TYPES, ElementType, EvolutionStage, VariantType
 )
-from core.evolution_system import EvolutionSystem
-from core.element_system import ElementSystem
 from core.variant_system import VariantSystem
 
 print("=" * 60)
@@ -42,7 +40,7 @@ for creature_type in test_types:
     print(f"  - Element: {creature.element.primary_element.value}")
     print(f"  - Variant: {creature.variant.variant.value} ({creature.variant.get_rarity_tier()})")
     print(f"  - Stage: {creature.evolution.get_stage_name()}")
-    print(f"  - Bond: {creature.bond}, Interactions: {creature.total_interactions}")
+    print(f"  - Bond: {creature.bonding.bond}, Interactions: {creature.total_interactions}")
 
 print("✓ Fantastical creatures created successfully!")
 
@@ -55,21 +53,18 @@ evo_creature = Creature(creature_type='phoenix', personality=PersonalityType.CLE
 print(f"Created {evo_creature.name} the {evo_creature.creature_type}")
 print(f"Starting stage: {evo_creature.evolution.get_stage_name()}")
 
-# Simulate aging and interactions
-evo_creature.age = 3 * 3600  # 3 hours
-evo_creature.happiness = 50
-evo_creature.bond = 35
-evo_creature.total_interactions = 60
+# Simulate a decision network that has partly settled
+evo_creature.decision_stability = 0.3
 
 can_evolve, next_stage, reason = evo_creature.can_evolve()
-print(f"\nChecking evolution eligibility:")
+print("\nChecking evolution eligibility:")
 print(f"  Can evolve: {can_evolve}")
 print(f"  Next stage: {next_stage}")
 print(f"  Reason: {reason}")
 
 # Get evolution progress
 progress = evo_creature.get_evolution_progress()
-print(f"\nEvolution Progress:")
+print("\nEvolution Progress:")
 print(f"  Overall: {progress['progress_percent']:.1f}%")
 for req in progress['requirements']:
     status = "✓" if req['met'] else "✗"
@@ -103,7 +98,7 @@ print(f"\nFire element modifiers: {list(fire_mods.keys())[:5]}...")
 
 # Test elemental interaction
 result = fire_phoenix.interact_with_element(ElementType.WATER)
-print(f"\nElemental interaction result:")
+print("\nElemental interaction result:")
 print(f"  Type: {result['interaction_type']}")
 print(f"  Message: {result['message']}")
 print(f"  Multiplier: {result['multiplier']}x")
@@ -137,7 +132,7 @@ for variant_type in VariantType:
 # Test special variant
 crystal_creature = Creature(creature_type='dragon', personality=PersonalityType.LOYAL)
 crystal_creature.variant = VariantSystem(VariantType.CRYSTAL)
-print(f"\nCrystal variant abilities:")
+print("\nCrystal variant abilities:")
 abilities = crystal_creature.variant.get_special_abilities()
 for ability in abilities:
     print(f"  - {ability}")
@@ -170,7 +165,7 @@ display_creature = Creature(creature_type='unicorn', personality=PersonalityType
 display_creature.variant = VariantSystem(VariantType.MYSTIC)
 display_creature.age = 7200  # 2 hours
 display_creature.happiness = 85
-display_creature.bond = 45
+display_creature.bonding.bond = 45
 
 info = display_creature.get_display_info()
 print(f"Display Info for {info['name']}:")
@@ -198,7 +193,7 @@ original.variant = VariantSystem(VariantType.SHINY)
 original.evolution.current_stage = EvolutionStage.JUVENILE
 original.age = 10000
 original.happiness = 75
-original.bond = 60
+original.bonding.bond = 60
 original.total_interactions = 85
 
 print(f"Original creature: {original.name}")
@@ -216,7 +211,7 @@ print(f"\nLoaded creature: {loaded.name}")
 print(f"  Stage: {loaded.evolution.get_stage_name()}")
 print(f"  Element: {loaded.element.primary_element.value}")
 print(f"  Variant: {loaded.variant.variant.value}")
-print(f"  Bond: {loaded.bond}")
+print(f"  Bond: {loaded.bonding.bond}")
 print(f"  Total interactions: {loaded.total_interactions}")
 
 assert loaded.name == original.name, "Name should match"

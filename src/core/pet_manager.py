@@ -3,7 +3,8 @@ Main pet manager coordinating creature behavior, UI, and game logic with enhance
 """
 import time
 import random
-from PyQt5.QtCore import QTimer
+from typing import Optional
+from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QCursor
 from PyQt5.QtWidgets import QMessageBox, QApplication
 from .creature import Creature
@@ -30,15 +31,14 @@ class PetManager:
         self.creature = None
         self.learner = None
         self.pet_window = None
+        self.ball_window = None
         self.is_egg = True
         self.last_update_time = time.time()
         self.ai_complexity = ai_complexity
 
         # Enhanced AI systems
-        self.sensory_system = None
-        if ai_complexity != AIComplexity.SIMPLE:
-            # Initialize sensory system for all non-simple modes
-            self.sensory_system = CompleteSensorySystem()
+        # Desktop layout (icons to hide behind); every level uses it
+        self.sensory_system = CompleteSensorySystem()
 
         # Data manager
         self.data_manager = PetDataManager()
@@ -74,22 +74,15 @@ class PetManager:
             if not self.is_egg and data.get('creature'):
                 self.creature = data['creature']
 
-                # Create enhanced learner
+                # Use the learner reconstructed by the data manager
                 if data.get('learner'):
-                    self.learner = EnhancedBehaviorLearner.from_dict(
-                        self.creature,
-                        data['learner']
-                    )
+                    self.learner = data['learner']
                 else:
                     # Create new enhanced learner
                     self.learner = EnhancedBehaviorLearner(
                         self.creature,
                         self.ai_complexity
                     )
-
-                # Reinitialize sensory system if needed
-                if self.ai_complexity != AIComplexity.SIMPLE and self.sensory_system is None:
-                    self.sensory_system = CompleteSensorySystem()
 
                 # Check if creature died from starvation
                 current_time = time.time()
@@ -135,10 +128,6 @@ class PetManager:
 
         self.is_egg = False
 
-        # Initialize sensory system if needed
-        if self.ai_complexity != AIComplexity.SIMPLE and self.sensory_system is None:
-            self.sensory_system = CompleteSensorySystem()
-
         # Start timers
         self.start_timers()
 
@@ -175,9 +164,9 @@ class PetManager:
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Information)
         msg.setWindowTitle("Goodbye...")
-        msg.setText(f"Your creature has passed on due to starvation.\n\n"
-                   f"They left behind an egg for you.\n\n"
-                   f"Take better care of the next one!")
+        msg.setText("Your creature has passed on due to starvation.\n\n"
+                   "They left behind an egg for you.\n\n"
+                   "Take better care of the next one!")
         msg.exec_()
 
     def start_timers(self):
@@ -202,8 +191,8 @@ class PetManager:
         self.mouse_chase_timer.timeout.connect(self.check_mouse_chase)
         self.mouse_chase_timer.start(500)  # Check twice per second
 
-        # Sensory update timer (for advanced AI modes)
-        if self.sensory_system:
+        # Sensory update timer (SIMPLE only reads the desktop layout when hiding)
+        if self.ai_complexity != AIComplexity.SIMPLE:
             self.sensory_update_timer = QTimer()
             self.sensory_update_timer.timeout.connect(self.update_sensory_inputs)
             self.sensory_update_timer.start(100)  # Update 10 times per second
@@ -221,21 +210,28 @@ class PetManager:
         if self.sensory_update_timer:
             self.sensory_update_timer.stop()
 
-    def update_sensory_inputs(self):
-        """Update sensory system with current mouse position and environment."""
+    def update_sensory_inputs(self, mouse_x: Optional[int] = None, mouse_y: Optional[int] = None):
+        """
+        Update sensory system with current mouse position and environment.
+
+        Args:
+            mouse_x: Cursor X position (read from QCursor if not given)
+            mouse_y: Cursor Y position (read from QCursor if not given)
+        """
         if not self.sensory_system or not self.pet_window:
             return
 
-        # Get current mouse position
-        cursor = QCursor()
-        mouse_pos = cursor.pos()
+        # Get current mouse position if the caller did not supply it
+        if mouse_x is None or mouse_y is None:
+            mouse_pos = QCursor.pos()
+            mouse_x, mouse_y = mouse_pos.x(), mouse_pos.y()
 
         # Update sensory system
-        self.sensory_system.update_mouse_position(mouse_pos.x(), mouse_pos.y())
+        self.sensory_system.update_mouse_position(mouse_x, mouse_y)
 
         # Update learner with sensory data
         if self.learner and hasattr(self.learner, 'update_sensory_inputs'):
-            self.learner.update_sensory_inputs(mouse_pos.x(), mouse_pos.y())
+            self.learner.update_sensory_inputs(mouse_x, mouse_y)
 
     def update_hunger(self):
         """Update creature hunger level."""
@@ -251,59 +247,82 @@ class PetManager:
         # Check if creature is starving
         if self.creature.is_starving():
             self.creature_died()
+        else:
+            self.check_evolution()
+
+    def check_evolution(self):
+        """Evolve the creature once it meets the requirements for its next stage."""
+        if not self.creature:
+            return
+
+        can_evolve, _, _ = self.creature.can_evolve()
+        if not can_evolve:
+            return
+
+        success, message = self.creature.evolve()
+        if not success:
+            return
+
+        if self.pet_window:
+            self.pet_window.update_sprite()
+
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setWindowTitle("Evolution!")
+        text = f"{self.creature.name} has grown!\n\n{message}"
+        if self.creature.is_elder():
+            text += ("\n\nAs an Elder, its behavior has reached full complexity. "
+                     "It has the experience to keep adapting to changes.")
+        msg.setText(text)
+        msg.exec_()
+
+        self.save_state()
 
     def update_behavior(self):
         """Update creature behavior using enhanced AI decision-making."""
         if not self.creature or not self.pet_window or not self.learner:
             return
 
-        # Simple sleep check (all AI levels)
-        if self.creature.should_sleep():
+        # Sleep check (all AI levels); pets that expect their player soon stay awake
+        if self.creature.should_sleep(self.learner.expects_player()):
             self.creature.set_state(BehaviorState.SLEEPING)
             self.creature.velocity = [0, 0]
             return
 
         # Get behavioral decision from enhanced learner
         try:
+            self._sync_learner_screen_size()
             decision = self.learner.get_behavioral_decision()
             self.current_decision = decision
 
-            # Extract activity from decision
             activity = decision.get('activity', 'idle')
-
-            # Map activity to behavior state
             self._apply_activity_decision(activity, decision)
 
-            # Apply movement from advanced AI (if available)
-            if 'velocity_x' in decision and 'velocity_y' in decision:
-                if decision.get('should_move', False):
-                    # Use AI-determined velocity
-                    self.creature.velocity = [
-                        decision['velocity_x'],
-                        decision['velocity_y']
-                    ]
-                else:
-                    self.creature.velocity = [0, 0]
-            else:
-                # Fallback to simple random movement for idle/explore
-                if activity in ['explore', 'idle'] and random.random() < 0.3:
-                    speed = 2 * self.creature.trait_modifiers.get('movement_speed', 1.0)
-                    self.creature.velocity = [
-                        random.uniform(-speed, speed),
-                        random.uniform(-speed, speed)
-                    ]
+            # Emotions change how much energy activity uses
+            modifiers = decision.get('emotional_modifiers')
+            if modifiers:
+                self.creature.emotional_energy_modifier = max(0.1, modifiers['energy_consumption'])
 
         except Exception as e:
             # Fallback to simple behavior if AI fails
             print(f"AI decision error: {e}")
             self._fallback_behavior()
 
+    def _sync_learner_screen_size(self):
+        """Give the learner's and the pet manager's sensory systems the real screen size."""
+        screen = QApplication.desktop().screenGeometry()
+        size = (screen.width(), screen.height())
+        if getattr(self, '_learner_screen_size', None) != (self.learner, size):
+            self.learner.set_screen_size(*size)
+            self.sensory_system.set_screen_size(*size)
+            self._learner_screen_size = (self.learner, size)
+
     def _apply_activity_decision(self, activity: str, decision: dict):
         """
-        Apply activity decision to creature state.
+        Apply activity decision to creature state and movement.
 
         Args:
-            activity: Activity name (e.g., 'mouse_chase', 'hide_and_seek')
+            activity: Activity name (e.g., 'mouse_chase', 'hide_seek')
             decision: Full decision dictionary from AI
         """
         # Map activities to behavior states
@@ -311,23 +330,43 @@ class PetManager:
             'mouse_chase': BehaviorState.CHASING,
             'ball_play': BehaviorState.PLAYING,
             'hide': BehaviorState.HIDING,
+            'hide_seek': BehaviorState.HIDING,
             'seek': BehaviorState.SEEKING,
             'hide_and_seek': BehaviorState.HIDING if random.random() < 0.5 else BehaviorState.SEEKING,
             'explore': BehaviorState.WALKING,
+            'random_wander': BehaviorState.WALKING,
+            'move_to_center': BehaviorState.WALKING,
+            'seek_interaction': BehaviorState.SEEKING,
+            'seek_food': BehaviorState.SEEKING,
             'sleep': BehaviorState.SLEEPING,
+            'stay_still': BehaviorState.IDLE,
             'idle': BehaviorState.IDLE,
             'eat': BehaviorState.EATING,
+            'icon_interaction': BehaviorState.WALKING,
         }
 
         new_state = activity_state_map.get(activity, BehaviorState.IDLE)
         self.creature.set_state(new_state)
 
-        # Special handling for specific activities
         if activity == 'mouse_chase':
-            # Will be handled by check_mouse_chase
-            pass
-        elif activity == 'hide':
-            # Move toward nearest icon (if sensory system available)
+            # Movement handled by check_mouse_chase
+            return
+
+        if activity in ('sleep', 'stay_still'):
+            self.creature.velocity = [0, 0]
+            return
+
+        if 'velocity_x' in decision:
+            # ADVANCED/EXPERT: the movement network decides how to move, at the personality's pace
+            if decision.get('should_move', False):
+                speed = self.creature.trait_modifiers.get('movement_speed', 1.0)
+                self.creature.velocity = [decision['velocity_x'] * speed, decision['velocity_y'] * speed]
+            else:
+                self.creature.velocity = [0, 0]
+            return
+
+        # SIMPLE/MEDIUM: steer toward a hiding spot or an icon, or wander
+        if activity in ('hide', 'hide_and_seek', 'icon_interaction'):
             if self.sensory_system and self.pet_window:
                 state = self.sensory_system.get_state_dict(
                     self.creature.position[0],
@@ -345,6 +384,14 @@ class PetManager:
                             (dx / distance) * speed,
                             (dy / distance) * speed
                         ]
+                        return
+            self.creature.velocity = [0, 0]
+        elif activity in ('explore', 'idle', 'ball_play') and random.random() < 0.3:
+            speed = 2 * self.creature.trait_modifiers.get('movement_speed', 1.0)
+            self.creature.velocity = [
+                random.uniform(-speed, speed),
+                random.uniform(-speed, speed)
+            ]
 
     def _fallback_behavior(self):
         """Fallback to simple random behavior if AI fails."""
@@ -449,7 +496,8 @@ class PetManager:
             random.uniform(-BALL_SPEED, -BALL_SPEED/2)  # Throw upward
         ]
 
-        ball = BallWindow(self, velocity)
+        # Keep a reference so the window is not garbage collected
+        self.ball_window = BallWindow(self, velocity)
 
         # Creature notices and might chase
         if self.creature:
@@ -485,12 +533,44 @@ class PetManager:
         if not self.creature or not self.learner:
             return
 
-        self.creature.interact(interaction_type, positive)
+        # The creature may receive the interaction badly (e.g. cranky personalities)
+        positive = self.creature.interact(interaction_type, positive)
+        if outcome:
+            outcome['positive'] = positive
 
         # Use enhanced learning with outcome data
         self.learner.learn_from_interaction(interaction_type, positive, outcome or {})
 
         self.save_state()
+
+    def train_trick(self, trick_name: str) -> str:
+        """
+        Practice a trick, starting to learn it first if needed.
+
+        Args:
+            trick_name: Name of a trick in TrainingSystem.STANDARD_TRICKS
+
+        Returns:
+            Message describing the result
+        """
+        if not self.creature:
+            return ""
+
+        training = self.creature.training
+        if trick_name not in training.learned_tricks:
+            started, message = training.start_learning_trick(trick_name)
+            if not started:
+                return message
+
+        success, message, _ = self.creature.practice_trick(trick_name)
+
+        # Training counts as an interaction (bond, neglect, learning)
+        self.interact('training_success' if success else 'training', positive=success)
+
+        # Knowing enough tricks can unlock the next evolution stage
+        self.check_evolution()
+
+        return message
 
     def show_stats(self):
         """Show creature statistics with enhanced AI information."""
@@ -515,7 +595,7 @@ class PetManager:
         # Add AI-specific information
         if self.ai_complexity == AIComplexity.SIMPLE:
             stats_text += f"Favorite Activity: {self.creature.get_preferred_activity().replace('_', ' ').title()}\n"
-            stats_text += f"\n[AI: Simple Mode]"
+            stats_text += "\n[AI: Simple Mode]"
         elif self.ai_complexity in [AIComplexity.MEDIUM, AIComplexity.ADVANCED, AIComplexity.EXPERT]:
             # Show current decision
             if self.current_decision:
@@ -542,6 +622,20 @@ class PetManager:
         msg.setIcon(QMessageBox.Information)
         msg.setWindowTitle(f"{self.creature.name}'s Stats")
         msg.setText(stats_text)
+        msg.exec_()
+
+    def show_ai_insights(self):
+        """Show the EXPERT-mode view of the AI's emotions, action values and metrics."""
+        if not self.creature or not self.learner:
+            return
+
+        import html
+        text = self.learner.get_insights(self.current_decision)
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setWindowTitle(f"{self.creature.name}'s AI Insights")
+        msg.setTextFormat(Qt.RichText)
+        msg.setText(f"<pre>{html.escape(text)}</pre>")
         msg.exec_()
 
     def exit_application(self):

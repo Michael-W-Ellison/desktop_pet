@@ -12,12 +12,11 @@ Tests all 6 Phase 10 features:
 import sys
 sys.path.insert(0, '/home/user/desktop_pet/src')
 
-from core.animation_system import AnimationSystem, AnimationState, Animation, AnimationFrame
-from core.emotion_particles import EmotionParticleEmitter, EmotionType, EmotionParticle
+from core.animation_system import AnimationSystem, AnimationState
+from core.emotion_particles import EmotionParticleEmitter, EmotionType
 from core.sound_system import SoundSystem, SoundEvent, SoundCategory
 from core.music_system import MusicSystem, MusicMood
 from core.speech_system import SpeechSystem, SpeechType, SpeechMood
-import time
 
 print("=" * 60)
 print("PHASE 10: ADVANCED VISUAL & AUDIO TEST")
@@ -74,7 +73,7 @@ print(f"Animation speed: {anim_system.animation_speed}x")
 
 # Animation statistics
 status = anim_system.get_status()
-print(f"\nAnimation status:")
+print("\nAnimation status:")
 print(f"  Current state: {status['current_state']}")
 print(f"  Facing right: {status['facing_right']}")
 print(f"  Total animations played: {status['total_animations_played']}")
@@ -190,7 +189,7 @@ print(f"Unmuted: {sound_system.muted}")
 
 # Statistics
 status = sound_system.get_status()
-print(f"\nSound system status:")
+print("\nSound system status:")
 print(f"  Total sounds played: {status['total_sounds_played']}")
 print(f"  Sounds by category: {status['sounds_by_category']}")
 print(f"  Max concurrent: {status['max_concurrent_sounds']}")
@@ -259,7 +258,7 @@ print(f"Low energy = {mood.value}")
 
 # Statistics
 status = music_system.get_status()
-print(f"\nMusic system status:")
+print("\nMusic system status:")
 print(f"  Shuffle mode: {status['shuffle_mode']}")
 print(f"  Total tracks played: {status['total_tracks_played']}")
 print(f"  Total playtime: {status['total_playtime_hours']:.2f} hours")
@@ -341,7 +340,7 @@ for creature in creatures:
 
 # Statistics
 status = speech_system.get_status()
-print(f"\nSpeech system status:")
+print("\nSpeech system status:")
 print(f"  Total utterances: {status['total_utterances']}")
 print(f"  Utterances by type: {status['utterances_by_type']}")
 print(f"  Expressiveness: {status['expressiveness']}")

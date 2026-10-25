@@ -227,7 +227,6 @@ class AutonomousBehavior:
         # Evaluate each furniture option
         best_motivation = 0.0
         best_furniture = None
-        best_category = None
 
         for furniture_id, category, position, effects in available_furniture:
             # Calculate distance
@@ -244,7 +243,6 @@ class AutonomousBehavior:
             if motivation > best_motivation:
                 best_motivation = motivation
                 best_furniture = furniture_id
-                best_category = category
 
         # Make decision
         if best_furniture and best_motivation > 30:  # Threshold to act

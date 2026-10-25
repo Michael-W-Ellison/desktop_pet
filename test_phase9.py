@@ -12,11 +12,10 @@ Tests:
 import sys
 sys.path.insert(0, '/home/user/desktop_pet/src')
 
-from core.social_system import SocialSystem, RelationshipType, InteractionType
-from core.pack_hierarchy import PackHierarchy, Rank
-from core.jealousy_system import JealousySystem, JealousyLevel, CompetitionType
+from core.social_system import SocialSystem
+from core.pack_hierarchy import PackHierarchy
+from core.jealousy_system import JealousySystem
 from core.peer_teaching import PeerTeachingSystem
-import time
 
 print("=" * 60)
 print("PHASE 9: SOCIAL & MULTI-PET SYSTEMS TEST")
@@ -58,7 +57,7 @@ for i in range(5):
     pet1_social.interact_with_pet('pet_002', 'cuddle', success=True)
 
 status = pet1_social.get_status()
-print(f"\nSocial status:")
+print("\nSocial status:")
 print(f"  Known pets: {status['known_pets']}")
 print(f"  Friends: {status['friends']}")
 print(f"  Best friend: {status['best_friend']}")
@@ -68,7 +67,7 @@ print(f"  Negative: {status['negative_interactions']}")
 
 # Check relationship
 rel = pet1_social.get_relationship('pet_002')
-print(f"\nRelationship with pet_002:")
+print("\nRelationship with pet_002:")
 print(f"  Friendship: {rel['friendship']:.1f}")
 print(f"  Type: {rel['relationship_type']}")
 print(f"  Interactions: {rel['interactions_count']}")
@@ -147,7 +146,7 @@ for i in range(3):
     jealousy.witness_attention_to_other('favorite_pet', 'feeding', 2.0)
 
 status = jealousy.get_status()
-print(f"\nJealousy status:")
+print("\nJealousy status:")
 print(f"  Is jealous: {status['is_jealous']}")
 print(f"  Most jealous of: {status['most_jealous_of']}")
 print(f"  Max jealousy level: {status['max_jealousy_level']:.1f}")
@@ -170,7 +169,7 @@ print(f"Jealousy after attention: {status['max_jealousy_level']:.1f}")
 print(f"Is still jealous: {status['is_jealous']}")
 
 # Competition stats
-print(f"\nCompetition stats:")
+print("\nCompetition stats:")
 print(f"  Total: {status['total_competitions']}")
 print(f"  Won: {status['competitions_won']}")
 print(f"  Lost: {status['competitions_lost']}")
@@ -231,7 +230,7 @@ for i in range(5):
 
 # Teaching stats
 stats = teacher.get_teaching_stats()
-print(f"\nTeacher stats:")
+print("\nTeacher stats:")
 print(f"  Tricks taught: {stats['tricks_taught_count']}")
 print(f"  Teaching sessions: {stats['total_teaching_sessions']}")
 print(f"  Success rate: {stats['teaching_success_rate']:.1%}")
@@ -323,7 +322,7 @@ print(f"  Delta challenges Alpha: {result['outcome']}")
 
 # Final pack status
 status = multi_pack.get_status()
-print(f"\nFinal pack status:")
+print("\nFinal pack status:")
 print(f"  Pack size: {status['pack_size']}")
 print(f"  Pack stability: {status['pack_stability']:.2f}")
 print(f"  Total challenges: {status['total_challenges']}")

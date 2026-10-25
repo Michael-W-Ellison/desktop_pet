@@ -5,7 +5,6 @@ Handles rare creature variants (shiny, mystic, shadow, crystal).
 Similar to shiny Pokemon but with unique stat modifiers and visual effects.
 """
 from typing import Dict, Any, Optional, List
-import random
 import numpy as np
 from core.config import (
     VariantType,

@@ -10,14 +10,11 @@ Tests all 4 Phase 15 features:
 import sys
 sys.path.insert(0, '/home/user/desktop_pet/src')
 
-from core.interaction_system import (InteractionSystem, Interaction, InteractionType,
-                                     InteractionState)
-from core.autonomous_behavior import (AutonomousBehavior, BehaviorDecision,
-                                      BehaviorPriority)
-from core.furniture_effects import (FurnitureEffectsManager, FurnitureEffect,
-                                    FurnitureQuality, FurnitureCondition)
-from core.interaction_animations import (InteractionAnimationManager, InteractionAnimation,
-                                         InteractionAnimationState, AnimationType)
+from core.interaction_system import (InteractionSystem, InteractionType)
+from core.autonomous_behavior import AutonomousBehavior
+from core.furniture_effects import (FurnitureEffectsManager, FurnitureQuality)
+from core.interaction_animations import (InteractionAnimationManager, InteractionAnimationState,
+                                         AnimationType)
 
 print("=" * 60)
 print("PHASE 15: FURNITURE INTERACTION SYSTEM TEST")
@@ -28,7 +25,7 @@ print("\n1. Testing Interaction System")
 print("-" * 60)
 
 interaction_sys = InteractionSystem()
-print(f"Interaction system initialized")
+print("Interaction system initialized")
 print(f"Interaction range: {interaction_sys.interaction_range} grid units")
 
 # Get available interactions for furniture
@@ -79,7 +76,7 @@ print(f"\nSleep interaction effects: {effects}")
 
 # Interaction statistics
 stats = interaction_sys.get_statistics()
-print(f"\nInteraction statistics:")
+print("\nInteraction statistics:")
 print(f"  Total interactions: {stats['total_interactions']}")
 print(f"  Completed: {stats['completed_interactions']}")
 print(f"  Completion rate: {stats['completion_rate']:.1f}%")
@@ -92,7 +89,7 @@ print("\n2. Testing Autonomous Behavior")
 print("-" * 60)
 
 auto_behavior = AutonomousBehavior()
-print(f"Autonomous behavior initialized")
+print("Autonomous behavior initialized")
 print(f"Enabled: {auto_behavior.enabled}")
 print(f"Decision interval: {auto_behavior.decision_interval}s")
 
@@ -108,7 +105,7 @@ pet_stats = {
 }
 
 priorities = auto_behavior.evaluate_needs(pet_stats)
-print(f"Need priorities:")
+print("Need priorities:")
 for need, priority in priorities.items():
     print(f"  {need}: {priority.value}")
 
@@ -137,7 +134,7 @@ pet_position = (2.0, 2.0)
 
 decision = auto_behavior.make_decision(pet_stats, available_furniture, pet_position)
 if decision:
-    print(f"✓ Decision made:")
+    print("✓ Decision made:")
     print(f"  Action: {decision.action}")
     print(f"  Furniture: {decision.furniture_id}")
     print(f"  Priority: {decision.priority.value}")
@@ -158,7 +155,7 @@ print(f"Should interrupt: {'✓' if should_interrupt else '✗'}")
 
 # Autonomous behavior statistics
 stats = auto_behavior.get_statistics()
-print(f"\nAutonomous behavior statistics:")
+print("\nAutonomous behavior statistics:")
 print(f"  Total decisions: {stats['total_decisions']}")
 print(f"  Autonomous interactions: {stats['autonomous_interactions']}")
 print(f"  Interaction rate: {stats['interaction_rate']:.1f}%")
@@ -171,7 +168,7 @@ print("\n3. Testing Furniture Effects")
 print("-" * 60)
 
 furniture_effects = FurnitureEffectsManager()
-print(f"Furniture effects manager initialized")
+print("Furniture effects manager initialized")
 
 # Register furniture
 print("\nRegistering furniture...")
@@ -184,7 +181,7 @@ print(f"Registered furniture: {len(furniture_effects.furniture_effects)}")
 # Get furniture effect
 luxury_bed = furniture_effects.get_furniture_effect('bed1')
 if luxury_bed:
-    print(f"\nLuxury Bed:")
+    print("\nLuxury Bed:")
     print(f"  Quality: {luxury_bed.quality.value}")
     print(f"  Multiplier: {luxury_bed.quality_multiplier}x")
     print(f"  Durability: {luxury_bed.current_durability}/{luxury_bed.max_durability}")
@@ -202,7 +199,7 @@ for i in range(20):
     furniture_effects.use_furniture('bed1')
 
 if luxury_bed:
-    print(f"After 20 uses:")
+    print("After 20 uses:")
     print(f"  Durability: {luxury_bed.current_durability}/{luxury_bed.max_durability}")
     print(f"  Condition: {luxury_bed.get_condition().value}")
     print(f"  Times used: {luxury_bed.times_used}")
@@ -212,7 +209,7 @@ if luxury_bed:
 print("\nRepairing bed...")
 repaired = furniture_effects.repair_furniture('bed1', 50)
 if repaired and luxury_bed:
-    print(f"✓ Repaired")
+    print("✓ Repaired")
     print(f"  New durability: {luxury_bed.current_durability}/{luxury_bed.max_durability}")
 
 # Upgrade furniture
@@ -226,7 +223,7 @@ if basic_bed:
 
 # Furniture effects statistics
 stats = furniture_effects.get_statistics()
-print(f"\nFurniture effects statistics:")
+print("\nFurniture effects statistics:")
 print(f"  Total furniture: {stats['total_furniture']}")
 print(f"  Total uses: {stats['total_uses']}")
 print(f"  Total repairs: {stats['total_repairs']}")
@@ -241,7 +238,7 @@ print("\n4. Testing Interaction Animations")
 print("-" * 60)
 
 anim_manager = InteractionAnimationManager()
-print(f"Animation manager initialized")
+print("Animation manager initialized")
 print(f"Total animations: {len(anim_manager.animations)}")
 
 # Play animation
@@ -277,23 +274,23 @@ for i in range(3):
 # Pause and resume
 print("\nTesting pause/resume...")
 anim_manager.pause_current_animation()
-print(f"  Paused")
+print("  Paused")
 frame_before = anim_manager.get_current_frame()
 anim_manager.update(1.0)  # This shouldn't advance frame
 frame_after = anim_manager.get_current_frame()
 print(f"  Frame unchanged: {'✓' if frame_before == frame_after else '✗'}")
 
 anim_manager.resume_current_animation()
-print(f"  Resumed")
+print("  Resumed")
 
 # Add custom animation
 print("\nAdding custom animation...")
 anim_manager.add_animation('custom_dance', 'Dance', frame_count=12, frame_rate=15, animation_type=AnimationType.PINGPONG)
-print(f"✓ Custom animation added")
+print("✓ Custom animation added")
 
 # Animation statistics
 stats = anim_manager.get_statistics()
-print(f"\nAnimation statistics:")
+print("\nAnimation statistics:")
 print(f"  Total animations: {stats['total_animations']}")
 print(f"  Total played: {stats['total_played']}")
 print(f"  Current animation: {stats['current_animation']}")
@@ -385,7 +382,7 @@ if effects:
 print("6. Simulating interaction completion...")
 interaction_sys.update_interactions(30.0)  # Complete
 anim_manager.update(1.0)
-print(f"   ✓ Interaction completed")
+print("   ✓ Interaction completed")
 print(f"   New energy would be: {pet_stats['energy'] + effects.get('energy', 0)}/100")
 
 print("\n✓ Integration working!")

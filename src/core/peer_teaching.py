@@ -3,10 +3,8 @@ Phase 9: Peer Teaching System
 
 Allows trained pets to teach tricks to untrained pets through social learning.
 """
-import time
 import random
-from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime
+from typing import Dict, Any, List, Optional
 
 
 class PeerTeachingSystem:

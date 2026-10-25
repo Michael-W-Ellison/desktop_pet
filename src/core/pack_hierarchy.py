@@ -6,7 +6,6 @@ Manages dominance hierarchy among multiple pets.
 import time
 import random
 from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime
 from enum import Enum
 
 

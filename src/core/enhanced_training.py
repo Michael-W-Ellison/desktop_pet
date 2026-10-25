@@ -11,7 +11,7 @@ Adds advanced training features:
 """
 import time
 import random
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, Any, Tuple
 from enum import Enum
 from .training_system import Trick, TrickDifficulty, TrickCategory
 

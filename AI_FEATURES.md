@@ -18,7 +18,8 @@ Choose the right level of AI sophistication for your needs:
 - **Best for**: General use, balanced experience
 - **Features**: LSTM networks with memory + sensory inputs
 - **Learning**: Temporal pattern recognition, schedule learning
-- **Memory**: Remembers sequences of up to 30 interactions
+- **Memory**: Remembers sequences of up to 50 interactions, and replays one of its last 500
+  player interactions at each decision so it keeps learning between interactions
 - **Performance**: Fast, moderate CPU usage
 
 #### 🟣 ADVANCED Mode (Ages 13+)
@@ -36,7 +37,7 @@ Choose the right level of AI sophistication for your needs:
 
 ---
 
-## 📊 The Six Major AI Enhancements
+## 📊 The Seven Major AI Enhancements
 
 ### 1. ⚡ Advanced Optimizers
 
@@ -183,7 +184,8 @@ Combines all four networks intelligently:
 - Is near hiding spot
 
 **Environmental Awareness**:
-- Detects desktop icons as obstacles and hiding spots
+- Detects desktop icons as obstacles and hiding spots (reads real icon positions on
+  Windows and rescans every minute; other systems assume a standard icon grid)
 - Tracks mouse movement and predicts approach
 - Knows time of day and adjusts behavior
 - Understands screen boundaries
@@ -240,7 +242,11 @@ Pet automatically sets goals based on state:
 - If energy < 25: Goal = "rest"
 - If happiness < 40: Goal = "seek_interaction"
 - If player nearby: Goal = "play"
+- If the player usually turns up about now: Goal = "seek_interaction"
 - Else: Goal = "explore"
+
+Once the pet has enough experience, the Strategic Planner (below) replaces these rules
+whenever its plan for the day does clearly better.
 
 **Learning Process**:
 1. Pet is in a state
@@ -258,6 +264,32 @@ Pet automatically sets goals based on state:
 - Develops strategies over weeks (e.g., "stay near mouse in evening")
 - Makes surprisingly intelligent decisions
 - Genuinely goal-seeking behavior
+
+---
+
+### 7. 🗺️ Strategic Planner (ADVANCED and EXPERT)
+
+**What it does**: Plans the coming day so the pet can follow multi-step strategies
+
+**How it works**:
+- **World model** learned from the pet's own experience: for each goal, how hunger,
+  energy and happiness change while the player is away, what an interaction under that
+  goal does (does asking for food get the pet fed?), and how the goal changes the chance
+  of an interaction while the player is around
+- **Player forecast** for the next 24 hours from the Social Network and the pet's memory
+  of previous days
+- **Planning** by dynamic programming over 24 hours in 15-minute steps, scoring each step
+  with the same reward terms the RL system learns from
+- The plan is recomputed every 5 minutes; once the pet has observed 500 decisions, the
+  planned goal replaces the goal rules whenever it does clearly better over the day
+
+**Your child will notice**:
+- Pet asks for food while the player is around, before it is hungry, when the next
+  chance to eat is hours away
+- Pet stays awake, and heads over, when the player usually arrives
+- Strategies change as the pet learns its player's routine over the weeks
+
+The EXPERT mode's AI Insights view shows the current plan for the day.
 
 ---
 

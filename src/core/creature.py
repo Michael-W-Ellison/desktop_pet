@@ -13,26 +13,39 @@ Enhanced with:
 - Preference System (individual likes/dislikes for toys, foods, activities)
 - Name Calling System (responds to being called by name)
 """
+import bisect
 import random
 import time
 from typing import Dict, Any, Optional, Tuple, List
-from datetime import datetime
 from .config import (
     PersonalityType, BehaviorState, CREATURE_TYPES, COLOR_PALETTES,
     PERSONALITY_TRAITS, MAX_HUNGER, HUNGER_DECAY_RATE, STARVATION_THRESHOLD,
-    EvolutionStage, ElementType, VariantType
+    EvolutionStage, ElementType, HAPPINESS_NEGLECT_GRACE_SECONDS, HAPPINESS_NEGLECT_DECAY_RATE,
+    INTERACTION_MEMORY_DAYS, INTERACTION_MEMORY_WINDOW, AWAKE_AFTER_INTERACTION_SECONDS,
+    MAX_SLEEP_DRIVE_AWAKE, ELDER_HABIT_SHARE
 )
-from .memory_system import IntegratedMemorySystem, MemoryImportance
+from .memory_system import IntegratedMemorySystem
+from .personality_behavior import PersonalityBehavior
+from .circadian_rhythm import CircadianRhythm
 from .training_system import TrainingSystem
 from .evolution_system import EvolutionSystem, EvolutionTrigger
 from .element_system import ElementSystem, create_element_system_for_species
 from .variant_system import VariantSystem, generate_random_variant
-from .bonding_system import BondingSystem, BondLevel
+from .bonding_system import BondingSystem
 from .trust_system import TrustSystem
 from .emotional_states import EmotionalStateManager, EmotionalState
 from .preference_system import PreferenceSystem
 from .name_calling import NameCallingSystem
 
+
+
+def _snap_to_limits(value: float, low: float = 0.0, high: float = 100.0) -> float:
+    """Return a limit when value is within 1e-6 of it, otherwise value."""
+    if abs(value - low) < 1e-6:
+        return low
+    if abs(value - high) < 1e-6:
+        return high
+    return value
 
 class Creature:
     """Represents a desktop pal creature with personality, stats, and learning capabilities."""
@@ -72,9 +85,20 @@ class Creature:
         # Learning and behavior
         self.learned_behaviors = {}
         self.interaction_history = []
+        # When the player interacted, kept for INTERACTION_MEMORY_DAYS (memory of past days)
+        self.interaction_times = []
+        # Experience of the player's habits (Elder needs enough of it)
+        self.interaction_type_counts: Dict[str, int] = {}
+        self.interaction_day_count = 0  # Separate days with player interaction
+        self.last_interaction_day = None  # Local date (YYYY-MM-DD) of the latest one
 
-        # Personality trait modifiers
+        # Personality trait modifiers, and the behavior they produce
         self.trait_modifiers = PERSONALITY_TRAITS[self.personality]
+        self.behavior = PersonalityBehavior(self.trait_modifiers)
+
+        # Day/night sleep cycle; sleepy personalities tire faster
+        self.circadian = CircadianRhythm(species_type=self.creature_type)
+        self.circadian.drive_multiplier = self.behavior.trait('sleep_frequency')
 
         # Phase 2: Enhanced Memory System
         self.memory = IntegratedMemorySystem(
@@ -90,6 +114,14 @@ class Creature:
 
         # Phase 4: Evolution System
         self.evolution = EvolutionSystem(current_stage=EvolutionStage.BABY)
+        # How settled each neural network is (0-1), and the least settled of them,
+        # which drives evolution; updated by EnhancedBehaviorLearner
+        self.network_stability = {}
+        self.decision_stability = 0.0
+        # Energy use set by the emotion network (contentment lowers it, excitement raises it)
+        self.emotional_energy_modifier = 1.0
+        # A pet woken by its player stays awake until this time
+        self.awake_until = 0.0
 
         # Phase 4: Element System
         self.element = create_element_system_for_species(self.creature_type)
@@ -99,7 +131,7 @@ class Creature:
 
         # Apply variant modifiers to initial stats
         variant_mods = self.variant.get_variant_modifiers()
-        self.happiness *= variant_mods.get('happiness_gain', 1.0)
+        self.happiness = min(100.0, self.happiness * variant_mods.get('happiness_gain', 1.0))
 
         # Phase 5: Advanced Bonding Systems
         self.bonding = BondingSystem(initial_bond=0.0)
@@ -150,11 +182,6 @@ class Creature:
         if self.phase7_enabled and self.autobiographical:
             self.autobiographical.record_first_time('birth', birth_details, emotional_intensity=1.0)
 
-        # Show special message for rare variants
-        if self.variant.is_rare():
-            rare_message = self.variant.get_encounter_message()
-            # This message will be shown by pet_manager when creature hatches
-
     def _generate_name(self) -> str:
         """Generate a random name for the creature."""
         prefixes = ['Pip', 'Moo', 'Fluff', 'Spark', 'Dash', 'Glow', 'Puff', 'Zip']
@@ -171,6 +198,14 @@ class Creature:
         # Update age
         self.age = time.time() - self.birth_time
 
+        # Day/night sleep cycle, kept in step with whether the creature is asleep
+        self.circadian.update(delta_time / 3600.0, self.current_hour())
+        asleep = self.current_state == BehaviorState.SLEEPING
+        if asleep and not self.circadian.is_sleeping:
+            self.circadian.fall_asleep()
+        elif not asleep and self.circadian.is_sleeping:
+            self.circadian.wake_up()
+
         # Update hunger
         minutes_elapsed = delta_time / 60.0
         hunger_increase = HUNGER_DECAY_RATE * minutes_elapsed
@@ -178,7 +213,8 @@ class Creature:
 
         # Update energy based on activity
         if self.current_state in [BehaviorState.RUNNING, BehaviorState.PLAYING]:
-            energy_drain = 0.5 * delta_time * self.trait_modifiers.get('energy_consumption', 1.0)
+            energy_drain = (0.5 * delta_time * self.trait_modifiers.get('energy_consumption', 1.0)
+                            * self.emotional_energy_modifier)
             self.energy = max(0, self.energy - energy_drain)
         elif self.current_state == BehaviorState.SLEEPING:
             energy_gain = 2.0 * delta_time
@@ -189,23 +225,36 @@ class Creature:
             self.energy = min(100, self.energy + energy_gain)
 
         # Update happiness based on interactions and care
+        # Only the part of this update past the grace period counts as neglect
         time_since_interaction = time.time() - self.last_interaction_time
-        if time_since_interaction > 300:  # 5 minutes without interaction
-            happiness_decay = 0.1 * delta_time
+        neglected_seconds = min(delta_time, time_since_interaction - HAPPINESS_NEGLECT_GRACE_SECONDS)
+        if neglected_seconds > 0:
+            happiness_decay = (HAPPINESS_NEGLECT_DECAY_RATE * neglected_seconds
+                               * self.behavior.neglect_happiness_multiplier)
             self.happiness = max(0, self.happiness - happiness_decay)
 
-        # Hunger affects happiness
+        # Hunger affects happiness (half the neglect rate, scaled by hunger and irritability)
         if self.hunger > 50:
-            happiness_decay = 0.05 * delta_time * (self.hunger / 50)
+            happiness_decay = (HAPPINESS_NEGLECT_DECAY_RATE * 0.5 * delta_time * (self.hunger / 50)
+                               * self.behavior.hunger_unhappiness_multiplier)
             self.happiness = max(0, self.happiness - happiness_decay)
+
+        # Floating-point error accumulated over many small updates can leave a stat a
+        # hair short of its limit (e.g. hunger 99.9999999), so snap values within 1e-6
+        self.hunger = _snap_to_limits(self.hunger)
+        self.energy = _snap_to_limits(self.energy)
+        self.happiness = _snap_to_limits(self.happiness)
 
         # Phase 5: Update emotional states
         self.emotional_states.update(delta_time)
 
         # Phase 5: Process bonding decay from neglect
+        # process_neglect() returns the decay for a whole neglect period, so
+        # pass only the neglected time that falls within this update
         hours_since_interaction = time_since_interaction / 3600.0
         if hours_since_interaction > 1:
-            self.bonding.process_neglect(hours_since_interaction)
+            neglected_hours_this_update = min(delta_time / 3600.0, hours_since_interaction - 1)
+            self.bonding.process_neglect(1 + neglected_hours_this_update)
 
         # Phase 5: Update presence tracking
         # Note: This assumes owner is present if app is running
@@ -250,7 +299,6 @@ class Creature:
         # Record in memory system (Phase 2)
         # Check if this is first feeding
         first_feeding = self.memory.recall_event('feed', first_only=True) is None
-        importance = MemoryImportance.CRUCIAL.value if first_feeding else MemoryImportance.NORMAL.value
 
         self.memory.record_interaction(
             'feed',
@@ -269,6 +317,23 @@ class Creature:
             emotional_intensity=0.7 if old_hunger > 70 else 0.5
         )
 
+        self.wake_for_player()
+        self.remember_interaction_time()
+
+        # Record in history for neural network learning
+        self.interaction_history.append({
+            'type': 'feed',
+            'positive': True,
+            'timestamp': time.time(),
+            'hunger_level': self.hunger,
+            'energy_level': self.energy,
+            'happiness_level': self.happiness,
+            'bond_gain': bond_gain,
+            'gentle': True
+        })
+        if len(self.interaction_history) > 100:
+            self.interaction_history = self.interaction_history[-100:]
+
     def interact(self, interaction_type: str, positive: bool = True,
                  item: str = None, gentle: bool = True):
         """
@@ -279,9 +344,19 @@ class Creature:
             positive: Whether the interaction was positive (enjoyed) or negative
             item: Specific item involved (toy name, food type, etc.)
             gentle: Whether interaction was gentle (affects trust)
+
+        Returns:
+            Whether the creature received the interaction well (cranky
+            personalities sometimes react badly to positive interactions)
         """
         self.last_interaction_time = time.time()
         self.total_interactions += 1  # Phase 4: Track for evolution
+
+        if positive and random.random() < self.behavior.negative_reaction_chance:
+            positive = False
+
+        self.wake_for_player()
+        self.remember_interaction_time()
 
         # Phase 5: Determine quality of interaction
         quality = 1.0
@@ -296,6 +371,11 @@ class Creature:
             positive=positive,
             quality=quality
         )
+        # Some personalities bond faster
+        extra_bond = bond_gain * (self.behavior.bond_gain_multiplier - 1.0)
+        if extra_bond > 0:
+            self.bonding.add_bond(extra_bond, 'personality')
+            bond_gain += extra_bond
 
         # Phase 5: Process trust based on interaction quality
         self.trust.process_interaction_quality(gentle=gentle)
@@ -372,18 +452,107 @@ class Creature:
             emotional_intensity=emotional_intensity
         )
 
+        return positive
+
+    def wake_for_player(self):
+        """The player's attention wakes a sleeping pet, which then stays up for a while."""
+        if self.current_state == BehaviorState.SLEEPING:
+            self.set_state(BehaviorState.IDLE)
+        self.awake_until = time.time() + AWAKE_AFTER_INTERACTION_SECONDS
+
+    # Interaction names that are the same habit
+    HABIT_NAMES = {'training_success': 'training', 'play_ball': 'ball_play', 'feed': 'being_fed'}
+
+    def record_player_interaction(self, interaction_type: str):
+        """Count a player interaction toward the pet's experience of its player's habits."""
+        kind = self.HABIT_NAMES.get(interaction_type, interaction_type)
+        self.interaction_type_counts[kind] = self.interaction_type_counts.get(kind, 0) + 1
+        today = time.strftime('%Y-%m-%d', time.localtime())
+        if today != self.last_interaction_day:
+            self.interaction_day_count += 1
+            self.last_interaction_day = today
+
+    def player_experience(self) -> Dict[str, Any]:
+        """
+        How much of its player's habits the pet has seen.
+
+        Returns:
+            'days': separate days with player interaction;
+            'habits': interaction type -> count, for types making up at least
+            ELDER_HABIT_SHARE of all interactions (what this player regularly does)
+        """
+        total = sum(self.interaction_type_counts.values())
+        habits = {kind: count for kind, count in self.interaction_type_counts.items()
+                  if total and count / total >= ELDER_HABIT_SHARE}
+        return {'days': self.interaction_day_count, 'habits': habits}
+
+    def remember_interaction_time(self):
+        """Remember that the player interacted now, forgetting interactions older than the memory span."""
+        now = time.time()
+        self.interaction_times.append(now)
+        cutoff = now - INTERACTION_MEMORY_DAYS * 24 * 3600
+        if self.interaction_times[0] < cutoff:
+            self.interaction_times = [t for t in self.interaction_times if t >= cutoff]
+
+    def interacted_around(self, moment: float, window: float = INTERACTION_MEMORY_WINDOW) -> bool:
+        """Whether the player interacted within `window` seconds of a past moment."""
+        # interaction_times is in time order
+        i = bisect.bisect_left(self.interaction_times, moment - window)
+        return i < len(self.interaction_times) and self.interaction_times[i] <= moment + window
+
+    def recall_same_time(self, at: Optional[float] = None) -> Dict[str, float]:
+        """
+        What the pet remembers about this time of day on previous days.
+
+        Args:
+            at: Time of day to recall, as a timestamp (defaults to now)
+
+        Returns:
+            yesterday_same_time: 1.0 if the player interacted around this time yesterday
+            week_same_time: share of the last 7 days with an interaction around this time
+        """
+        now = time.time() if at is None else at
+        days = [self.interacted_around(now - d * 24 * 3600) for d in range(1, 8)]
+        return {
+            'yesterday_same_time': 1.0 if days[0] else 0.0,
+            'week_same_time': sum(days) / len(days),
+        }
+
     def is_starving(self) -> bool:
         """Check if the creature is starving (will die)."""
         return self.hunger >= STARVATION_THRESHOLD
 
-    def should_sleep(self) -> bool:
-        """Determine if creature should sleep based on energy."""
-        return self.energy < 20
+    def should_sleep(self, expecting_player: bool = False) -> bool:
+        """
+        Determine if creature should sleep, based on energy and its day/night cycle.
+
+        Low energy always means sleep (sooner for sleepy personalities). Otherwise the
+        sleep drive decides: bedtime, night, exhaustion or sleep debt send it to sleep,
+        and once asleep it sleeps through the night or until rested. A pet that was just
+        woken by its player, or expects the player soon, stays awake unless its sleep
+        drive is at its maximum.
+
+        Args:
+            expecting_player: Whether the pet expects the player within the next half hour
+        """
+        if self.energy < self.behavior.sleep_energy_threshold:
+            return True
+        if (time.time() < self.awake_until or expecting_player) and self.circadian.sleep_drive < MAX_SLEEP_DRIVE_AWAKE:
+            return False
+        hour = self.current_hour()
+        if self.current_state == BehaviorState.SLEEPING:
+            return self.circadian.should_stay_asleep(hour)
+        return self.circadian.should_sleep(hour, self.energy)[0]
+
+    @staticmethod
+    def current_hour() -> int:
+        """Local hour of day (0-23)."""
+        return time.localtime(time.time()).tm_hour
 
     def get_preferred_activity(self) -> str:
         """Get the creature's currently most preferred activity."""
         # Filter out being_fed from activities
-        activities = {k: v for k, v in self.preference_scores.items() if k != 'being_fed'}
+        activities = {k: v for k, v in self.preferences.activity_preferences.items() if k != 'being_fed'}
         if not activities:
             return 'idle'
         return max(activities.items(), key=lambda x: x[1])[0]
@@ -433,7 +602,8 @@ class Creature:
             return [0.0] * count
 
         recent = self.interaction_history[-count:]
-        type_mapping = {'feed': 0.2, 'play_ball': 0.4, 'pet': 0.6, 'talk': 0.8, 'other': 0.5}
+        type_mapping = {'feed': 0.2, 'being_fed': 0.2, 'play_ball': 0.4, 'ball_play': 0.4,
+                        'pet': 0.6, 'talk': 0.8, 'other': 0.5}
 
         encoded = []
         for interaction in recent:
@@ -474,7 +644,7 @@ class Creature:
                 activities.append(0.6)
             elif itype in ['hide_and_seek', 'hide']:
                 activities.append(0.4)
-            elif itype == 'feed':
+            elif itype in ['feed', 'being_fed']:
                 activities.append(0.2)
             else:
                 activities.append(0.0)
@@ -560,7 +730,7 @@ class Creature:
             'recent_activities': self.get_recent_activities(5),
 
             # Preferences
-            'preference_scores': self.preference_scores.copy(),
+            'preference_scores': self.preferences.activity_preferences.copy(),
 
             # State
             'current_state': self.current_state.value,
@@ -695,8 +865,14 @@ class Creature:
             'happiness': self.happiness,
             'bond': self.bonding.bond,  # Phase 5: Use bonding system
             'total_interactions': self.total_interactions,
-            'tricks_learned': len(self.get_known_tricks())
+            'tricks_learned': len(self.get_known_tricks()),
+            'decision_stability': self.decision_stability,
+            'player_experience': self.player_experience()
         }
+
+    def is_elder(self) -> bool:
+        """Elders' behavior has reached full complexity; they keep learning and adapting."""
+        return self.evolution.current_stage == EvolutionStage.ELDER
 
     def can_evolve(self) -> Tuple[bool, Optional[EvolutionStage], str]:
         """
@@ -723,7 +899,7 @@ class Creature:
             self.memory.record_interaction(
                 'evolved',
                 {
-                    'old_stage': self.evolution.evolution_history[-1]['from_stage'].value,
+                    'old_stage': self.evolution.evolution_history[-1]['from_stage'],
                     'new_stage': new_stage.value,
                     'age_hours': stats['age_hours'],
                     'bond': self.bonding.bond  # Phase 5: Use bonding system
@@ -1371,11 +1547,18 @@ class Creature:
             'last_interaction_time': self.last_interaction_time,
             'position': self.position,
             'interaction_history': self.interaction_history,
+            'interaction_times': self.interaction_times,
+            'interaction_type_counts': self.interaction_type_counts,
+            'interaction_day_count': self.interaction_day_count,
+            'last_interaction_day': self.last_interaction_day,
             # Phase 2: Memory and Training
             'memory_system': self.memory.to_dict(),
             'training_system': self.training.to_dict(),
             # Phase 4: Evolution, Element, Variant
             'evolution_system': self.evolution.to_dict(),
+            'circadian': self.circadian.to_dict(),
+            'decision_stability': self.decision_stability,
+            'network_stability': self.network_stability,
             'element_system': self.element.to_dict(),
             'variant_system': self.variant.to_dict(),
             # Phase 5: Advanced Bonding Systems
@@ -1423,6 +1606,16 @@ class Creature:
         creature.last_interaction_time = data['last_interaction_time']
         creature.position = data['position']
         creature.interaction_history = data['interaction_history']
+        creature.interaction_times = data.get('interaction_times', [])
+        creature.interaction_type_counts = data.get('interaction_type_counts', {})
+        if 'interaction_day_count' in data:
+            creature.interaction_day_count = data['interaction_day_count']
+            creature.last_interaction_day = data.get('last_interaction_day')
+        else:
+            # Older saves: the days still in the remembered interaction times
+            days = sorted({time.strftime('%Y-%m-%d', time.localtime(t)) for t in creature.interaction_times})
+            creature.interaction_day_count = len(days)
+            creature.last_interaction_day = days[-1] if days else None
 
         # Phase 2: Restore memory and training if present
         if 'memory_system' in data:
@@ -1434,6 +1627,13 @@ class Creature:
         # Phase 4: Restore evolution, element, variant if present
         if 'evolution_system' in data:
             creature.evolution = EvolutionSystem.from_dict(data['evolution_system'])
+        if 'circadian' in data:
+            creature.circadian = CircadianRhythm.from_dict(data['circadian'])
+            creature.circadian.drive_multiplier = creature.behavior.trait('sleep_frequency')
+        creature.decision_stability = data.get('decision_stability', 0.0)
+        # Saves from before per-network measurement only tracked the activity network
+        creature.network_stability = data.get('network_stability',
+                                              {'activity': creature.decision_stability})
 
         if 'element_system' in data:
             creature.element = ElementSystem.from_dict(data['element_system'])

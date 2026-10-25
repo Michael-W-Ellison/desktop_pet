@@ -97,9 +97,8 @@ class Trick:
         randomness = np.random.normal(0, 0.1)
         proficiency_gain = effective_learning_rate + randomness
 
-        # Update proficiency
-        old_proficiency = self.proficiency
-        self.proficiency = min(1.0, self.proficiency + proficiency_gain)
+        # Update proficiency (randomness can make the gain negative)
+        self.proficiency = max(0.0, min(1.0, self.proficiency + proficiency_gain))
 
         # Determine success (easier as proficiency increases)
         success_chance = self.proficiency * 0.7 + 0.1  # 10% minimum chance
@@ -158,7 +157,7 @@ class Trick:
             description=data['description'],
             success_threshold=data['success_threshold']
         )
-        trick.proficiency = data['proficiency']
+        trick.proficiency = max(0.0, min(1.0, data['proficiency']))
         trick.practice_count = data['practice_count']
         trick.success_count = data['success_count']
         trick.last_practiced = data['last_practiced']
@@ -532,6 +531,7 @@ class TrainingSystem:
         """
         if trick_name in self.learned_tricks:
             return False, f"Already know or learning '{trick_name}'"
+
 
         if trick_name not in self.STANDARD_TRICKS:
             return False, f"Unknown trick '{trick_name}'"

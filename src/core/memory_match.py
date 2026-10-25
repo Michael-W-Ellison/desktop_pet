@@ -4,8 +4,7 @@ Phase 12: Memory Match Game
 A memory matching game played with your pet.
 """
 import random
-import time
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 from enum import Enum
 from .game_base import MiniGame, GameDifficulty, GameState
 

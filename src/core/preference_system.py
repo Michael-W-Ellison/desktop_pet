@@ -5,7 +5,6 @@ Each pet develops individual preferences for toys, foods, activities, and times 
 Preferences are learned through experience and influenced by personality.
 """
 from typing import Dict, Any, Optional, Tuple, List
-import random
 import numpy as np
 
 

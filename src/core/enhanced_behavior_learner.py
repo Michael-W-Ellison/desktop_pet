@@ -7,15 +7,50 @@ Provides different AI complexity levels:
 - ADVANCED: Full system with specialized networks and RL
 - EXPERT: All features plus visualization and detailed logging
 """
+import copy
+import itertools
+import math
+import random
+import time
+from collections import deque
 import numpy as np
 from typing import Dict, Any, Optional
-from .config import AIComplexity, DEFAULT_AI_COMPLEXITY
-from .neural_network import NeuralNetwork, BehaviorLearner as SimpleBehaviorLearner
-from .advanced_network import AdvancedNeuralNetwork
+from .config import (
+    AIComplexity, DEFAULT_AI_COMPLEXITY, DECISION_STABILITY_WINDOW, DECISION_STABILITY_SMOOTHING,
+    DECISION_STABILITY_MIN_CHANGE,
+    LEARNING_RATE, SEQUENCE_LENGTH, RL_STATE_SIZE, BehaviorState, PLANNER_MIN_EXPERIENCE,
+    ANTICIPATION_THRESHOLD, MEDIUM_REPLAY_CAPACITY
+)
+from .neural_network import BehaviorLearner as SimpleBehaviorLearner
 from .lstm_network import LSTMNetwork
 from .specialized_networks import NetworkCoordinator
-from .sensory_system import CompleteSensorySystem
+from .sensory_system import CompleteSensorySystem, HidingSpotMemory
 from .reinforcement_learning import GoalOrientedBehaviorSystem
+from .expert_monitor import ExpertMonitor, bar
+from .planner import Planner
+
+# Final activity for each RL action type
+RL_ACTION_ACTIVITY = {
+    'move_to_mouse': 'mouse_chase',
+    'explore': 'explore',
+    'seek_food': 'seek_food',
+    'hide': 'hide_seek',
+    'play_ball': 'ball_play',
+    'sleep': 'sleep',
+    'move_to_center': 'move_to_center',
+    'stay_still': 'stay_still',
+    'seek_interaction': 'seek_interaction',
+    'random_wander': 'random_wander',
+}
+
+# Player interaction names used by the social network
+SOCIAL_INTERACTION_TYPE = {'being_fed': 'feed', 'ball_play': 'play_ball', 'pet': 'pet', 'talk': 'talk'}
+
+# Activity-network activity taught directly by a player interaction
+INTERACTION_ACTIVITY = {'being_fed': 'eat', 'ball_play': 'ball_play'}
+
+# Mouse closer than this (pixels) counts as the player being nearby
+PLAYER_NEARBY_DISTANCE = 200
 
 
 class EnhancedBehaviorLearner:
@@ -24,6 +59,9 @@ class EnhancedBehaviorLearner:
 
     Adapts sophistication based on user preference and creature age.
     """
+
+    # Fixed (hunger, energy, happiness, time) states used to probe activity decisions
+    STABILITY_PROBES = list(itertools.product((0.1, 0.5, 0.9), (0.2, 0.8), (0.2, 0.8), (0.0, 1.0)))
 
     def __init__(self, creature, complexity: AIComplexity = DEFAULT_AI_COMPLEXITY):
         """
@@ -55,6 +93,22 @@ class EnhancedBehaviorLearner:
         self.total_interactions = 0
         self.learning_history = []
 
+        # ADVANCED/EXPERT: the decision being carried out and the player
+        # interactions since it was made, learned from at the next decision
+        self.pending_decision = None
+        self.events_since_decision = []
+        self.hiding_spots = HidingSpotMemory()
+
+        # Most recent activity chosen (personalities with long attention spans stick with it)
+        self.last_activity = None
+
+        # Recent probe outputs per network for measuring stability (not saved)
+        self.probe_history = {}
+
+        # MEDIUM: past player interactions (input sequence, activity index, target),
+        # replayed one per decision
+        self.interaction_replay = deque(maxlen=MEDIUM_REPLAY_CAPACITY)
+
     def _init_simple(self):
         """Initialize simple AI (basic feedforward network)."""
         self.simple_learner = SimpleBehaviorLearner(self.creature)
@@ -65,12 +119,12 @@ class EnhancedBehaviorLearner:
         """Initialize medium AI (advanced network with LSTM)."""
         # Use advanced network with LSTM for activity prediction
         self.activity_network = LSTMNetwork(
-            input_size=37,  # State + sensory inputs
+            input_size=len(self.get_state_vector()),  # State + sensory inputs
             hidden_size=32,
             output_size=5,  # Activity probabilities
             num_layers=2,
-            learning_rate=0.001,
-            sequence_length=30
+            learning_rate=LEARNING_RATE,
+            sequence_length=SEQUENCE_LENGTH
         )
 
         self.network_coordinator = None
@@ -82,7 +136,10 @@ class EnhancedBehaviorLearner:
         self.network_coordinator = NetworkCoordinator()
 
         # Reinforcement learning system
-        self.rl_system = GoalOrientedBehaviorSystem()
+        self.rl_system = GoalOrientedBehaviorSystem(state_size=RL_STATE_SIZE)
+
+        # Strategic planner: chooses goals by planning the coming day
+        self.planner = Planner()
 
         self.activity_network = None
 
@@ -91,15 +148,38 @@ class EnhancedBehaviorLearner:
         # Same as advanced, but with additional monitoring
         self._init_advanced()
 
-        # Additional expert features
+        # Additional expert features: detailed log file, learning metrics,
+        # decision tracking, and the AI Insights view (get_insights)
         self.detailed_logging = True
         self.visualization_enabled = True
-        self.performance_metrics = {
-            'decisions_per_minute': [],
-            'learning_rate_history': [],
-            'reward_history': [],
-            'exploration_rate': []
-        }
+        self.monitor = ExpertMonitor()
+
+    def set_screen_size(self, screen_width: int, screen_height: int):
+        """Use the actual screen size for sensing and movement targets."""
+        if self.sensory_system:
+            self.sensory_system.set_screen_size(screen_width, screen_height)
+
+    def get_rl_state_vector(self) -> np.ndarray:
+        """
+        State for the reinforcement-learning agent: 7 creature stats + 28 sensory inputs.
+
+        Returns:
+            Vector of length RL_STATE_SIZE
+        """
+        creature = self.creature
+        stats = [
+            creature.hunger / 100.0,
+            creature.energy / 100.0,
+            creature.happiness / 100.0,
+            min(1.0, (time.time() - creature.last_interaction_time) / 3600.0),
+            creature.bonding.bond / 100.0,
+            creature.trust.trust / 100.0,
+            1.0 if creature.current_state == BehaviorState.SLEEPING else 0.0,
+        ]
+        sensory = self.sensory_system.get_complete_sensory_input(
+            creature.position[0], creature.position[1]
+        )
+        return np.concatenate([stats, sensory])
 
     def update_sensory_inputs(self, mouse_x: float, mouse_y: float):
         """Update sensory system with current mouse position."""
@@ -178,44 +258,63 @@ class EnhancedBehaviorLearner:
         """
         if self.complexity == AIComplexity.SIMPLE:
             # Use simple learner
-            return self.simple_learner.get_best_activity()
+            scores = self.simple_learner.get_activity_scores()
 
         elif self.complexity == AIComplexity.MEDIUM:
             # Use LSTM network
-            state = self.get_state_vector()
-            output = self.activity_network.predict(state)
-
+            output = self.activity_network.predict(self.get_state_vector())[0]
             activities = ['ball_play', 'mouse_chase', 'hide_and_seek', 'explore', 'idle']
-            return activities[np.argmax(output)]
+            scores = dict(zip(activities, (float(s) for s in output)))
 
         else:  # ADVANCED or EXPERT
             # Use full network coordinator
-            state_dict = self._get_complete_state_dict()
-            behavior = self.network_coordinator.decide_behavior(state_dict)
-
+            behavior = self.network_coordinator.decide_behavior(
+                self._get_complete_state_dict(), self._choose_by_personality
+            )
             return behavior.get('activity', 'idle')
+
+        return self._choose_by_personality(scores)
+
+    def _choose_by_personality(self, scores: Dict[str, float]) -> str:
+        """Pick an activity from learned scores, shaped by the creature's personality."""
+        activity = self.creature.behavior.choose_activity(scores, self.last_activity)
+        self.last_activity = activity
+        return activity
 
     def _get_complete_state_dict(self) -> Dict[str, Any]:
         """Get complete state dictionary for advanced AI."""
-        import time
-
+        quality = self._get_recent_interaction_quality()
         state_dict = {
             'hunger': self.creature.hunger,
             'energy': self.creature.energy,
             'happiness': self.creature.happiness,
             'time_since_interaction': time.time() - self.creature.last_interaction_time,
             'personality_vector': self._encode_personality(),
-            'recent_interaction_quality': self._get_recent_interaction_quality(),
-            'recent_activities': [0, 0, 0, 0, 0],  # Simplified
+            'recent_interaction_quality': quality,
+            'recent_activities': self.creature.get_recent_activities(5),
+            'recent_interaction_types': self.creature.get_recent_interaction_types(5),
+            'player_mood_estimate': float(np.mean(quality)),
+            # Memory of previous days at this time
+            **self.creature.recall_same_time(),
         }
 
-        # Add sensory information
+        # Add sensory information and movement targets
         if self.sensory_system:
-            sensory_state = self.sensory_system.get_state_dict(
-                self.creature.position[0],
-                self.creature.position[1]
-            )
+            x, y = self.creature.position[0], self.creature.position[1]
+            sensory_state = self.sensory_system.get_state_dict(x, y)
             state_dict.update(sensory_state)
+
+            mouse = (sensory_state['mouse_x'], sensory_state['mouse_y'])
+            layout = self.sensory_system.layout_analyzer
+            spot = self.hiding_spots.choose(layout.get_hiding_spots(x, y))
+            state_dict['hiding_spot'] = spot
+            state_dict['targets'] = {
+                'mouse': mouse,
+                'center': (layout.screen_width / 2, layout.screen_height / 2),
+                'hiding_spot': ((spot['x'] + spot['width'] / 2, spot['y'] + spot['height'] / 2)
+                                if spot else None),
+            }
+            state_dict['player_nearby'] = math.dist((x, y), mouse) < PLAYER_NEARBY_DISTANCE
 
         return state_dict
 
@@ -248,51 +347,48 @@ class EnhancedBehaviorLearner:
             outcome: Additional outcome information
         """
         self.total_interactions += 1
+        self.creature.record_player_interaction(activity_type)
 
         if self.complexity == AIComplexity.SIMPLE:
-            # Simple learning
-            self.simple_learner.learn_from_interaction(activity_type, enjoyed)
+            # Interactions that are not themselves activities (petting, feeding)
+            # are credited to what the pet was doing at the time
+            activities = self.simple_learner.ACTIVITIES
+            activity = activity_type if activity_type in activities else self.last_activity
+            if activity in activities:
+                self.simple_learner.learn_from_interaction(activity, enjoyed)
 
         elif self.complexity == AIComplexity.MEDIUM:
-            # LSTM learning
-            state = self.get_state_vector()
-            target = np.zeros((1, 5))
-
+            # LSTM learning; non-activity interactions credit the current activity
             activities = ['ball_play', 'mouse_chase', 'hide_and_seek', 'explore', 'idle']
-            if activity_type in activities:
-                idx = activities.index(activity_type)
+            activity = activity_type if activity_type in activities else self.last_activity
+            self.activity_network.add_to_sequence(self.get_state_vector())
+
+            if activity in activities and len(self.activity_network.sequence_buffer) >= 3:
+                # Only that activity's score is trained, so no activity crowds out the rest
+                idx = activities.index(activity)
+                target = np.zeros((1, 5))
+                mask = np.zeros((1, 5))
                 target[0, idx] = 1.0 if enjoyed else 0.2
-
-            self.activity_network.add_to_sequence(state)
-
-            if len(self.activity_network.sequence_buffer) >= 3:
+                mask[0, idx] = 1.0
                 sequence = list(self.activity_network.sequence_buffer)[-3:]
-                targets = [target] * len(sequence)
-                self.activity_network.train_sequence(sequence, targets)
+                self.activity_network.train_sequence(sequence, [target] * len(sequence), output_mask=mask)
+                # Kept for replay at later decisions
+                self.interaction_replay.append((sequence, idx, target[0, idx]))
 
         else:  # ADVANCED or EXPERT
-            # Full learning with all systems
-            state_dict = self._get_complete_state_dict()
+            # The interaction is credited to the current decision at the next decision
+            self.events_since_decision.append({'type': activity_type, 'positive': enjoyed})
 
-            # Learn with network coordinator
-            action = {'activity': activity_type}
-            outcome_dict = outcome or {'enjoyment': 1.0 if enjoyed else 0.3, 'reward': 0.5}
-
-            self.network_coordinator.learn_from_outcome(
-                state_dict,
-                action,
-                outcome_dict
-            )
-
-            # RL learning
-            if self.rl_system and outcome:
-                state_vector = self.get_state_vector()
-                self.rl_system.learn_from_outcome(
-                    state_vector,
-                    outcome.get('action_idx', 0),
-                    state_vector,  # Simplified - should be next state
-                    outcome
+            # Some interactions directly show which activity the pet enjoys
+            activity = INTERACTION_ACTIVITY.get(activity_type)
+            if activity:
+                enjoyment = (outcome or {}).get('enjoyment', 1.0 if enjoyed else 0.3)
+                self.network_coordinator.activity_net.learn_from_activity(
+                    self._get_complete_state_dict(), activity, enjoyment
                 )
+
+            if self.complexity == AIComplexity.EXPERT:
+                self.monitor.record_interaction(activity_type, enjoyed)
 
         # Record for expert mode
         if self.complexity == AIComplexity.EXPERT:
@@ -303,6 +399,146 @@ class EnhancedBehaviorLearner:
                 'timestamp': time.time()
             })
 
+        # Only player interactions advance the stage
+        self._update_decision_stability()
+
+    @staticmethod
+    def _probe_lstm(network: LSTMNetwork, inputs) -> np.ndarray:
+        """Outputs of an LSTM for each input on its own, leaving its recurrent state unchanged."""
+        saved_states = (copy.deepcopy(network.h_states), copy.deepcopy(network.c_states))
+        outputs = [network.forward_sequence([x], reset_state=True)[0][0][0] for x in inputs]
+        network.h_states, network.c_states = saved_states
+        return np.concatenate(outputs)
+
+    def _probe_network_scores(self) -> Dict[str, np.ndarray]:
+        """
+        Outputs of each learning network for fixed probe states.
+
+        SIMPLE and MEDIUM have one learning network; ADVANCED and EXPERT have four
+        here (movement, activity, emotion and the RL Q-network). The social network is
+        judged by the accuracy of its forecasts instead (_update_decision_stability).
+
+        Returns:
+            Network name -> flat array of outputs across all probe states
+        """
+        probes = self.STABILITY_PROBES
+
+        if self.complexity == AIComplexity.SIMPLE:
+            learner = self.simple_learner
+            activities = ['ball_play', 'mouse_chase', 'hide_and_seek', 'icon_interaction']
+            inputs = np.array([[hunger, energy, happiness, hours] + learner.encode_activity(activity)
+                               for hunger, energy, happiness, hours in probes
+                               for activity in activities])
+            return {'activity': learner.network.predict(inputs).ravel()}
+
+        personality = self._encode_personality()
+
+        if self.complexity == AIComplexity.MEDIUM:
+            network = self.activity_network
+            padding = [0.0] * (network.input_size - 4 - len(personality))
+            inputs = [np.array([hunger, energy, happiness, hours] + personality + padding)
+                      for hunger, energy, happiness, hours in probes]
+            return {'activity': self._probe_lstm(network, inputs)}
+
+        # ADVANCED or EXPERT: every network, each with probe inputs in its own format
+        coordinator = self.network_coordinator
+        movement_inputs = np.array([coordinator.movement_net.encode_state({
+            'pos_x': 960, 'pos_y': 540, 'target_x': hunger * 1920, 'target_y': happiness * 1080,
+            'energy': energy * 100, 'distance_to_target': hours * 500,
+            'edge_top': 540, 'edge_bottom': 540, 'edge_left': 960, 'edge_right': 960,
+            'personality_vector': personality,
+        }) for hunger, energy, happiness, hours in probes])
+        emotion_inputs = np.array([coordinator.emotion_net.encode_state({
+            'hunger': hunger * 100, 'energy': energy * 100, 'happiness': happiness * 100,
+            'recent_interaction_quality': [hours] * 10, 'personality_vector': personality,
+        }) for hunger, energy, happiness, hours in probes])
+        activity_inputs = [np.array([hunger, energy, happiness, hours] + [0.0] * 5 + [0.5] * 5)
+                           for hunger, energy, happiness, hours in probes]
+        rl_inputs = np.array([[hunger, energy, happiness, hours, 0.5, 0.5, 0.0] + [0.0] * (RL_STATE_SIZE - 7)
+                              for hunger, energy, happiness, hours in probes])
+        # The pet picks the action with the highest Q-value, so only how actions compare
+        # in each state matters; a shift of every action's value (e.g. all worse while
+        # the pet is hungry and alone) changes no decision and is not counted
+        q_values = self.rl_system.rl_agent.q_network.forward(rl_inputs)[0]
+        q_values_relative = q_values - q_values.mean(axis=1, keepdims=True)
+
+        return {
+            'movement': coordinator.movement_net.network.predict(movement_inputs).ravel(),
+            'activity': self._probe_lstm(coordinator.activity_net.network, activity_inputs),
+            'emotion': coordinator.emotion_net.network.predict(emotion_inputs).ravel(),
+            'rl': q_values_relative.ravel(),
+        }
+
+    def _update_decision_stability(self):
+        """
+        Update how settled each network is; called once per player interaction.
+
+        For each network, over the last DECISION_STABILITY_WINDOW interactions, compares
+        how far its probe outputs moved overall with the total distance they
+        travelled. A network that is still learning moves consistently in one
+        direction (ratio near 1); a settled one only jitters around the same point
+        (ratio near 0). The social network is judged by forecast accuracy instead.
+        The creature's decision stability is the least settled network.
+        """
+        stabilities = self.creature.network_stability
+        for name, scores in self._probe_network_scores().items():
+            history = self.probe_history.setdefault(name, deque(maxlen=DECISION_STABILITY_WINDOW + 1))
+            history.append(scores)
+            if len(history) <= DECISION_STABILITY_WINDOW:
+                continue
+
+            history = list(history)
+            path = sum(np.linalg.norm(b - a) for a, b in zip(history, history[1:]))
+            if path == 0:
+                continue  # Network has not changed during the window
+            # A network creeping toward a limit (e.g. an output approaching 1.0) moves
+            # in one direction forever; changes too small to alter behavior count as settled
+            path = max(path, DECISION_STABILITY_MIN_CHANGE * math.sqrt(scores.size))
+            settled = 1.0 - np.linalg.norm(history[-1] - history[0]) / path
+
+            stability = stabilities.get(name, 0.0)
+            stabilities[name] = float(stability + DECISION_STABILITY_SMOOTHING * (settled - stability))
+
+        # The social network keeps sharpening its forecasts around when sessions start and
+        # end, so its outputs never stop moving; it counts as settled once its forecasts
+        # have stopped getting more accurate
+        if self.network_coordinator:
+            settled = self.network_coordinator.social_net.accuracy_settledness()
+            if settled is not None:
+                stability = stabilities.get('social', 0.0)
+                stabilities['social'] = float(stability + DECISION_STABILITY_SMOOTHING * (settled - stability))
+
+        # Every network must have settled; one that has not been measured yet counts as 0
+        names = self.network_names()
+        self.creature.decision_stability = min(stabilities.get(name, 0.0) for name in names)
+
+    def _replay_past_interaction(self):
+        """
+        MEDIUM: train once on a stored past interaction (one is chosen at random).
+
+        Gives the LSTM a training step at every decision, as ADVANCED's networks
+        get, while still learning only from what the player has done.
+        """
+        if not self.interaction_replay:
+            return
+        sequence, idx, value = random.choice(self.interaction_replay)
+        output_size = self.activity_network.output_size
+        target = np.zeros((1, output_size))
+        mask = np.zeros((1, output_size))
+        target[0, idx] = value
+        mask[0, idx] = 1.0
+        # Train without disturbing the recurrent state used for live decisions
+        saved_states = (copy.deepcopy(self.activity_network.h_states),
+                        copy.deepcopy(self.activity_network.c_states))
+        self.activity_network.train_sequence(sequence, [target] * len(sequence), output_mask=mask)
+        self.activity_network.h_states, self.activity_network.c_states = saved_states
+
+    def network_names(self):
+        """Names of the networks whose stability drives evolution at this level."""
+        if self.complexity in (AIComplexity.ADVANCED, AIComplexity.EXPERT):
+            return ['movement', 'activity', 'emotion', 'social', 'rl']
+        return ['activity']
+
     def get_behavioral_decision(self) -> Dict[str, Any]:
         """
         Get complete behavioral decision.
@@ -311,30 +547,246 @@ class EnhancedBehaviorLearner:
             Dictionary with activity, movement, emotional state, etc.
         """
         if self.complexity in [AIComplexity.SIMPLE, AIComplexity.MEDIUM]:
-            # Simplified decision
-            activity = self.choose_activity()
-            return {
-                'activity': activity,
-                'velocity_x': 0,
-                'velocity_y': 0,
-                'should_move': False
-            }
+            if self.complexity == AIComplexity.MEDIUM:
+                self._replay_past_interaction()
+            # Activity only; the pet manager handles movement
+            return {'activity': self.choose_activity()}
 
-        else:  # ADVANCED or EXPERT
-            # Full decision with all systems
-            state_dict = self._get_complete_state_dict()
+        # ADVANCED or EXPERT: full decision with all systems
+        state_dict = self._get_complete_state_dict()
+        rl_state = self.get_rl_state_vector()
 
-            # Get decision from network coordinator
-            decision = self.network_coordinator.decide_behavior(state_dict)
+        # Learn from how the previous decision turned out
+        self._learn_from_previous_decision(state_dict, rl_state)
 
-            # Optionally use RL to refine decision
-            if self.rl_system:
-                state_vector = self.get_state_vector()
-                rl_decision = self.rl_system.execute_goal(state_vector, state_dict)
-                decision['rl_goal'] = rl_decision.get('goal')
-                decision['rl_action'] = rl_decision.get('action')
+        # Emotion -> social -> activity -> movement networks
+        decision = self.network_coordinator.decide_behavior(state_dict, self._choose_by_personality)
+        modifiers = decision['emotional_modifiers']
+        # Emotional desire for company, scaled by how social the personality is
+        state_dict['interaction_desire'] = (modifiers['interaction_desire']
+                                            * self.creature.behavior.interaction_desire)
 
-            return decision
+        # Once experienced, the planner picks the goal that does best over the coming day
+        goal_source = 'rules'
+        if self.planner.ready:
+            now = time.time()
+            if self.planner.needs_replan(now):
+                self.planner.make_plan(
+                    {key: state_dict[key] for key in ('hunger', 'energy', 'happiness')},
+                    now, self._forecast_player
+                )
+            rule_goal = self.rl_system.rule_goal(state_dict)
+            state_dict['planned_goal'] = self.planner.choose_goal(rule_goal)
+            if state_dict['planned_goal'] != rule_goal:
+                goal_source = 'planner'
+
+        # The RL agent works toward the current goal; its action is carried out
+        # when it serves that goal, otherwise the networks' choice stands
+        rl_decision = self.rl_system.execute_goal(rl_state, state_dict)
+        decision.update({
+            'rl_goal': rl_decision['goal'],
+            'rl_action': rl_decision['action'],
+            'rl_q_value': rl_decision['q_value'],
+            'goal_source': goal_source,
+            'decided_by': 'networks',
+        })
+        if rl_decision['serves_goal']:
+            activity = RL_ACTION_ACTIVITY[rl_decision['action']['type']]
+            if activity != decision['activity']:
+                decision['activity'] = activity
+                decision.update(self.network_coordinator.plan_movement(state_dict, activity, modifiers))
+            decision['decided_by'] = 'rl'
+            self.last_activity = activity
+
+        decision['target'] = self.network_coordinator.get_target(state_dict, decision['activity'])
+
+        self.pending_decision = {
+            'state': state_dict,
+            'rl_state': rl_state,
+            'rl_action_idx': rl_decision['action_idx'],
+            'goal': rl_decision['goal'],
+            'time': time.time(),
+            'decision': decision,
+        }
+        self.events_since_decision = []
+
+        if self.complexity == AIComplexity.EXPERT:
+            self.monitor.record_decision(decision)
+
+        return decision
+
+    def get_insights(self, decision: Optional[Dict[str, Any]] = None) -> str:
+        """
+        Text view of what the AI is doing (EXPERT mode's AI Insights).
+
+        Args:
+            decision: Most recent decision, if any
+
+        Returns:
+            Multi-line description with bars for emotions, Q-values and metrics
+        """
+        lines = [f"Decision stability: {bar(self.creature.decision_stability)} "
+                 f"{self.creature.decision_stability:.0%} (least settled network)"]
+        for name in self.network_names():
+            value = self.creature.network_stability.get(name, 0.0)
+            label = 'RL' if name == 'rl' else name.capitalize()
+            lines.append(f"  {label:<12} {bar(value)} {value:.0%}")
+        lines.append(f"Stage: {self.creature.evolution.get_stage_name()}")
+        lines.append(f"Interactions learned from: {self.total_interactions}")
+
+        if self.complexity not in (AIComplexity.ADVANCED, AIComplexity.EXPERT):
+            return "\n".join(lines)
+
+        coordinator, agent = self.network_coordinator, self.rl_system.rl_agent
+        emotions = coordinator.emotion_net
+        lines += ["", "Emotions:"]
+        for i, name in enumerate(emotions.emotion_names):
+            value = float(emotions.current_emotions[i])
+            lines.append(f"  {name.capitalize():<12} {bar(value)} {value:.2f}")
+
+        if decision:
+            prediction = decision.get('player_prediction', {})
+            lines += ["", f"Activity: {decision.get('activity')} (decided by {decision.get('decided_by')})",
+                      f"Goal: {decision.get('rl_goal')}",
+                      f"Player interaction expected: {prediction.get('interaction_probability', 0):.0%}"]
+
+        q_values, _ = agent.q_network.forward(self.get_rl_state_vector())
+        q_values = q_values[0]
+        low, high = float(np.min(q_values)), float(np.max(q_values))
+        if self.planner.ready and self.planner.plan:
+            lines += ["", "Plan for the coming day:"] + [f"  {line}" for line in self.planner.describe()]
+        else:
+            lines += ["", f"Planner: learning ({self.planner.model.experience} of "
+                          f"{PLANNER_MIN_EXPERIENCE} decisions observed); goals follow fixed rules"]
+
+        lines += ["", f"Action values (exploration {agent.epsilon:.0%}):"]
+        for i, q in enumerate(q_values):
+            name = agent.get_action_description(i)['name']
+            scaled = (q - low) / (high - low) if high > low else 0.5
+            lines.append(f"  {name:<24} {bar(scaled, 12)} {q:+.2f}")
+
+        if self.complexity == AIComplexity.EXPERT:
+            lines += ["", "Learning metrics:"]
+            for name, values in self.monitor.summary().items():
+                if values['latest'] is None:
+                    lines.append(f"  {name}: no data yet")
+                else:
+                    lines.append(f"  {name}: latest {values['latest']:.4g}, "
+                                 f"average {values['average']:.4g} ({values['count']} samples)")
+            lines += ["", "Recent decisions:"]
+            for entry in self.monitor.recent_decisions(5):
+                lines.append(f"  {time.strftime('%H:%M:%S', time.localtime(entry['time']))} "
+                             f"{entry['activity']} via {entry['decided_by']} (goal {entry['goal']})")
+
+        return "\n".join(lines)
+
+    def expects_player(self) -> bool:
+        """Whether the pet expects the player within the next half hour (ADVANCED/EXPERT)."""
+        if self.complexity not in (AIComplexity.ADVANCED, AIComplexity.EXPERT):
+            return False
+        return self._forecast_player(time.time()) > ANTICIPATION_THRESHOLD
+
+    def _forecast_player(self, when: float) -> float:
+        """Forecast P(player interacts within 30 minutes) at a future time, for the planner."""
+        social = self.network_coordinator.social_net
+        state = {
+            'time_since_interaction': max(0.0, when - self.creature.last_interaction_time),
+            'recent_interaction_types': self.creature.get_recent_interaction_types(5),
+            'player_mood_estimate': float(np.mean(self._get_recent_interaction_quality())),
+            **self.creature.recall_same_time(at=when),
+        }
+        return social.predict_player_behavior(state, when)['interaction_probability']
+
+    def _expected_emotions(self, state: Dict[str, Any]) -> Dict[str, float]:
+        """
+        Emotions the situation calls for, used to train the emotion network.
+
+        Args:
+            state: Complete state dictionary
+
+        Returns:
+            Target intensity (0-1) for each emotion
+        """
+        hunger = state['hunger'] / 100.0
+        energy = state['energy'] / 100.0
+        happiness = state['happiness'] / 100.0
+        quality = float(np.mean(state['recent_interaction_quality']))
+        hours_alone = min(1.0, state['time_since_interaction'] / 3600.0)
+        recent_types = self.creature.interaction_history[-5:]
+        play_share = (sum(1 for i in recent_types if i.get('type') == 'ball_play') / len(recent_types)
+                      if recent_types else 0.0)
+
+        def clip(value):
+            return float(min(1.0, max(0.0, value)))
+
+        # Personality sets how strongly the pet feels each of these
+        behavior = self.creature.behavior
+        return {
+            'joy': clip(happiness * (0.5 + 0.5 * quality) * behavior.joy_scale),
+            'excitement': clip(energy * (0.4 + 0.6 * play_share)),
+            'contentment': clip((1.0 - hunger) * happiness),
+            'anxiety': clip((max(0.0, hunger - 0.5) * 1.5 + (1.0 - quality) * 0.3) * behavior.anxiety_scale),
+            'loneliness': clip(hours_alone * behavior.loneliness_scale),
+        }
+
+    def _learn_from_previous_decision(self, state_after: Dict[str, Any], rl_state_after: np.ndarray):
+        """
+        Learn from the outcome of the previous decision (ADVANCED/EXPERT).
+
+        Args:
+            state_after: Complete state now
+            rl_state_after: RL state now
+        """
+        pending, events = self.pending_decision, self.events_since_decision
+        self.pending_decision = None
+        if pending is None:
+            return
+
+        state_before = pending['state']
+        positive = any(e['positive'] for e in events)
+        before = {key: state_before[key] for key in ('hunger', 'energy', 'happiness')}
+        after = {
+            'hunger': state_after['hunger'],
+            'energy': state_after['energy'],
+            'happiness': state_after['happiness'],
+            'alive': not self.creature.is_starving(),
+            'player_interacted': bool(events),
+            'interaction_positive': positive,
+            'ball_caught': any(e['type'] == 'ball_play' and e['positive'] for e in events),
+        }
+
+        # The planner's world model learns what pursuing this goal did
+        forecast = pending['decision'].get('player_prediction', {}).get('interaction_probability', 0.0)
+        self.planner.model.observe(pending['goal'], time.time() - pending['time'], before, after,
+                                   bool(events), positive, forecast)
+
+        # Reinforcement learning from the real transition
+        reward = self.rl_system.learn_from_outcome(
+            pending['rl_state'], pending['rl_action_idx'], rl_state_after, before, after
+        )
+        reward01 = 1.0 / (1.0 + math.exp(-reward / 2.0))
+
+        # Specialized networks
+        last_event = events[-1] if events else None
+        self.network_coordinator.learn_from_outcome(state_before, pending['decision'], {
+            'reward01': reward01,
+            'expected_emotions': self._expected_emotions(state_after),
+            'interaction_type': (SOCIAL_INTERACTION_TYPE.get(last_event['type'], last_event['type'])
+                                 if last_event else None),
+            'positive': positive,
+        })
+
+        # Hiding spots earn the reward of the time spent hiding there
+        if pending['decision']['activity'] == 'hide_seek' and state_before.get('hiding_spot'):
+            self.hiding_spots.record(state_before['hiding_spot'], reward01)
+
+        # Stability (and so evolution) is only measured at player interactions, so
+        # learning from decisions alone does not advance the pet's stage
+
+        if self.complexity == AIComplexity.EXPERT:
+            agent = self.rl_system.rl_agent
+            self.monitor.record_learning(reward, agent.q_network.optimizer.learning_rate,
+                                         agent.epsilon, self.creature.decision_stability)
 
     def to_dict(self) -> Dict[str, Any]:
         """Save learner state."""
@@ -348,6 +800,10 @@ class EnhancedBehaviorLearner:
 
         elif self.complexity == AIComplexity.MEDIUM:
             data['activity_network'] = self.activity_network.to_dict()
+            data['interaction_replay'] = [
+                {'sequence': [np.round(x, 5).tolist() for x in sequence], 'activity': idx, 'target': value}
+                for sequence, idx, value in self.interaction_replay
+            ]
 
         else:  # ADVANCED or EXPERT
             if self.network_coordinator:
@@ -355,6 +811,9 @@ class EnhancedBehaviorLearner:
 
             if self.rl_system:
                 data['rl_system'] = self.rl_system.rl_agent.to_dict()
+
+            data['hiding_spots'] = self.hiding_spots.to_dict()
+            data['planner'] = self.planner.to_dict()
 
         if self.complexity == AIComplexity.EXPERT:
             data['learning_history'] = self.learning_history[-100:]  # Last 100 only
@@ -376,21 +835,34 @@ class EnhancedBehaviorLearner:
             learner.simple_learner = SimpleBehaviorLearner.from_dict(creature, data['simple_learner'])
 
         elif complexity == AIComplexity.MEDIUM and 'activity_network' in data:
-            learner.activity_network = LSTMNetwork.from_dict(data['activity_network'])
+            saved_network = LSTMNetwork.from_dict(data['activity_network'])
+            # Saves from older versions used an input size that did not match
+            # the state vector; keep the freshly sized network in that case
+            if saved_network.input_size == learner.activity_network.input_size:
+                saved_network.set_sequence_length(SEQUENCE_LENGTH)
+                learner.activity_network = saved_network
+                for item in data.get('interaction_replay', []):
+                    learner.interaction_replay.append(
+                        ([np.array(x) for x in item['sequence']], item['activity'], item['target']))
 
-        else:  # ADVANCED or EXPERT
+        elif complexity in (AIComplexity.ADVANCED, AIComplexity.EXPERT):
+            if 'hiding_spots' in data:
+                learner.hiding_spots = HidingSpotMemory.from_dict(data['hiding_spots'])
+            if 'planner' in data:
+                learner.planner = Planner.from_dict(data['planner'])
+
             if 'network_coordinator' in data:
                 learner.network_coordinator = NetworkCoordinator.from_dict(data['network_coordinator'])
 
             if 'rl_system' in data:
                 from .reinforcement_learning import ReinforcementLearningAgent
-                learner.rl_system.rl_agent = ReinforcementLearningAgent.from_dict(data['rl_system'])
+                saved_agent = ReinforcementLearningAgent.from_dict(data['rl_system'])
+                # Saves from older versions used a state size that did not match
+                # the state vector; keep the freshly sized agent in that case
+                if saved_agent.state_size == learner.rl_system.rl_agent.state_size:
+                    learner.rl_system.rl_agent = saved_agent
 
         if complexity == AIComplexity.EXPERT and 'learning_history' in data:
             learner.learning_history = data['learning_history']
 
         return learner
-
-
-# Import time at module level
-import time

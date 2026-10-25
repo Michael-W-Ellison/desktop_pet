@@ -34,7 +34,7 @@
 
 - **Double-click egg** → Hatch creature
 - **Left-click & drag** → Move pet around
-- **Right-click pet** → Menu (Feed, Play, Stats, Exit)
+- **Right-click pet** → Menu (Feed, Play, Train, Stats, Exit)
 - **System tray icon** → Quick access when pet is hidden
 
 ## Your First 5 Minutes
@@ -55,7 +55,20 @@
 💡 **Interact often!**
 - Pets learn from interactions
 - More interaction = happier pet
+- Happiness starts falling after 5 minutes without interaction and reaches 0 after an hour
 - Each pet has unique preferences
+
+🌱 **Growing up**
+- Pets evolve from Baby → Juvenile → Adult → Elder as their learned behavior settles
+- Interactions are what train your pet's neural network, so the more you interact, the sooner it grows up
+- To become an Elder, a pet must also know your habits: interactions on at least 7 separate days, and
+  at least 30 of each kind of interaction you regularly use (one that makes up 5% or more of your interactions)
+- An Elder's behavior has reached full complexity, and it keeps adapting as things change
+
+🎓 **Train tricks!**
+- Right-click → "Train" → "Learn New Trick" to start a trick, then pick it from "Train" to practice
+- Each practice shows the result and the trick's proficiency
+- Some personalities refuse to practice more often than others
 
 ## Troubleshooting
 

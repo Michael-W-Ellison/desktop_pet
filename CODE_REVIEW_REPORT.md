@@ -7,6 +7,19 @@
 
 ---
 
+## Addendum (October 21, 2026 follow-up review)
+
+The assessment below predates a follow-up review that found further runtime defects, now fixed:
+
+1. **Startup crash with Pillow 10+** – `PIL.ImageQt` no longer supports PyQt5, so `ImageQt.ImageQt(...)` raised `AttributeError` in `src/main.py` and `src/ui/pet_window.py`. Replaced with `ui.image_utils.pil_to_qimage`.
+2. **`TypeError` in mouse tracking** – `PetWindow.update_mouse_tracking` passed cursor coordinates to `PetManager.update_sensory_inputs()`, which took no arguments. The method now accepts optional coordinates.
+3. **`NameError`s in `src/core/reinforcement_learning.py`** – `hunger_before` was undefined in `calculate_reward`, and `from_dict` iterated with the wrong loop variable, so loading ADVANCED/EXPERT saves failed.
+4. **Missing `Tuple` import** in `src/core/music_system.py`.
+5. **Outdated test** – `test_phase4.py` referenced the removed `Creature.bond` attribute.
+6. **Save file location** – `DATA_FILE` was relative to the current working directory; it is now resolved against the application directory.
+
+---
+
 ## Executive Summary
 
 A thorough code review was conducted on the Desktop Pet codebase to identify potential runtime issues. **Three critical issues were found and fixed**, all related to import inconsistencies that would have caused `ImportError` exceptions at runtime.

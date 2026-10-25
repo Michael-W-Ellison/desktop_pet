@@ -1,13 +1,13 @@
 """
 Transparent overlay window for displaying the desktop pal.
 """
-from PyQt5.QtWidgets import QWidget, QLabel, QMenu, QAction, QApplication
-from PyQt5.QtCore import Qt, QTimer, QPoint, QRect
-from PyQt5.QtGui import QPixmap, QCursor, QPainter, QImage
-from PIL import ImageQt
-import random
+from PyQt5.QtWidgets import QWidget, QLabel, QMenu, QAction, QApplication, QToolTip
+from PyQt5.QtCore import Qt, QTimer, QPoint
+from PyQt5.QtGui import QPixmap, QCursor
+from PIL import Image
 from ui.sprite_generator import SpriteGenerator
-from core.config import BehaviorState, PET_SIZE, FPS, ANIMATION_UPDATE_INTERVAL
+from ui.image_utils import pil_to_qimage
+from core.config import PET_SIZE, FPS, ANIMATION_UPDATE_INTERVAL, STAGE_SIZE_MULTIPLIERS, AIComplexity
 
 
 class PetWindow(QWidget):
@@ -75,15 +75,22 @@ class PetWindow(QWidget):
         else:
             # Show creature
             creature = self.pet_manager.creature
-            sprite = SpriteGenerator.generate_creature_sprite(
+            # Scale by evolution stage so the largest stage fills the window
+            stage_multiplier = (creature.evolution.get_stage_multiplier()
+                                / max(STAGE_SIZE_MULTIPLIERS.values()))
+            body = SpriteGenerator.generate_creature_sprite(
                 creature.creature_type,
                 creature.color_palette,
                 PET_SIZE,
-                creature.facing_right
+                creature.facing_right,
+                stage_multiplier=stage_multiplier
             )
+            # Place the scaled sprite bottom-centred on a window-sized canvas
+            sprite = Image.new('RGBA', PET_SIZE, (0, 0, 0, 0))
+            sprite.paste(body, ((PET_SIZE[0] - body.width) // 2, PET_SIZE[1] - body.height), body)
 
         # Convert PIL Image to QPixmap
-        qimage = ImageQt.ImageQt(sprite)
+        qimage = pil_to_qimage(sprite)
         pixmap = QPixmap.fromImage(qimage)
         self.sprite_label.setPixmap(pixmap)
 
@@ -176,32 +183,77 @@ class PetWindow(QWidget):
 
         if self.pet_manager.creature:
             # Creature is alive - show interaction options
-            feed_action = QAction("Feed", self)
+            feed_action = QAction("Feed", menu)
             feed_action.triggered.connect(self.pet_manager.feed_creature)
             menu.addAction(feed_action)
 
-            play_action = QAction("Play with Ball", self)
+            play_action = QAction("Play with Ball", menu)
             play_action.triggered.connect(self.pet_manager.play_ball)
             menu.addAction(play_action)
 
+            self.add_train_menu(menu)
+
             menu.addSeparator()
 
-            stats_action = QAction("Show Stats", self)
+            stats_action = QAction("Show Stats", menu)
             stats_action.triggered.connect(self.pet_manager.show_stats)
             menu.addAction(stats_action)
+
+            if self.pet_manager.ai_complexity == AIComplexity.EXPERT:
+                insights_action = QAction("AI Insights", menu)
+                insights_action.triggered.connect(self.pet_manager.show_ai_insights)
+                menu.addAction(insights_action)
         else:
             # Egg state
-            hatch_action = QAction("Hatch Egg", self)
+            hatch_action = QAction("Hatch Egg", menu)
             hatch_action.triggered.connect(lambda: (self.pet_manager.hatch_egg(), self.update_sprite()))
             menu.addAction(hatch_action)
 
         menu.addSeparator()
 
-        exit_action = QAction("Exit", self)
+        exit_action = QAction("Exit", menu)
         exit_action.triggered.connect(self.pet_manager.exit_application)
         menu.addAction(exit_action)
 
         menu.exec_(position)
+
+    def add_train_menu(self, menu: QMenu):
+        """Add the Train submenu: tricks in progress plus tricks not yet started."""
+        training = self.pet_manager.creature.training
+        train_menu = menu.addMenu("Train")
+
+        for name, trick in sorted(training.learned_tricks.items()):
+            if trick.is_mastered():
+                status = "mastered"
+            elif trick.can_perform():
+                status = "known"
+            else:
+                status = "learning"
+            action = QAction(f"{self.trick_label(name)} ({trick.proficiency:.0%}, {status})", train_menu)
+            action.triggered.connect(lambda checked=False, n=name: self.train_trick(n))
+            train_menu.addAction(action)
+
+        new_tricks = [name for name in sorted(training.STANDARD_TRICKS) if name not in training.learned_tricks]
+        if new_tricks:
+            if training.learned_tricks:
+                train_menu.addSeparator()
+            learn_menu = train_menu.addMenu("Learn New Trick")
+            for name in new_tricks:
+                difficulty = training.STANDARD_TRICKS[name].difficulty.name.lower()
+                action = QAction(f"{self.trick_label(name)} ({difficulty})", learn_menu)
+                action.triggered.connect(lambda checked=False, n=name: self.train_trick(n))
+                learn_menu.addAction(action)
+
+    @staticmethod
+    def trick_label(trick_name: str) -> str:
+        """Format a trick name for display, e.g. 'play_dead' -> 'Play Dead'."""
+        return trick_name.replace('_', ' ').title()
+
+    def train_trick(self, trick_name: str):
+        """Practice a trick and show the result next to the pet."""
+        message = self.pet_manager.train_trick(trick_name)
+        if message:
+            QToolTip.showText(self.mapToGlobal(QPoint(0, 0)), message, self)
 
 
 class BallWindow(QWidget):
@@ -245,7 +297,7 @@ class BallWindow(QWidget):
 
         # Generate ball sprite
         sprite = SpriteGenerator.generate_ball_sprite(self.size)
-        qimage = ImageQt.ImageQt(sprite)
+        qimage = pil_to_qimage(sprite)
         pixmap = QPixmap.fromImage(qimage)
 
         label = QLabel(self)

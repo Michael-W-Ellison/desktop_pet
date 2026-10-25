@@ -11,10 +11,10 @@ Tests all 5 Phase 11 features:
 import sys
 sys.path.insert(0, '/home/user/desktop_pet/src')
 
-from core.journal_system import JournalSystem, JournalEntry, EntryMood, EntryCategory
-from core.screenshot_system import ScreenshotSystem, Screenshot, PhotoFilter, PhotoFrame
-from core.photo_album import PhotoAlbumSystem, PhotoAlbum, AlbumType
-from core.memory_book import MemoryBookSystem, Milestone, MilestoneType, ScrapbookPage
+from core.journal_system import JournalSystem, EntryMood, EntryCategory
+from core.screenshot_system import ScreenshotSystem, PhotoFilter, PhotoFrame
+from core.photo_album import PhotoAlbumSystem, AlbumType
+from core.memory_book import MemoryBookSystem, MilestoneType
 import time
 
 print("=" * 60)
@@ -81,7 +81,7 @@ first_entry_id = list(journal.entries.keys())[0]
 
 # Mark as favorite
 journal.toggle_favorite(first_entry_id)
-print(f"Marked first entry as favorite")
+print("Marked first entry as favorite")
 
 # Read entry
 entry = journal.get_entry(first_entry_id)
@@ -89,7 +89,7 @@ print(f"Read entry '{entry.title}' (read {entry.read_count} times)")
 
 # Edit entry
 journal.edit_entry(first_entry_id, title="My First Day with Fluffy!")
-print(f"Edited entry title")
+print("Edited entry title")
 
 # Search entries
 print("\nSearching journal...")
@@ -113,7 +113,7 @@ print(f"Recent entries: {len(recent)}")
 
 # Journal statistics
 stats = journal.get_statistics()
-print(f"\nJournal statistics:")
+print("\nJournal statistics:")
 print(f"  Total entries: {stats['total_entries']}")
 print(f"  Total words: {stats['total_words']}")
 print(f"  Average words per entry: {stats['average_words_per_entry']:.1f}")
@@ -200,19 +200,19 @@ first_photo_id = list(screenshots.screenshots.keys())[0]
 
 # Toggle favorite
 screenshots.toggle_favorite(first_photo_id)
-print(f"\nMarked first photo as favorite")
+print("\nMarked first photo as favorite")
 
 # Add caption
 screenshots.add_caption(first_photo_id, "Updated caption: Fluffy's very first photo!")
-print(f"Updated photo caption")
+print("Updated photo caption")
 
 # Apply filter
 screenshots.apply_filter(first_photo_id, PhotoFilter.SEPIA)
-print(f"Applied sepia filter")
+print("Applied sepia filter")
 
 # Apply frame
 screenshots.apply_frame(first_photo_id, PhotoFrame.POLAROID)
-print(f"Applied polaroid frame")
+print("Applied polaroid frame")
 
 # Search screenshots
 results = screenshots.search_screenshots("fluffy")
@@ -232,7 +232,7 @@ print(f"Recent screenshots: {len(recent_photos)}")
 
 # Screenshot statistics
 stats = screenshots.get_statistics()
-print(f"\nScreenshot statistics:")
+print("\nScreenshot statistics:")
 print(f"  Total screenshots: {stats['total_screenshots']}")
 print(f"  Total favorites: {stats['total_favorites']}")
 print(f"  Total file size: {stats['total_file_size_mb']:.2f} MB")
@@ -328,7 +328,7 @@ print(f"Created event album: '{event.name}'")
 
 # Album statistics
 stats = albums.get_statistics()
-print(f"\nAlbum system statistics:")
+print("\nAlbum system statistics:")
 print(f"  Total albums: {stats['total_albums']}")
 print(f"  Total photos in albums: {stats['total_photos_in_albums']}")
 print(f"  Average photos per album: {stats['average_photos_per_album']:.1f}")
@@ -442,7 +442,7 @@ for entry in timeline[:3]:
 # Export memory book
 print("\nExporting memory book...")
 export = memory_book.export_memory_book()
-print(f"Export data:")
+print("Export data:")
 print(f"  Pet name: {export['pet_name']}")
 print(f"  Total milestones: {export['total_milestones']}")
 print(f"  Total scrapbook pages: {export['total_scrapbook_pages']}")
@@ -450,7 +450,7 @@ print(f"  Timeline entries: {len(export['timeline'])}")
 
 # Memory book statistics
 stats = memory_book.get_statistics()
-print(f"\nMemory book statistics:")
+print("\nMemory book statistics:")
 print(f"  Total milestones: {stats['total_milestones']}")
 print(f"  Total scrapbook pages: {stats['total_scrapbook_pages']}")
 print(f"  Uncelebrated milestones: {stats['uncelebrated_milestones']}")

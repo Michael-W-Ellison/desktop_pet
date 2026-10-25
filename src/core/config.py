@@ -2,16 +2,26 @@
 Configuration and constants for the Desktop Pal application.
 """
 import os
+import sys
 from enum import Enum
+
+
+def _get_app_dir() -> str:
+    """Directory containing the executable (frozen) or the project root (script)."""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 # Application settings
 APP_NAME = "Desktop Pal"
 VERSION = "1.0.0"
-DATA_FILE = "pet_data.json"
+APP_DIR = _get_app_dir()
+DATA_FILE = os.path.join(APP_DIR, "pet_data.json")
 
 # Window settings
-PET_SIZE = (128, 128)
-TOY_SIZE = (64, 64)
+PET_SIZE = (192, 192)
+TOY_SIZE = (96, 96)
 FPS = 30
 ANIMATION_SPEED = 150  # milliseconds per frame
 
@@ -26,6 +36,17 @@ HUNGER_DECAY_RATE = 0.1  # Hunger increases by this amount per minute
 STARVATION_THRESHOLD = 100  # Creature dies when hunger reaches this
 MAX_HUNGER = 100
 FEED_AMOUNT = 30  # How much feeding reduces hunger
+HAPPINESS_NEGLECT_GRACE_SECONDS = 300  # Happiness starts falling after 5 minutes without interaction
+HAPPINESS_NEGLECT_ZERO_SECONDS = 3600  # Full happiness reaches 0 after 1 hour without interaction
+HAPPINESS_NEGLECT_DECAY_RATE = 100 / (HAPPINESS_NEGLECT_ZERO_SECONDS - HAPPINESS_NEGLECT_GRACE_SECONDS)  # Per second
+SLEEP_ENERGY_THRESHOLD = 20  # Energy below which the pet sleeps (scaled by the sleep_frequency trait)
+AWAKE_AFTER_INTERACTION_SECONDS = 30 * 60  # A pet woken by its player stays up this long
+MAX_SLEEP_DRIVE_AWAKE = 95  # Sleep drive above which the pet sleeps even when woken or expecting the player
+
+# Personality-driven activity choice (see personality_behavior.py)
+ACTIVITY_CHOICE_TEMPERATURE = 0.1  # Lower = learned scores matter more relative to frequency traits
+BASE_ACTIVITY_PERSISTENCE = 0.3  # Chance of keeping the current activity (scaled by attention traits)
+BASE_RANDOM_ACTIVITY_CHANCE = 0.05  # Chance of a random activity (scaled by unpredictability traits)
 
 # Learning settings - Basic Network
 LEARNING_RATE = 0.001  # Lower for Adam optimizer
@@ -43,6 +64,57 @@ ENHANCED_NETWORK_LAYERS = [64, 32, 16, 8]  # Larger, deeper network
 USE_DROPOUT = True  # Prevent overfitting
 DROPOUT_RATE = 0.25  # 25% dropout
 USE_BATCH_NORMALIZATION = True  # Stable training
+USE_RESIDUAL_CONNECTIONS = True  # Skip connections between equal-sized layers
+TRAINING_BATCH_SIZE = 16  # Mini-batch size for feedforward networks (batch norm needs > 1)
+
+# Learning rate scheduling (exponential decay per training step, with a floor)
+LEARNING_RATE_DECAY = 0.00001  # Reaches the floor after about 230,000 updates
+MIN_LEARNING_RATE_FRACTION = 0.1  # Learning rate never drops below this fraction of its start
+
+# LSTM memory
+SEQUENCE_LENGTH = 50  # How many interactions to remember
+
+# Social network: predicts whether the player will interact within this many seconds
+SOCIAL_PREDICTION_HORIZON = 30 * 60
+SOCIAL_LEARNING_RATE = 0.003  # Higher than LEARNING_RATE so the schedule is learned within days
+# Labelled moments kept for replay (7 days at one decision every 5 s; not saved). Training on
+# random past moments instead of the newest stops long runs without the player overwriting
+# what sessions are like
+SOCIAL_REPLAY_CAPACITY = 7 * 24 * 720
+# The social forecast is blended toward the player's average visit rate by as much as its
+# past accuracy shows is best, so a player without a pattern gets about the average rate.
+# Labelled moments the record spans (decays with this time constant, about 4 days at
+# one decision every 5 s), and how many it needs before blending
+SOCIAL_CALIBRATION_MOMENTS = 75000
+SOCIAL_CALIBRATION_MIN_MOMENTS = 100
+# The social network counts as settled once its forecasts (as used, after blending) have
+# stopped getting more accurate: each hour of the last 24 is compared with the same hour the
+# day before. Drops in mean squared error smaller than SOCIAL_ACCURACY_MIN_IMPROVEMENT do not
+# count; an improvement beyond that by this many standard errors scores 0, none scores 1
+SOCIAL_ACCURACY_SIGNIFICANCE = 3.0
+SOCIAL_ACCURACY_MIN_IMPROVEMENT = 0.005
+
+# Memory of when the player interacted on previous days
+INTERACTION_MEMORY_DAYS = 14
+INTERACTION_MEMORY_WINDOW = 30 * 60  # "Around this time" means within 30 minutes
+
+# Expected player interaction above which a content pet goes to meet the player
+ANTICIPATION_THRESHOLD = 0.5
+
+# Strategic planner (ADVANCED/EXPERT, see planner.py)
+PLANNER_STEP_MINUTES = 15  # Length of one plan step
+PLANNER_HORIZON_HOURS = 24  # How far ahead the pet plans
+PLANNER_DISCOUNT = 0.99  # Weight of each later step relative to the one before
+PLANNER_MIN_EXPERIENCE = 500  # Decision steps observed before plans replace the goal rules
+PLANNER_REPLAN_SECONDS = 5 * 60  # How often the plan is recomputed
+PLANNER_MARGIN = 1.0  # How much better (in reward over the horizon) a plan must be to override the goal rules
+
+# Reinforcement learning
+GAMMA = 0.95  # How much to value future rewards (0-1)
+EPSILON_DECAY = 0.995  # How fast to reduce exploration
+EPSILON_MIN = 0.1  # Minimum exploration rate
+RL_REPLAY_CAPACITY = 10000  # Past experiences kept for replay
+RL_STATE_SIZE = 35  # 7 creature stats + 28 sensory inputs
 
 # AI Complexity levels (for different age groups)
 class AIComplexity(Enum):
@@ -214,32 +286,31 @@ ELEMENT_ADVANTAGES = {
     ElementType.NEUTRAL: []
 }
 
-# Phase 4: Evolution requirements for each stage
+# Evolution requirements for each stage: how settled the pet's neural networks have
+# become (0 = still changing in a consistent direction, 1 = only small random jitter),
+# as measured by EnhancedBehaviorLearner. At ADVANCED/EXPERT every network is measured
+# and the least settled one counts.
 EVOLUTION_REQUIREMENTS = {
-    EvolutionStage.BABY: {
-        "min_age_hours": 0,
-        "min_happiness": 0,
-        "min_bond": 0
-    },
-    EvolutionStage.JUVENILE: {
-        "min_age_hours": 2,
-        "min_happiness": 40,
-        "min_bond": 30
-    },
-    EvolutionStage.ADULT: {
-        "min_age_hours": 6,
-        "min_happiness": 60,
-        "min_bond": 60,
-        "min_interactions": 50
-    },
-    EvolutionStage.ELDER: {
-        "min_age_hours": 12,
-        "min_happiness": 70,
-        "min_bond": 80,
-        "min_interactions": 100,
-        "min_tricks_learned": 3
-    }
+    EvolutionStage.BABY: {"min_decision_stability": 0.0},
+    EvolutionStage.JUVENILE: {"min_decision_stability": 0.25},
+    EvolutionStage.ADULT: {"min_decision_stability": 0.50},
+    EvolutionStage.ELDER: {"min_decision_stability": 0.75},
 }
+
+# Elder also needs enough experience of its own player's habits
+ELDER_MIN_INTERACTION_DAYS = 7    # Separate days with player interaction (a weekly pattern seen)
+ELDER_HABIT_SHARE = 0.05          # Interaction types making up this share of all interactions are habits
+ELDER_MIN_HABIT_SAMPLES = 30      # Interactions of each habit type needed
+
+# Decision stability measurement (EnhancedBehaviorLearner)
+DECISION_STABILITY_WINDOW = 200       # Player interactions compared per measurement
+DECISION_STABILITY_SMOOTHING = 0.005  # Moving-average weight of each new measurement
+# Change in a network's outputs (root-mean-square per output, over one window) below which
+# the network counts as settled even if it still moves steadily in one direction
+DECISION_STABILITY_MIN_CHANGE = 0.01
+
+# MEDIUM: past player interactions kept and replayed, one per decision
+MEDIUM_REPLAY_CAPACITY = 500
 
 # Phase 4: Stage size multipliers (how big the creature is at each stage)
 STAGE_SIZE_MULTIPLIERS = {

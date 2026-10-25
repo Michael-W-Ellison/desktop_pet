@@ -4,11 +4,10 @@ Particle Effects System for Desktop Pal
 Renders visual particle effects for elements (fire, water, etc.) and variants (shiny, mystic, etc.).
 Uses PIL to generate particle effects that can be composited onto the creature sprite.
 """
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict
 from PIL import Image, ImageDraw
 import random
 import math
-import time
 
 
 class Particle:
@@ -84,7 +83,6 @@ class ParticleEffect:
 
     def generate_particles(self, dt: float):
         """Override in subclasses to generate particles."""
-        pass
 
     def render(self, size: Tuple[int, int]) -> Image.Image:
         """

@@ -6,10 +6,9 @@ and learn about the application.
 """
 from PyQt5.QtWidgets import (
     QWizard, QWizardPage, QVBoxLayout, QHBoxLayout, QLabel,
-    QCheckBox, QPushButton, QFrame, QProgressBar, QMessageBox
+    QCheckBox, QFrame, QProgressBar, QMessageBox
 )
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFont, QPixmap, QPainter, QColor
 
 from core.installation import InstallationManager
 

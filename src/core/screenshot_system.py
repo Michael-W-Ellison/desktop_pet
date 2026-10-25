@@ -5,7 +5,7 @@ Captures screenshots/photos of the desktop pal for the photo album.
 """
 import time
 import os
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 from enum import Enum
 
@@ -298,7 +298,7 @@ class ScreenshotSystem:
             'evolution': f"{kwargs.get('pet_name', 'Pet')} evolved!",
             'new_trick': f"{kwargs.get('pet_name', 'Pet')} learned {kwargs.get('trick_name', 'a new trick')}!",
             'milestone': f"Milestone: {kwargs.get('milestone_name', 'Achievement unlocked')}!",
-            'funny_moment': f"Funny moment captured!",
+            'funny_moment': "Funny moment captured!",
             'rare_emotion': f"{kwargs.get('pet_name', 'Pet')} showed {kwargs.get('emotion', 'a rare emotion')}!"
         }
 

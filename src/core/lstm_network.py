@@ -2,9 +2,10 @@
 LSTM (Long Short-Term Memory) network for temporal pattern learning and memory.
 """
 import numpy as np
-from typing import List, Tuple, Optional
+from typing import List, Optional
 from collections import deque
-from .optimizers import AdamOptimizer, clip_gradients
+from .optimizers import AdamOptimizer, clip_gradients, make_adam_optimizer, make_lr_scheduler, LearningRateScheduler
+from .config import GRADIENT_CLIP_NORM
 
 
 class LSTMCell:
@@ -27,22 +28,25 @@ class LSTMCell:
         self.hidden_size = hidden_size
 
         # Initialize weights for gates (input, forget, cell, output)
-        # Concatenate input and hidden, so weight matrix is (input_size + hidden_size, hidden_size)
+        # Concatenate input and hidden, so weight matrix is (input_size + hidden_size, hidden_size).
+        # Xavier-scaled weights keep signals a useful size from the start; a forget-gate
+        # bias of 1 lets the cell remember by default
+        scale = np.sqrt(1.0 / (input_size + hidden_size))
 
         # Forget gate weights
-        self.Wf = np.random.randn(input_size + hidden_size, hidden_size) * 0.01
-        self.bf = np.zeros((1, hidden_size))
+        self.Wf = np.random.randn(input_size + hidden_size, hidden_size) * scale
+        self.bf = np.ones((1, hidden_size))
 
         # Input gate weights
-        self.Wi = np.random.randn(input_size + hidden_size, hidden_size) * 0.01
+        self.Wi = np.random.randn(input_size + hidden_size, hidden_size) * scale
         self.bi = np.zeros((1, hidden_size))
 
         # Cell gate weights (candidate values)
-        self.Wc = np.random.randn(input_size + hidden_size, hidden_size) * 0.01
+        self.Wc = np.random.randn(input_size + hidden_size, hidden_size) * scale
         self.bc = np.zeros((1, hidden_size))
 
         # Output gate weights
-        self.Wo = np.random.randn(input_size + hidden_size, hidden_size) * 0.01
+        self.Wo = np.random.randn(input_size + hidden_size, hidden_size) * scale
         self.bo = np.zeros((1, hidden_size))
 
     @staticmethod
@@ -203,7 +207,7 @@ class LSTMNetwork:
             self.lstm_layers.append(LSTMCell(layer_input_size, hidden_size))
 
         # Output layer (hidden_size -> output_size)
-        self.Wy = np.random.randn(hidden_size, output_size) * 0.01
+        self.Wy = np.random.randn(hidden_size, output_size) * np.sqrt(1.0 / hidden_size)
         self.by = np.zeros((1, output_size))
 
         # Hidden and cell states for each layer
@@ -213,8 +217,29 @@ class LSTMNetwork:
         # Sequence buffer (stores recent interactions)
         self.sequence_buffer = deque(maxlen=sequence_length)
 
-        # Optimizer
-        self.optimizer = AdamOptimizer(learning_rate=learning_rate)
+        # Optimizer and learning rate schedule
+        self.optimizer = make_adam_optimizer(learning_rate)
+        self.lr_scheduler = make_lr_scheduler(learning_rate)
+
+    def set_sequence_length(self, sequence_length: int):
+        """Change how many recent inputs the sequence buffer keeps."""
+        self.sequence_length = sequence_length
+        self.sequence_buffer = deque(self.sequence_buffer, maxlen=sequence_length)
+
+    def _parameters(self):
+        """
+        Weight and bias arrays in a fixed order, as the optimizer expects them.
+
+        Returns:
+            (weights, biases) lists; the arrays are updated in place
+        """
+        weights, biases = [], []
+        for layer in self.lstm_layers:
+            weights += [layer.Wf, layer.Wi, layer.Wc, layer.Wo]
+            biases += [layer.bf, layer.bi, layer.bc, layer.bo]
+        weights.append(self.Wy)
+        biases.append(self.by)
+        return weights, biases
 
     def reset_states(self):
         """Reset hidden and cell states to zero."""
@@ -274,7 +299,8 @@ class LSTMNetwork:
         return outputs, all_caches
 
     def backward_sequence(self, sequence: List[np.ndarray], targets: List[np.ndarray],
-                          outputs: List[np.ndarray], all_caches: List):
+                          outputs: List[np.ndarray], all_caches: List,
+                          output_mask: Optional[np.ndarray] = None):
         """
         Backward pass through time (BPTT).
 
@@ -283,6 +309,8 @@ class LSTMNetwork:
             targets: List of target outputs
             outputs: List of predicted outputs
             all_caches: Cached values from forward pass
+            output_mask: 1 for outputs that have a target, 0 for outputs to leave
+                untrained (all outputs are trained if omitted)
 
         Returns:
             Dictionary of gradients
@@ -296,84 +324,84 @@ class LSTMNetwork:
         dWy = np.zeros_like(self.Wy)
         dby = np.zeros_like(self.by)
 
-        # Initialize gradients for next timestep
+        # Gradients arriving from the next timestep, per layer
         dh_next = [np.zeros((1, self.hidden_size)) for _ in range(self.num_layers)]
         dc_next = [np.zeros((1, self.hidden_size)) for _ in range(self.num_layers)]
 
         # Backpropagate through time
         for t in reversed(range(len(sequence))):
-            # Output layer gradient
+            # Output layer gradient, using the top layer's hidden state at this timestep
             dy = outputs[t] - targets[t]
-            dWy += np.dot(self.h_states[-1].T, dy)
+            if output_mask is not None:
+                dy = dy * output_mask
+            _, _, _, _, _, _, _, c_top, o_top = all_caches[t][-1]
+            h_top = o_top * np.tanh(c_top)
+            dWy += np.dot(h_top.T, dy)
             dby += dy
 
-            # Gradient flowing back to last LSTM layer
-            dh = np.dot(dy, self.Wy.T) + dh_next[-1]
+            # Gradient reaching the top layer's output from the output layer
+            dh_from_above = np.dot(dy, self.Wy.T)
 
-            # Backpropagate through LSTM layers (in reverse order)
+            # Backpropagate through LSTM layers (top to bottom)
             for layer_idx in reversed(range(self.num_layers)):
-                cache = all_caches[t][layer_idx]
+                # Each layer's hidden state feeds both the layer above and its own next timestep
+                dh = dh_from_above + dh_next[layer_idx]
 
                 dx, dh_prev, dc_prev, layer_grads = self.lstm_layers[layer_idx].backward(
-                    dh, dc_next[layer_idx], cache
+                    dh, dc_next[layer_idx], all_caches[t][layer_idx]
                 )
 
-                # Accumulate gradients
                 for param, grad in layer_grads.items():
                     grads[f'layer_{layer_idx}_{param}'] += grad
 
-                # Update gradients for next timestep
                 dh_next[layer_idx] = dh_prev
                 dc_next[layer_idx] = dc_prev
 
-                # Gradient for previous layer
-                if layer_idx > 0:
-                    dh = dh_prev
-                else:
-                    # No need to backprop to input
-                    pass
+                # This layer's input is the hidden state of the layer below
+                dh_from_above = dx
 
-        # Add output layer gradients
+        # Average gradients over the sequence
         grads['Wy'] = dWy / len(sequence)
         grads['by'] = dby / len(sequence)
-
-        # Average LSTM gradients over sequence
         for key in grads:
             if key.startswith('layer_'):
                 grads[key] /= len(sequence)
 
         return grads
 
-    def train_sequence(self, sequence: List[np.ndarray], targets: List[np.ndarray]):
+    def train_sequence(self, sequence: List[np.ndarray], targets: List[np.ndarray],
+                       output_mask: Optional[np.ndarray] = None):
         """
         Train on a sequence of inputs and targets.
 
         Args:
             sequence: List of input vectors
             targets: List of target outputs
+            output_mask: 1 for outputs that have a target, 0 for outputs to leave untrained
         """
         # Forward pass
         outputs, all_caches = self.forward_sequence(sequence, reset_state=True)
 
         # Backward pass
-        grads = self.backward_sequence(sequence, targets, outputs, all_caches)
+        grads = self.backward_sequence(sequence, targets, outputs, all_caches, output_mask)
 
-        # Clip gradients
-        grad_list = [grads[k] for k in sorted(grads.keys())]
-        grad_list = clip_gradients(grad_list, max_norm=5.0)
-
-        # Update parameters using optimizer
-        # Note: This is simplified - in full implementation would organize params better
+        # Order gradients to match _parameters()
+        weight_grads, bias_grads = [], []
         for layer_idx in range(self.num_layers):
-            for param in ['Wf', 'bf', 'Wi', 'bi', 'Wc', 'bc', 'Wo', 'bo']:
-                key = f'layer_{layer_idx}_{param}'
-                if key in grads:
-                    current_param = getattr(self.lstm_layers[layer_idx], param)
-                    current_param -= self.learning_rate * grads[key]
+            weight_grads += [grads[f'layer_{layer_idx}_{p}'] for p in ('Wf', 'Wi', 'Wc', 'Wo')]
+            bias_grads += [grads[f'layer_{layer_idx}_{p}'] for p in ('bf', 'bi', 'bc', 'bo')]
+        weight_grads.append(grads['Wy'])
+        bias_grads.append(grads['by'])
 
-        # Update output layer
-        self.Wy -= self.learning_rate * grads['Wy']
-        self.by -= self.learning_rate * grads['by']
+        # Clip by the global norm of all gradients
+        clipped = clip_gradients(weight_grads + bias_grads, max_norm=GRADIENT_CLIP_NORM)
+        weight_grads, bias_grads = clipped[:len(weight_grads)], clipped[len(weight_grads):]
+
+        # Adam update with the scheduled learning rate
+        self.optimizer.learning_rate = self.lr_scheduler.get_lr()
+        self.lr_scheduler.step()
+        weights, biases = self._parameters()
+        self.optimizer.update(weights, biases, weight_grads, bias_grads)
 
     def predict(self, x: np.ndarray, use_sequence: bool = True):
         """
@@ -399,6 +427,13 @@ class LSTMNetwork:
             outputs, _ = self.forward_sequence([x], reset_state=False)
             return outputs[0]
 
+    def predict_single(self, x: np.ndarray):
+        """Prediction for one input on its own, leaving the recurrent state unchanged."""
+        saved_states = ([h.copy() for h in self.h_states], [c.copy() for c in self.c_states])
+        outputs, _ = self.forward_sequence([x], reset_state=True)
+        self.h_states, self.c_states = saved_states
+        return outputs[0]
+
     def add_to_sequence(self, x: np.ndarray):
         """Add input to sequence buffer."""
         self.sequence_buffer.append(x)
@@ -418,7 +453,9 @@ class LSTMNetwork:
             'sequence_buffer': [x.tolist() for x in self.sequence_buffer],
             'Wy': self.Wy.tolist(),
             'by': self.by.tolist(),
-            'lstm_layers': []
+            'lstm_layers': [],
+            'optimizer': self.optimizer.to_dict(),
+            'lr_scheduler': self.lr_scheduler.to_dict()
         }
 
         # Save each LSTM layer
@@ -468,5 +505,11 @@ class LSTMNetwork:
             network.lstm_layers[i].bc = np.array(layer_data['bc'])
             network.lstm_layers[i].Wo = np.array(layer_data['Wo'])
             network.lstm_layers[i].bo = np.array(layer_data['bo'])
+
+        # Restore optimizer state (saves from older versions have none)
+        if data.get('optimizer'):
+            network.optimizer = AdamOptimizer.from_dict(data['optimizer'])
+        if data.get('lr_scheduler'):
+            network.lr_scheduler = LearningRateScheduler.from_dict(data['lr_scheduler'])
 
         return network

@@ -2,15 +2,18 @@
 Evolution System for Desktop Pal
 
 Handles creature evolution through different life stages (baby -> juvenile -> adult -> elder).
-Evolution is based on age, care quality, bond strength, and interactions.
+Evolution is based on how settled the pet's neural networks are; Elder also
+needs enough experience of the player's habits.
 """
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 import time
 from enum import Enum
 from core.config import (
     EvolutionStage,
     EVOLUTION_REQUIREMENTS,
-    STAGE_SIZE_MULTIPLIERS
+    STAGE_SIZE_MULTIPLIERS,
+    ELDER_MIN_INTERACTION_DAYS,
+    ELDER_MIN_HABIT_SAMPLES
 )
 
 
@@ -28,14 +31,13 @@ class EvolutionSystem:
     """
     Manages creature evolution through life stages.
 
-    Evolution progression:
-    - BABY: 0-2 hours, no requirements
-    - JUVENILE: 2+ hours, needs happiness 40+, bond 30+
-    - ADULT: 6+ hours, needs happiness 60+, bond 60+, 50+ interactions
-    - ELDER: 12+ hours, needs happiness 70+, bond 80+, 100+ interactions, 3+ tricks
-
-    Creatures can evolve automatically when requirements are met, or evolution
-    can be checked manually. Poor care can delay evolution.
+    Evolution progression is driven by how settled the pet's neural networks have
+    become; at ADVANCED/EXPERT every network must have settled (see
+    EVOLUTION_REQUIREMENTS in config):
+    - BABY: starting stage
+    - JUVENILE: decisions 25%+ settled
+    - ADULT: decisions 50%+ settled
+    - ELDER: decisions 75%+ settled; behavior has reached full complexity and keeps adapting
     """
 
     def __init__(self, current_stage: EvolutionStage = EvolutionStage.BABY):
@@ -57,11 +59,7 @@ class EvolutionSystem:
 
         Args:
             creature_stats: Dictionary containing:
-                - age_hours: Creature age in hours
-                - happiness: Current happiness (0-100)
-                - bond: Bond level (0-100)
-                - total_interactions: Total number of interactions
-                - tricks_learned: Number of tricks learned
+                - decision_stability: How settled the neural networks are (0-1)
 
         Returns:
             Tuple of (can_evolve, next_stage, reason)
@@ -70,53 +68,43 @@ class EvolutionSystem:
         if self.current_stage == EvolutionStage.ELDER:
             return False, None, "Already at maximum evolution stage (Elder)"
 
-        # Determine next stage
+        next_stage = self._next_stage()
+        required = EVOLUTION_REQUIREMENTS[next_stage]['min_decision_stability']
+        stability = creature_stats.get('decision_stability', 0.0)
+
+        if stability < required:
+            return False, None, (f"Behavior still developing - decisions {stability:.0%} settled, "
+                                 f"needs {required:.0%}")
+
+        if next_stage == EvolutionStage.ELDER:
+            missing = self._missing_player_experience(creature_stats)
+            if missing:
+                return False, None, f"Still getting to know its player - {missing[0]}"
+
+        return True, next_stage, f"Ready to evolve to {next_stage.value.title()}!"
+
+    @staticmethod
+    def _missing_player_experience(creature_stats: Dict[str, Any]) -> List[str]:
+        """What the pet has not yet seen enough of its player to be an Elder (empty when enough)."""
+        experience = creature_stats.get('player_experience', {'days': 0, 'habits': {}})
+        missing = []
+        if experience['days'] < ELDER_MIN_INTERACTION_DAYS:
+            missing.append(f"interactions on {experience['days']} of {ELDER_MIN_INTERACTION_DAYS} days")
+        if not experience['habits']:
+            missing.append("no interactions yet")
+        for kind, count in sorted(experience['habits'].items()):
+            if count < ELDER_MIN_HABIT_SAMPLES:
+                missing.append(f"{count} of {ELDER_MIN_HABIT_SAMPLES} '{kind}' interactions")
+        return missing
+
+    def _next_stage(self) -> EvolutionStage:
+        """Get the stage after the current one (current stage must not be Elder)."""
         stage_progression = {
             EvolutionStage.BABY: EvolutionStage.JUVENILE,
             EvolutionStage.JUVENILE: EvolutionStage.ADULT,
             EvolutionStage.ADULT: EvolutionStage.ELDER
         }
-        next_stage = stage_progression[self.current_stage]
-
-        # Get requirements for next stage
-        requirements = EVOLUTION_REQUIREMENTS[next_stage]
-
-        # Check each requirement
-        age_hours = creature_stats.get('age_hours', 0)
-        happiness = creature_stats.get('happiness', 0)
-        bond = creature_stats.get('bond', 0)
-        interactions = creature_stats.get('total_interactions', 0)
-        tricks = creature_stats.get('tricks_learned', 0)
-
-        # Age check
-        if age_hours < requirements['min_age_hours']:
-            hours_needed = requirements['min_age_hours'] - age_hours
-            return False, None, f"Too young - needs {hours_needed:.1f} more hours"
-
-        # Happiness check
-        if happiness < requirements['min_happiness']:
-            needed = requirements['min_happiness'] - happiness
-            return False, None, f"Not happy enough - needs {needed:.0f} more happiness"
-
-        # Bond check
-        if bond < requirements['min_bond']:
-            needed = requirements['min_bond'] - bond
-            return False, None, f"Bond not strong enough - needs {needed:.0f} more bond"
-
-        # Interaction check (for adult and elder)
-        if 'min_interactions' in requirements:
-            if interactions < requirements['min_interactions']:
-                needed = requirements['min_interactions'] - interactions
-                return False, None, f"Not enough interactions - needs {needed} more"
-
-        # Tricks check (for elder)
-        if 'min_tricks_learned' in requirements:
-            if tricks < requirements['min_tricks_learned']:
-                needed = requirements['min_tricks_learned'] - tricks
-                return False, None, f"Not enough tricks learned - needs {needed} more"
-
-        # All requirements met!
-        return True, next_stage, f"Ready to evolve to {next_stage.value.title()}!"
+        return stage_progression[self.current_stage]
 
     def evolve(self, creature_stats: Dict[str, Any]) -> Tuple[bool, Optional[EvolutionStage], str]:
         """
@@ -142,8 +130,8 @@ class EvolutionSystem:
         # Record evolution event
         evolution_event = {
             'timestamp': time.time(),
-            'from_stage': old_stage,
-            'to_stage': next_stage,
+            'from_stage': old_stage.value,
+            'to_stage': next_stage.value,
             'age_hours': creature_stats.get('age_hours', 0),
             'happiness': creature_stats.get('happiness', 0),
             'bond': creature_stats.get('bond', 0)
@@ -180,99 +168,45 @@ class EvolutionSystem:
                 'message': "Maximum evolution stage reached!"
             }
 
-        # Determine next stage
-        stage_progression = {
-            EvolutionStage.BABY: EvolutionStage.JUVENILE,
-            EvolutionStage.JUVENILE: EvolutionStage.ADULT,
-            EvolutionStage.ADULT: EvolutionStage.ELDER
-        }
-        next_stage = stage_progression[self.current_stage]
-        requirements = EVOLUTION_REQUIREMENTS[next_stage]
-
-        # Calculate progress for each requirement
-        age_hours = creature_stats.get('age_hours', 0)
-        happiness = creature_stats.get('happiness', 0)
-        bond = creature_stats.get('bond', 0)
-        interactions = creature_stats.get('total_interactions', 0)
-        tricks = creature_stats.get('tricks_learned', 0)
-
-        progress_items = []
-        total_progress = 0
-        num_requirements = 0
-
-        # Age progress
-        age_progress = min(100, (age_hours / requirements['min_age_hours']) * 100)
-        progress_items.append({
-            'name': 'Age',
-            'current': age_hours,
-            'required': requirements['min_age_hours'],
-            'progress': age_progress,
-            'met': age_hours >= requirements['min_age_hours']
-        })
-        total_progress += age_progress
-        num_requirements += 1
-
-        # Happiness progress
-        happiness_progress = min(100, (happiness / requirements['min_happiness']) * 100)
-        progress_items.append({
-            'name': 'Happiness',
-            'current': happiness,
-            'required': requirements['min_happiness'],
-            'progress': happiness_progress,
-            'met': happiness >= requirements['min_happiness']
-        })
-        total_progress += happiness_progress
-        num_requirements += 1
-
-        # Bond progress
-        bond_progress = min(100, (bond / requirements['min_bond']) * 100)
-        progress_items.append({
-            'name': 'Bond',
-            'current': bond,
-            'required': requirements['min_bond'],
-            'progress': bond_progress,
-            'met': bond >= requirements['min_bond']
-        })
-        total_progress += bond_progress
-        num_requirements += 1
-
-        # Interactions (if required)
-        if 'min_interactions' in requirements:
-            interaction_progress = min(100, (interactions / requirements['min_interactions']) * 100)
-            progress_items.append({
-                'name': 'Interactions',
-                'current': interactions,
-                'required': requirements['min_interactions'],
-                'progress': interaction_progress,
-                'met': interactions >= requirements['min_interactions']
-            })
-            total_progress += interaction_progress
-            num_requirements += 1
-
-        # Tricks (if required)
-        if 'min_tricks_learned' in requirements:
-            trick_progress = min(100, (tricks / requirements['min_tricks_learned']) * 100)
-            progress_items.append({
-                'name': 'Tricks Learned',
-                'current': tricks,
-                'required': requirements['min_tricks_learned'],
-                'progress': trick_progress,
-                'met': tricks >= requirements['min_tricks_learned']
-            })
-            total_progress += trick_progress
-            num_requirements += 1
-
-        # Calculate overall progress
-        overall_progress = total_progress / num_requirements if num_requirements > 0 else 0
+        next_stage = self._next_stage()
+        required = EVOLUTION_REQUIREMENTS[next_stage]['min_decision_stability']
+        stability = creature_stats.get('decision_stability', 0.0)
+        progress = min(100, (stability / required) * 100) if required > 0 else 100
 
         can_evolve, _, reason = self.check_evolution_eligibility(creature_stats)
+
+        requirements = [{
+            'name': 'Decision Stability',
+            'current': stability,
+            'required': required,
+            'progress': progress,
+            'met': stability >= required
+        }]
+        if next_stage == EvolutionStage.ELDER:
+            experience = creature_stats.get('player_experience', {'days': 0, 'habits': {}})
+            requirements.append({
+                'name': 'Days With Player',
+                'current': experience['days'],
+                'required': ELDER_MIN_INTERACTION_DAYS,
+                'progress': min(100, experience['days'] / ELDER_MIN_INTERACTION_DAYS * 100),
+                'met': experience['days'] >= ELDER_MIN_INTERACTION_DAYS
+            })
+            for kind, count in sorted(experience['habits'].items()):
+                requirements.append({
+                    'name': f"'{kind}' Interactions",
+                    'current': count,
+                    'required': ELDER_MIN_HABIT_SAMPLES,
+                    'progress': min(100, count / ELDER_MIN_HABIT_SAMPLES * 100),
+                    'met': count >= ELDER_MIN_HABIT_SAMPLES
+                })
+            progress = min(r['progress'] for r in requirements)
 
         return {
             'current_stage': self.current_stage,
             'next_stage': next_stage,
             'can_evolve': can_evolve,
-            'progress_percent': overall_progress,
-            'requirements': progress_items,
+            'progress_percent': progress,
+            'requirements': requirements,
             'message': reason
         }
 
@@ -320,13 +254,7 @@ class EvolutionSystem:
         if self.current_stage == EvolutionStage.ELDER:
             return False, "Already at maximum stage"
 
-        # Determine next stage
-        stage_progression = {
-            EvolutionStage.BABY: EvolutionStage.JUVENILE,
-            EvolutionStage.JUVENILE: EvolutionStage.ADULT,
-            EvolutionStage.ADULT: EvolutionStage.ELDER
-        }
-        next_stage = stage_progression[self.current_stage]
+        next_stage = self._next_stage()
 
         old_stage = self.current_stage
         self.current_stage = next_stage
@@ -335,8 +263,8 @@ class EvolutionSystem:
         # Record evolution
         evolution_event = {
             'timestamp': time.time(),
-            'from_stage': old_stage,
-            'to_stage': next_stage,
+            'from_stage': old_stage.value,
+            'to_stage': next_stage.value,
             'forced': True
         }
         self.evolution_history.append(evolution_event)

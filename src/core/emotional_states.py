@@ -4,10 +4,9 @@ Emotional States System for Desktop Pal
 Manages complex emotional states including jealousy, separation anxiety, and excitement.
 These emotional states are influenced by bonding level and recent experiences.
 """
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Optional, Tuple
 from enum import Enum
 import time
-import numpy as np
 
 
 class EmotionalState(Enum):

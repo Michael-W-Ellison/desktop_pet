@@ -225,33 +225,33 @@ class NameCallingSystem:
         """Get message describing the response."""
         if bond >= 80:
             messages = [
-                f"Rushes over excitedly, thrilled to hear your voice!",
-                f"Drops everything and bounds toward you with pure joy!",
-                f"Responds immediately with obvious delight!"
+                "Rushes over excitedly, thrilled to hear your voice!",
+                "Drops everything and bounds toward you with pure joy!",
+                "Responds immediately with obvious delight!"
             ]
         elif bond >= 60:
             messages = [
-                f"Perks up and hurries over happily!",
-                f"Turns toward you with clear affection!",
-                f"Responds warmly and approaches!"
+                "Perks up and hurries over happily!",
+                "Turns toward you with clear affection!",
+                "Responds warmly and approaches!"
             ]
         elif bond >= 40:
             messages = [
-                f"Looks up and walks over casually.",
-                f"Acknowledges you and comes closer.",
-                f"Responds and approaches in a friendly manner."
+                "Looks up and walks over casually.",
+                "Acknowledges you and comes closer.",
+                "Responds and approaches in a friendly manner."
             ]
         elif bond >= 20:
             messages = [
-                f"Glances over hesitantly.",
-                f"Acknowledges you but seems uncertain.",
-                f"Responds cautiously."
+                "Glances over hesitantly.",
+                "Acknowledges you but seems uncertain.",
+                "Responds cautiously."
             ]
         else:
             messages = [
-                f"Barely acknowledges you.",
-                f"Gives you a wary glance.",
-                f"Seems to notice but doesn't approach."
+                "Barely acknowledges you.",
+                "Gives you a wary glance.",
+                "Seems to notice but doesn't approach."
             ]
 
         return random.choice(messages)

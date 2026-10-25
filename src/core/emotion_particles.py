@@ -3,7 +3,6 @@ Phase 10: Emotion Particle System
 
 Manages emotion-based visual particles (hearts, stars, sweat, etc.).
 """
-import time
 import random
 import math
 from typing import Dict, Any, List, Optional, Tuple
@@ -246,7 +245,6 @@ class EmotionParticleEmitter:
         elif emotion_type == EmotionType.DIZZY_STARS:
             # Circle around head
             angle = random.uniform(0, 2 * math.pi)
-            radius = 30
             vx = math.cos(angle) * 20
             vy = math.sin(angle) * 20
             lifetime = random.uniform(2.0, 3.0)
