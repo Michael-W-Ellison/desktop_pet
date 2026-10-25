@@ -137,6 +137,68 @@ def ramp(color) -> List[Color]:
     return out
 
 
+class Pose:
+    """
+    One animation frame's adjustments to a picture.
+
+    bob: pixels the body moves up (negative) or down; points near the ground stay put
+    shear: pixels the top leans right (positive) or left, for the egg's wobble
+    phase: walk-cycle angle in radians, or None when not walking
+    eyes_closed: draw eyes as closed lids (blinking, sleeping)
+    sleeping_z: rising 'z' glyphs above the head, 0 for none, 1 or 2 for their height
+    lift: pixels the whole creature rises off the ground (hops, floating); the shadow stays
+    """
+
+    def __init__(self, bob: float = 0.0, shear: float = 0.0, phase: Optional[float] = None,
+                 eyes_closed: bool = False, sleeping_z: int = 0, lift: float = 0.0):
+        self.bob, self.shear, self.phase = bob, shear, phase
+        self.eyes_closed, self.sleeping_z, self.lift = eyes_closed, sleeping_z, lift
+
+
+# Animation frames: name -> pose. Idle breathes and blinks, walk is a 4-step trot,
+# sleep breathes slowly with eyes closed, the egg wobbles.
+FRAMES = {
+    'idle_0': Pose(),
+    'idle_1': Pose(bob=-1),
+    'blink': Pose(eyes_closed=True),
+    'walk_0': Pose(phase=0.0),
+    'walk_1': Pose(phase=math.pi / 2, bob=-1),
+    'walk_2': Pose(phase=math.pi),
+    'walk_3': Pose(phase=3 * math.pi / 2, bob=-1),
+    'sleep_0': Pose(bob=1, eyes_closed=True, sleeping_z=1),
+    'sleep_1': Pose(bob=2, eyes_closed=True, sleeping_z=2),
+    'wobble_l': Pose(shear=-1),
+    'wobble_r': Pose(shear=1),
+}
+
+# How each species moves when walking; species not listed trot on four legs (or step on two)
+GAITS = {
+    'bunny': 'hop', 'hamster': 'hop', 'bird': 'hop', 'owl': 'hop', 'phoenix': 'hop',
+    'penguin': 'waddle', 'gnome': 'waddle', 'golem': 'waddle',
+    'wisp': 'float', 'sprite': 'float', 'sylph': 'float', 'undine': 'float', 'kraken': 'float',
+    'basilisk': 'slither',
+}
+GAIT_FRAMES = {
+    'hop': [Pose(), Pose(lift=3), Pose(lift=4), Pose(lift=2)],
+    'waddle': [Pose(shear=-1), Pose(bob=-1), Pose(shear=1), Pose(bob=-1)],
+    'float': [Pose(lift=1), Pose(lift=2), Pose(lift=3), Pose(lift=2)],
+    'slither': [Pose(shear=-1), Pose(), Pose(shear=1), Pose()],
+}
+
+
+def pose_for(name: str, frame: str) -> Pose:
+    """Pose of one animation frame for a species (walk frames follow the species' gait)."""
+    gait = GAITS.get(name)
+    if gait and frame.startswith('walk_'):
+        return GAIT_FRAMES[gait][int(frame[-1])]
+    return FRAMES[frame]
+
+
+# Walk-cycle stride (how far a foot swings either side) and lift, in unit coordinates
+STRIDE = 0.03
+LIFT = 0.03
+
+
 class Painter:
     """
     Builds one pixel-art creature on a grid x grid canvas.
@@ -148,11 +210,13 @@ class Painter:
     tone, and finish() adds a coloured outline around the whole sprite.
     """
 
-    def __init__(self, size: int, seed: int = 0):
+    def __init__(self, size: int, seed: int = 0, pose: Optional[Pose] = None):
         self.grid = size
         self.n = size * MASK_SUPERSAMPLE
         self.seed = seed
+        self.pose = pose or Pose()
         self._parts = 0
+        self._legs = 0
         self.rgb = np.zeros((size, size, 3), dtype=np.float32)
         self.alpha = np.zeros((size, size), dtype=np.float32)
         gy, gx = np.mgrid[0:size, 0:size]
@@ -165,7 +229,40 @@ class Painter:
         return v * self.n
 
     def pts(self, points: Sequence[Point]) -> List[Tuple[float, float]]:
-        return [(x * self.n, y * self.n) for x, y in points]
+        return [(tx * self.n, ty * self.n) for tx, ty in (self.T(x, y) for x, y in points)]
+
+    def T(self, x: float, y: float) -> Point:
+        """
+        Apply the pose: the body bobs while points at the ground stay planted, and the
+        top leans for a wobble.
+        """
+        pose = self.pose
+        if pose.lift:
+            y = y - pose.lift / self.grid
+        if pose.bob:
+            y = y + pose.bob / self.grid * min(1.0, max(0.0, (0.9 - y) / 0.15))
+        if pose.shear:
+            x = x + pose.shear / self.grid * min(1.0, max(0.0, (0.9 - y) / 0.6))
+        return x, y
+
+    def leg_phase(self) -> Optional[float]:
+        """
+        Walk phase for the next leg drawn, or None when not walking. Legs are drawn far
+        hind, far fore, near hind, near fore, so offsets 0, pi, pi, 0 move diagonal pairs
+        together (a trot); two-legged figures alternate.
+        """
+        k = self._legs
+        self._legs += 1
+        if self.pose.phase is None:
+            return None
+        return self.pose.phase + (0.0 if k % 4 in (0, 3) else math.pi)
+
+    def step(self, phase: Optional[float], point: Point, weight: float = 1.0) -> Point:
+        """Move a leg point for the walk cycle: swing back and forth, lift while swinging forward."""
+        if phase is None:
+            return point
+        x, y = point
+        return (x + STRIDE * math.sin(phase) * weight, y - LIFT * max(0.0, math.cos(phase)) * weight)
 
     def gpx(self, v: float) -> float:
         return v * self.grid
@@ -203,7 +300,8 @@ class Painter:
             t = i / k * (len(widths) - 1)
             j = min(int(t), len(widths) - 2)
             r = (widths[j] + (widths[j + 1] - widths[j]) * (t - j)) * self.n
-            cx, cy = x * self.n, y * self.n
+            tx, ty = self.T(x, y)
+            cx, cy = tx * self.n, ty * self.n
             d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=255)
         return m
 
@@ -346,7 +444,7 @@ class Painter:
         d = ImageDraw.Draw(layer)
         path = catmull_rom(points, closed=False) if smooth and len(points) > 2 else list(points)
         w = max(1, int(round(width * g)))
-        d.line([(x * g, y * g) for x, y in path], fill=255, width=w)
+        d.line([(tx * g, ty * g) for tx, ty in (self.T(x, y) for x, y in path)], fill=255, width=w)
         m = np.asarray(layer, dtype=np.float32) / 255.0
         if opacity < 0.6 and w == 1:
             return  # Too faint to show as pixels
@@ -356,6 +454,7 @@ class Painter:
     def dot(self, cx, cy, r, color, opacity: float = 1.0, blur: float = 0.0):
         g = self.grid
         rr = max(0.5, r * g)
+        cx, cy = self.T(cx, cy)
         dist = np.hypot(self._gx + 0.5 - cx * g, self._gy + 0.5 - cy * g)
         core = (dist <= rr).astype(np.float32)
         col = np.broadcast_to(np.array(rgb(color), dtype=np.float32), (g, g, 3))
@@ -366,11 +465,22 @@ class Painter:
 
     def eye(self, cx, cy, r, iris, pupil: str = 'round', sclera=(250, 248, 240),
             look: Point = (0.25, 0.0), lid=None, squash: float = 1.0):
-        """Pixel eye: iris, pupil and a highlight pixel, sized from the radius."""
+        """Pixel eye: iris, pupil and a highlight pixel, sized from the radius; a lid line when closed."""
         g = self.grid
         rr = max(1.0, r * g)
         ry = rr * squash
+        cx, cy = self.T(cx, cy)
         x, y = cx * g, cy * g
+        if self.pose.eyes_closed:
+            # Closed lid: a short curved line, dark, slightly below the eye's centre
+            lid_c = np.array(rgb(lid) if lid else (28, 20, 26), dtype=np.float32)
+            dx = self._gx + 0.5 - x
+            line = (np.abs(dx) <= max(1.0, rr)) & (np.abs(self._gy + 0.5 - (y + 0.25 * ry + (dx / max(1.0, rr)) ** 2 * 0.6)) < 0.6)
+            if not line.any():
+                line = np.zeros((g, g), bool)
+                line[min(g - 1, int(y)), min(g - 1, int(x))] = True
+            self._over(np.broadcast_to(lid_c, (g, g, 3)), line.astype(np.float32))
+            return
         dx = (self._gx + 0.5 - x) / rr
         dy = (self._gy + 0.5 - y) / max(0.8, ry)
         inside = dx ** 2 + dy ** 2 <= 1.15
@@ -424,8 +534,29 @@ class Painter:
         halo = np.where((halo > 0) & (halo < 0.3) & (self._bayer > 0.5), 0.0, halo)
         self._over(np.broadcast_to(np.array(lighten(color, 0.2), np.float32), (g, g, 3)), halo)
 
+    def _sleeping_z(self):
+        """Small 'z' glyphs rising from the upper right of the sprite."""
+        solid = self.alpha >= 0.5
+        if not solid.any():
+            return
+        rows, cols = np.nonzero(solid)
+        top, right = rows.min(), cols.max()
+        g = self.grid
+        size = max(3, g // 16)
+        for k in range(self.pose.sleeping_z):
+            x0 = min(g - size, right - size * (2 - k) + k)
+            y0 = max(0, top - size * (k + 1) - 1 - k)
+            glyph = np.zeros((g, g), np.float32)
+            glyph[y0, x0:x0 + size] = 1
+            glyph[y0 + size - 1, x0:x0 + size] = 1
+            for i in range(size):
+                glyph[y0 + i, x0 + size - 1 - i] = 1
+            self._over(np.broadcast_to(np.array((236, 240, 255), np.float32), (g, g, 3)), glyph)
+
     def finish(self) -> Image.Image:
         """The pixel canvas with a coloured outline around the whole sprite."""
+        if self.pose.sleeping_z:
+            self._sleeping_z()
         solid = self.alpha >= 0.5
         edge = solid & ~(np.roll(solid, 1, 0) & np.roll(solid, -1, 0) & np.roll(solid, 1, 1) & np.roll(solid, -1, 1))
         dark = self.rgb * 0.45 + np.array((30, 18, 40), np.float32) * 0.55 * 0.45
@@ -535,6 +666,8 @@ def palette_for(name: str, palette: Sequence, index: Optional[int] = None) -> Di
 # Shared body parts
 
 def leg(p: Painter, top: Point, knee: Point, foot: Point, w_top: float, w_foot: float, color, **kw):
+    phase = p.leg_phase()
+    knee, foot = p.step(phase, knee, 0.5), p.step(phase, foot)
     p.part(p.limb_mask([top, knee, foot], [w_top, (w_top + w_foot) / 2, w_foot]), color, **kw)
 
 
@@ -1120,9 +1253,10 @@ def fore_leg(p: Painter, shoulder: Point, w: float, color, foot='paw', foot_colo
     """Front leg: shoulder muscle, upper arm to elbow, forearm to wrist, short pastern, foot."""
     x, y = shoulder
     span = GROUND_FOOT - y
-    elbow = (x - 0.006, y + span * 0.38)
-    wrist = (x + 0.004, y + span * 0.8)
-    foot_pt = (x + 0.012, GROUND_FOOT - w * 0.4)
+    phase = p.leg_phase()
+    elbow = p.step(phase, (x - 0.006, y + span * 0.38), 0.3)
+    wrist = p.step(phase, (x + 0.004, y + span * 0.8), 0.8)
+    foot_pt = p.step(phase, (x + 0.012, GROUND_FOOT - w * 0.4))
     p.part(p.ellipse_mask(x, y + span * 0.08, w * 1.5, span * 0.26, 0.15), color, texture=texture, outline=0.35)
     p.part(p.limb_mask([(x, y), elbow, wrist, foot_pt], [w * 1.3, w * 1.05, w * 0.82, w * 0.8]), color,
            texture=texture, texture_angle=1.5)
@@ -1133,9 +1267,10 @@ def hind_leg(p: Painter, hip: Point, w: float, color, foot='paw', foot_color=Non
     """Hind leg: thigh, stifle forward, gaskin back to the hock, cannon down to the foot."""
     x, y = hip
     span = GROUND_FOOT - y
-    stifle = (x + 0.035, y + span * 0.36)
-    hock = (x - 0.03, y + span * 0.66)
-    foot_pt = (x - 0.012, GROUND_FOOT - w * 0.4)
+    phase = p.leg_phase()
+    stifle = p.step(phase, (x + 0.035, y + span * 0.36), 0.35)
+    hock = p.step(phase, (x - 0.03, y + span * 0.66), 0.8)
+    foot_pt = p.step(phase, (x - 0.012, GROUND_FOOT - w * 0.4))
     p.part(p.ellipse_mask(x + 0.01, y + span * 0.16, w * 2.3, span * 0.34, -0.35), color, texture=texture,
            outline=0.35)
     p.part(p.limb_mask([(x + 0.01, y + span * 0.2), stifle, hock, foot_pt], [w * 1.6, w * 1.2, w * 0.82, w * 0.78]),
@@ -1574,9 +1709,15 @@ def draw_egg(p: Painter):
                                           rng.uniform(0, 3)), egg), (170, 130, 70), flat=True, opacity=0.55)
 
 
-def render_creature(name: str, palette: Sequence, grid: int, palette_index: Optional[int] = None) -> Image.Image:
-    """Pixel-art creature facing right on a grid x grid canvas with a transparent background."""
-    p = Painter(grid, seed=sum(map(ord, name)))
+def render_creature(name: str, palette: Sequence, grid: int, palette_index: Optional[int] = None,
+                    frame: str = 'idle_0') -> Image.Image:
+    """
+    Pixel-art creature facing right on a grid x grid canvas with a transparent background.
+
+    Args:
+        frame: Animation frame, a key of FRAMES
+    """
+    p = Painter(grid, seed=sum(map(ord, name)), pose=pose_for(name, frame))
     SPECIES.get(name, SPECIES['cat'])(p, palette_for(name, palette, palette_index))
     return p.finish()
 
@@ -1643,10 +1784,10 @@ def draw_shelter(p: Painter):
     p.part(p.limb_mask([(0.06, 0.57), (0.5, 0.15), (0.94, 0.57)], [0.016, 0.018, 0.016]), (120, 44, 36), gloss=0.4)
 
 
-def render_item(name: str, grid: int) -> Image.Image:
-    """Pixel-art item on a grid x grid canvas: 'ball', 'food', 'shelter' or 'egg'."""
+def render_item(name: str, grid: int, frame: str = 'idle_0') -> Image.Image:
+    """Pixel-art item on a grid x grid canvas: 'ball', 'food', 'shelter' or 'egg' (frame: a key of FRAMES)."""
     draw = {'ball': draw_ball, 'food': draw_food, 'shelter': draw_shelter, 'egg': draw_egg}[name]
-    p = Painter(grid, seed=len(name))
+    p = Painter(grid, seed=len(name), pose=FRAMES[frame])
     draw(p)
     return p.finish()
 

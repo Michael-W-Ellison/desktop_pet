@@ -23,19 +23,29 @@ def _pixel_scale(size: Tuple[int, int], grid: int) -> int:
     return max(1, min(size) // grid)
 
 
-@lru_cache(maxsize=64)
-def _creature_picture(creature_type: str, colors: Tuple[str, ...], grid: int) -> Image.Image:
+# Animation frames, by animation (keys of creature_art.FRAMES)
+ANIMATIONS = {
+    'idle': ['idle_0', 'idle_1'],
+    'blink': ['blink'],
+    'walk': ['walk_0', 'walk_1', 'walk_2', 'walk_3'],
+    'sleep': ['sleep_0', 'sleep_1'],
+    'wobble': ['wobble_l', 'idle_0', 'wobble_r', 'idle_0'],
+}
+
+
+@lru_cache(maxsize=256)
+def _creature_picture(creature_type: str, colors: Tuple[str, ...], grid: int, frame: str) -> Image.Image:
     palette = list(colors)
     index = COLOR_PALETTES.index(palette) if palette in COLOR_PALETTES else None
-    return creature_art.render_creature(creature_type, palette, grid, index)
+    return creature_art.render_creature(creature_type, palette, grid, index, frame)
 
 
-@lru_cache(maxsize=16)
-def _item_picture(name: str, size: Tuple[int, int]) -> Image.Image:
+@lru_cache(maxsize=32)
+def _item_picture(name: str, size: Tuple[int, int], frame: str = 'idle_0') -> Image.Image:
     # Items use the same pixel size as creatures where the size allows (3x), else 2x
     scale = 3 if min(size) >= 96 else 2 if min(size) >= 48 else 1
     grid = max(8, min(size) // scale)
-    return creature_art.render_item(name, grid).resize(size, Image.Resampling.NEAREST)
+    return creature_art.render_item(name, grid, frame).resize(size, Image.Resampling.NEAREST)
 
 
 class SpriteGenerator:
@@ -46,7 +56,8 @@ class SpriteGenerator:
                                  size: Tuple[int, int] = (128, 128),
                                  facing_right: bool = True,
                                  stage_multiplier: float = 1.0,
-                                 variant_colors: Optional[List[str]] = None) -> Image.Image:
+                                 variant_colors: Optional[List[str]] = None,
+                                 frame: str = 'idle_0') -> Image.Image:
         """
         Picture of a creature.
 
@@ -58,6 +69,7 @@ class SpriteGenerator:
             stage_multiplier: Size multiplier for the evolution stage; the creature is
                 drawn on a grid this much smaller, so the image is about size scaled by this
             variant_colors: Optional colours in place of the palette
+            frame: Animation frame (see ANIMATIONS)
 
         Returns:
             PIL Image of the creature
@@ -65,15 +77,15 @@ class SpriteGenerator:
         colors = tuple(variant_colors if variant_colors else color_palette)
         scale = _pixel_scale(size, CREATURE_GRID)
         grid = max(8, int(round(CREATURE_GRID * stage_multiplier)))
-        img = _creature_picture(creature_type, colors, grid)
+        img = _creature_picture(creature_type, colors, grid, frame)
         if not facing_right:
             img = img.transpose(Image.FLIP_LEFT_RIGHT)
         return img.resize((grid * scale, grid * scale), Image.Resampling.NEAREST)
 
     @staticmethod
-    def generate_egg_sprite(size: Tuple[int, int] = (128, 128)) -> Image.Image:
-        """Generate an egg sprite."""
-        return _item_picture('egg', tuple(size)).copy()
+    def generate_egg_sprite(size: Tuple[int, int] = (128, 128), frame: str = 'idle_0') -> Image.Image:
+        """Generate an egg sprite (frame: 'idle_0', or 'wobble_l'/'wobble_r' while it rocks)."""
+        return _item_picture('egg', tuple(size), frame).copy()
 
     @staticmethod
     def generate_shelter_sprite(size: Tuple[int, int] = (128, 128)) -> Image.Image:

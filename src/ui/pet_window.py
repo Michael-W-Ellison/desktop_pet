@@ -5,9 +5,10 @@ from PyQt5.QtWidgets import QWidget, QLabel, QMenu, QAction, QApplication, QTool
 from PyQt5.QtCore import Qt, QTimer, QPoint
 from PyQt5.QtGui import QPixmap, QCursor
 from PIL import Image
-from ui.sprite_generator import SpriteGenerator
+from ui.sprite_generator import SpriteGenerator, ANIMATIONS
 from ui.image_utils import pil_to_qimage
-from core.config import PET_SIZE, FPS, ANIMATION_UPDATE_INTERVAL, STAGE_SIZE_MULTIPLIERS, AIComplexity
+from core.config import (PET_SIZE, FPS, ANIMATION_UPDATE_INTERVAL, STAGE_SIZE_MULTIPLIERS, AIComplexity,
+                         BehaviorState)
 
 
 class PetWindow(QWidget):
@@ -24,6 +25,8 @@ class PetWindow(QWidget):
         self.pet_manager = pet_manager
         self.dragging = False
         self.drag_position = QPoint()
+        self.anim_tick = 0  # Animation timer ticks since the window opened
+        self._shown_sprite = None  # What the label currently shows, to skip redundant redraws
 
         self.init_ui()
         self.update_sprite()
@@ -67,11 +70,39 @@ class PetWindow(QWidget):
                 screen_geometry.height() // 2 - PET_SIZE[1] // 2
             )
 
+    def current_frame(self) -> str:
+        """
+        Animation frame for what the pet is doing, from the animation timer.
+
+        Egg: rocks briefly every few seconds. Sleeping: slow breathing with rising z's.
+        Moving: walk cycle (or the species' hop, waddle, float or slither). Otherwise
+        idle breathing with a blink every few seconds.
+        """
+        t = self.anim_tick
+        creature = self.pet_manager.creature
+        if not creature:
+            frames = ANIMATIONS['wobble']
+            return frames[(t % 40) // 2] if t % 40 < 2 * len(frames) else 'idle_0'
+        if creature.current_state == BehaviorState.SLEEPING:
+            return ANIMATIONS['sleep'][(t // 8) % 2]
+        if abs(creature.velocity[0]) > 0.2 or abs(creature.velocity[1]) > 0.2:
+            return ANIMATIONS['walk'][(t // 2) % 4]
+        if t % 45 < 2:
+            return ANIMATIONS['blink'][0]
+        return ANIMATIONS['idle'][(t // 6) % 2]
+
     def update_sprite(self):
         """Update the displayed sprite based on creature state."""
-        if not self.pet_manager.creature:
+        frame = self.current_frame()
+        creature = self.pet_manager.creature
+        key = ((creature.creature_type, tuple(creature.color_palette), creature.facing_right,
+                creature.evolution.current_stage) if creature else 'egg', frame)
+        if key == self._shown_sprite:
+            return
+        self._shown_sprite = key
+        if not creature:
             # Show egg
-            sprite = SpriteGenerator.generate_egg_sprite(PET_SIZE)
+            sprite = SpriteGenerator.generate_egg_sprite(PET_SIZE, frame)
         else:
             # Show creature
             creature = self.pet_manager.creature
@@ -83,7 +114,8 @@ class PetWindow(QWidget):
                 creature.color_palette,
                 PET_SIZE,
                 creature.facing_right,
-                stage_multiplier=stage_multiplier
+                stage_multiplier=stage_multiplier,
+                frame=frame
             )
             # Place the scaled sprite bottom-centred on a window-sized canvas
             sprite = Image.new('RGBA', PET_SIZE, (0, 0, 0, 0))
@@ -96,6 +128,9 @@ class PetWindow(QWidget):
 
     def update_animation(self):
         """Update animation frame."""
+        self.anim_tick += 1
+        if not self.pet_manager.creature:
+            self.update_sprite()
         if self.pet_manager.creature:
             # Update sprite based on facing direction
             creature = self.pet_manager.creature

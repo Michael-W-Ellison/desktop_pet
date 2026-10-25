@@ -200,6 +200,9 @@ All graphics are **pixel art generated in code** - no image files needed!
 - Each species is built from body parts on a 64x64 pixel grid, shaded with five-tone colour ramps,
   light dithering and a coloured outline, and shown at 3x with crisp pixels
 - Each evolution stage is drawn on its own grid (a Baby on 32x32), so pixels stay the same size as it grows
+- Animated: idle breathing with blinks, a 4-frame walk cycle (a trot on four legs; hopping, waddling,
+  floating or slithering for species that move differently), sleeping with closed eyes and rising z's,
+  and a wobbling egg; frames are drawn once and cached
 - Egg, ball, food bowl, shelter and the application icon are drawn the same way
 - Everything drawn with PIL and NumPy
 
