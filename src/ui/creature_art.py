@@ -320,8 +320,11 @@ class Painter:
         # Ordered dithering between neighbouring tones
         tone = np.clip(np.floor(level + (self._bayer - 0.5) * 0.35 + 0.5), 0, 4).astype(np.int32)
         if outline > 0 and not flat:
+            # Darken only the edges on the shadow side (facing down or right), so parts blend
+            # where they are lit and stay distinct where they overlap in shadow
             inner = solid & ~(np.roll(solid, 1, 0) & np.roll(solid, -1, 0) & np.roll(solid, 1, 1) & np.roll(solid, -1, 1))
-            tone = np.where(inner, np.maximum(tone - 1, 0), tone)
+            shadow_side = (-gx * 0.6 - gy * 0.8) > 0
+            tone = np.where(inner & shadow_side, np.maximum(tone - 1, 0), tone)
 
         ramps = np.zeros((g, g, 3), dtype=np.float32)
         for lv in range(5):
@@ -657,193 +660,6 @@ def humanoid_head(p: Painter, cx, cy, r, skin, eye_c, hair=None):
 
 # Real animals
 
-@species('cat')
-def draw_cat(p: Painter, pal):
-    coat, belly, eye_c, markings = pal['coat'], pal['belly'], pal['eye'], pal['markings']
-    far = darken(coat, 0.22)
-    p.shadow(0.5, 0.33)
-    p.part(p.limb_mask([(0.24, 0.66), (0.13, 0.6), (0.1, 0.44), (0.15, 0.31)], [0.034, 0.031, 0.028, 0.022]),
-           coat, texture='fur', texture_angle=-1.4)
-    leg(p, (0.33, 0.66), (0.36, 0.8), (0.35, 0.905), 0.04, 0.022, far, texture='fur')
-    leg(p, (0.62, 0.64), (0.6, 0.79), (0.61, 0.905), 0.034, 0.021, far, texture='fur')
-    paw(p, 0.36, 0.915, 0.026, far)
-    paw(p, 0.62, 0.915, 0.024, far)
-    body = p.blob_mask([(0.22, 0.6), (0.34, 0.5), (0.55, 0.5), (0.7, 0.52), (0.73, 0.66),
-                        (0.6, 0.75), (0.4, 0.76), (0.25, 0.71)])
-    p.part(body, coat, color2=belly, gradient=0.6, texture='fur')
-    if markings:
-        for x in (0.34, 0.42, 0.5, 0.58):
-            p.part(p.intersect(p.limb_mask([(x, 0.5), (x - 0.012, 0.58), (x + 0.004, 0.66)],
-                                           [0.013, 0.01, 0.003]), body), markings, flat=True, opacity=0.5)
-    # Haunch and near legs
-    p.part(p.ellipse_mask(0.31, 0.64, 0.09, 0.11, -0.3), coat, texture='fur', outline=0.25)
-    leg(p, (0.29, 0.7), (0.26, 0.82), (0.29, 0.905), 0.04, 0.024, coat, texture='fur')
-    paw(p, 0.305, 0.915, 0.03, coat)
-    p.part(p.ellipse_mask(0.66, 0.62, 0.06, 0.08, 0.2), coat, texture='fur', outline=0.25)
-    leg(p, (0.67, 0.66), (0.68, 0.8), (0.68, 0.905), 0.036, 0.022, coat, texture='fur')
-    paw(p, 0.695, 0.915, 0.028, coat)
-    # Neck and head
-    p.part(p.limb_mask([(0.66, 0.6), (0.73, 0.52), (0.77, 0.47)], [0.07, 0.065, 0.06]), coat, texture='fur')
-    for x0, y0, x1, y1, x2, y2 in ((0.7, 0.42, 0.72, 0.27, 0.78, 0.38), (0.81, 0.37, 0.85, 0.24, 0.885, 0.39)):
-        p.part(p.blob_mask([(x0, y0), (x1, y1), (x2, y2)]), coat, texture='fur', roundness=0.6)
-        p.part(p.blob_mask([(x0 + 0.017, y0 - 0.006), (x1 + 0.005, y1 + 0.035), (x2 - 0.014, y2 - 0.008)]),
-               (222, 158, 158), roundness=0.4, gloss=0.05)
-    head = p.blob_mask([(0.68, 0.47), (0.72, 0.38), (0.82, 0.35), (0.91, 0.4), (0.94, 0.49),
-                        (0.88, 0.56), (0.76, 0.58), (0.69, 0.54)])
-    p.part(head, coat, texture='fur', texture_angle=0.3)
-    if markings:
-        for dx in (0.0, 0.025):
-            p.stroke([(0.8 + dx, 0.36), (0.79 + dx, 0.4)], 0.008, markings, opacity=0.5)
-    p.part(p.ellipse_mask(0.895, 0.51, 0.05, 0.038), lighten(belly, 0.25), texture='fur', roundness=0.7)
-    p.part(p.blob_mask([(0.915, 0.475), (0.94, 0.478), (0.928, 0.495)]), (196, 112, 120), gloss=0.5)
-    p.stroke([(0.927, 0.495), (0.924, 0.515), (0.91, 0.522)], 0.004, (70, 45, 45))
-    p.stroke([(0.924, 0.515), (0.936, 0.522)], 0.004, (70, 45, 45))
-    p.eye(0.84, 0.445, 0.03, eye_c, pupil='slit', look=(0.4, 0.0), squash=0.85)
-    whiskers(p, 0.9, 0.51, 0.09)
-
-
-@species('dog')
-def draw_dog(p: Painter, pal):
-    coat, belly, eye_c, patch = pal['coat'], pal['belly'], pal['eye'], pal['markings']
-    far = darken(coat, 0.22)
-    p.shadow(0.5, 0.36)
-    p.part(p.limb_mask([(0.2, 0.52), (0.12, 0.42), (0.14, 0.3)], [0.03, 0.025, 0.016]), coat, texture='fur',
-           texture_angle=-1.2)
-    leg(p, (0.27, 0.62), (0.3, 0.77), (0.29, 0.9), 0.045, 0.026, far, texture='fur')
-    leg(p, (0.62, 0.62), (0.6, 0.77), (0.61, 0.9), 0.04, 0.025, far, texture='fur')
-    paw(p, 0.3, 0.912, 0.03, far)
-    paw(p, 0.62, 0.912, 0.029, far)
-    body = p.blob_mask([(0.18, 0.52), (0.3, 0.44), (0.55, 0.44), (0.7, 0.46), (0.74, 0.6),
-                        (0.6, 0.68), (0.42, 0.66), (0.24, 0.66)])
-    p.part(body, coat, color2=belly, gradient=0.55, texture='fur')
-    if patch and pal['coat'][0] > 200:
-        p.part(p.intersect(p.ellipse_mask(0.38, 0.5, 0.09, 0.06, 0.2), body), patch, flat=True, opacity=0.8)
-    p.part(p.ellipse_mask(0.25, 0.57, 0.1, 0.11, -0.2), coat, texture='fur', outline=0.25)
-    leg(p, (0.24, 0.62), (0.21, 0.77), (0.25, 0.9), 0.05, 0.027, coat, texture='fur')
-    paw(p, 0.265, 0.912, 0.033, coat)
-    p.part(p.ellipse_mask(0.66, 0.56, 0.07, 0.09, 0.2), coat, texture='fur', outline=0.25)
-    leg(p, (0.67, 0.6), (0.69, 0.76), (0.68, 0.9), 0.042, 0.026, coat, texture='fur')
-    paw(p, 0.7, 0.912, 0.032, coat)
-    if pal['markings'] and pal['coat'][0] < 60:  # tan points
-        p.part(p.ellipse_mask(0.69, 0.86, 0.03, 0.045), belly, flat=True, opacity=0.9)
-    # Neck, collar, head
-    p.part(p.limb_mask([(0.64, 0.54), (0.72, 0.44), (0.76, 0.36)], [0.085, 0.075, 0.07]), coat, texture='fur')
-    neck = p.limb_mask([(0.64, 0.54), (0.72, 0.44), (0.76, 0.36)], [0.085, 0.075, 0.07])
-    p.part(p.intersect(p.limb_mask([(0.63, 0.41), (0.7, 0.455), (0.77, 0.5)], [0.016, 0.016, 0.016]), neck),
-           pal['primary'], gloss=0.5, roundness=0.6)
-    p.part(p.ellipse_mask(0.745, 0.51, 0.013, 0.016), (230, 196, 70), gloss=0.9)
-    head = p.blob_mask([(0.7, 0.33), (0.78, 0.24), (0.87, 0.26), (0.91, 0.33), (0.97, 0.37),
-                        (0.97, 0.42), (0.9, 0.45), (0.78, 0.44), (0.71, 0.4)])
-    p.part(head, coat, texture='fur')
-    p.part(p.ellipse_mask(0.92, 0.405, 0.05, 0.035), belly, texture='fur', roundness=0.7, opacity=0.9)
-    p.part(p.ellipse_mask(0.965, 0.368, 0.02, 0.016), (30, 26, 28), gloss=0.8)
-    p.stroke([(0.965, 0.385), (0.95, 0.42), (0.92, 0.428)], 0.004, (60, 40, 36))
-    p.part(p.blob_mask([(0.925, 0.425), (0.945, 0.43), (0.94, 0.465), (0.925, 0.46)]), (214, 100, 110), gloss=0.4)
-    p.eye(0.855, 0.32, 0.024, eye_c, look=(0.5, 0.0))
-    # Floppy ear
-    ear = p.blob_mask([(0.76, 0.27), (0.8, 0.26), (0.81, 0.33), (0.79, 0.42), (0.75, 0.4), (0.74, 0.32)])
-    p.part(ear, darken(coat, 0.18) if not patch else patch, texture='fur', texture_angle=1.4)
-
-
-@species('bunny')
-def draw_bunny(p: Painter, pal):
-    coat, belly, eye_c = pal['coat'], pal['belly'], pal['eye']
-    p.shadow(0.48, 0.3)
-    # Far ear
-    p.part(p.limb_mask([(0.66, 0.38), (0.62, 0.22), (0.6, 0.08)], [0.035, 0.04, 0.02]), darken(coat, 0.2),
-           texture='fur', texture_angle=-1.5)
-    body = p.blob_mask([(0.22, 0.75), (0.25, 0.58), (0.38, 0.47), (0.55, 0.48), (0.66, 0.58),
-                        (0.66, 0.78), (0.55, 0.9), (0.3, 0.9)])
-    p.part(body, coat, color2=belly, gradient=0.4, texture='fur', texture_angle=-0.4)
-    p.part(p.ellipse_mask(0.2, 0.68, 0.045, 0.045), (250, 250, 248), texture='fur')
-    # Big hind leg and long foot
-    p.part(p.ellipse_mask(0.36, 0.73, 0.13, 0.14, -0.4), coat, texture='fur', outline=0.25)
-    p.part(p.blob_mask([(0.3, 0.86), (0.48, 0.865), (0.53, 0.89), (0.5, 0.915), (0.3, 0.915)]),
-           lighten(coat, 0.1), texture='fur')
-    # Front legs
-    leg(p, (0.6, 0.72), (0.62, 0.83), (0.62, 0.9), 0.03, 0.02, coat, texture='fur')
-    paw(p, 0.635, 0.912, 0.025, belly)
-    # Head and near ear
-    head = p.blob_mask([(0.58, 0.43), (0.64, 0.35), (0.74, 0.33), (0.82, 0.38), (0.84, 0.47),
-                        (0.78, 0.53), (0.66, 0.54), (0.59, 0.5)])
-    p.part(head, coat, texture='fur')
-    p.part(p.ellipse_mask(0.79, 0.48, 0.045, 0.04), belly, texture='fur', roundness=0.6)
-    ear = p.limb_mask([(0.7, 0.36), (0.68, 0.2), (0.7, 0.05)], [0.038, 0.045, 0.022])
-    p.part(ear, coat, texture='fur', texture_angle=-1.5)
-    p.part(p.limb_mask([(0.7, 0.33), (0.687, 0.2), (0.698, 0.08)], [0.018, 0.026, 0.01]), (226, 170, 170),
-           roundness=0.5, gloss=0.05)
-    p.part(p.blob_mask([(0.83, 0.455), (0.845, 0.46), (0.838, 0.472)]), (210, 140, 150), gloss=0.4)
-    p.stroke([(0.838, 0.472), (0.832, 0.49), (0.82, 0.495)], 0.003, (90, 60, 60))
-    p.eye(0.75, 0.41, 0.03, eye_c, look=(0.3, 0.0), squash=1.05)
-    whiskers(p, 0.82, 0.48, 0.08, (230, 230, 230))
-
-
-@species('fox')
-def draw_fox(p: Painter, pal):
-    coat, belly, socks, eye_c = pal['coat'], pal['belly'], pal['markings'], pal['eye']
-    p.shadow(0.5, 0.38)
-    # Bushy tail with white tip
-    tail = p.blob_mask([(0.24, 0.55), (0.14, 0.6), (0.05, 0.7), (0.04, 0.8), (0.1, 0.82), (0.2, 0.74), (0.28, 0.62)])
-    p.part(tail, coat, texture='fur', texture_angle=2.2, texture_scale=1.4)
-    p.part(p.intersect(p.ellipse_mask(0.06, 0.78, 0.06, 0.06), tail), (248, 246, 242), texture='fur')
-    leg(p, (0.3, 0.6), (0.33, 0.76), (0.32, 0.9), 0.034, 0.018, socks, texture='fur')
-    leg(p, (0.62, 0.6), (0.6, 0.76), (0.61, 0.9), 0.03, 0.018, socks, texture='fur')
-    paw(p, 0.33, 0.912, 0.024, socks)
-    paw(p, 0.62, 0.912, 0.023, socks)
-    body = p.blob_mask([(0.24, 0.55), (0.34, 0.47), (0.55, 0.47), (0.69, 0.49), (0.71, 0.6),
-                        (0.6, 0.66), (0.4, 0.66), (0.26, 0.62)])
-    p.part(body, coat, color2=belly, gradient=0.5, texture='fur')
-    p.part(p.ellipse_mask(0.31, 0.58, 0.075, 0.09, -0.3), coat, texture='fur', outline=0.25)
-    leg(p, (0.28, 0.63), (0.25, 0.77), (0.28, 0.9), 0.04, 0.019, coat, texture='fur')
-    p.part(p.limb_mask([(0.262, 0.8), (0.28, 0.9)], [0.02, 0.019]), socks, texture='fur')
-    paw(p, 0.29, 0.912, 0.026, socks)
-    leg(p, (0.66, 0.6), (0.67, 0.76), (0.67, 0.9), 0.032, 0.018, coat, texture='fur')
-    p.part(p.limb_mask([(0.67, 0.76), (0.67, 0.9)], [0.019, 0.018]), socks, texture='fur')
-    paw(p, 0.68, 0.912, 0.025, socks)
-    # Neck with white chest
-    p.part(p.limb_mask([(0.64, 0.55), (0.71, 0.46), (0.74, 0.4)], [0.07, 0.06, 0.055]), coat, texture='fur')
-    p.part(p.blob_mask([(0.68, 0.46), (0.75, 0.44), (0.74, 0.56), (0.68, 0.6)]), belly, texture='fur', roundness=0.6)
-    # Head: ears with dark backs, long muzzle
-    for base in ((0.72, 0.35), (0.79, 0.33)):
-        bx, by = base
-        p.part(p.blob_mask([(bx - 0.02, by + 0.02), (bx + 0.005, by - 0.13), (bx + 0.035, by + 0.01)]),
-               socks, texture='fur', roundness=0.6)
-        p.part(p.blob_mask([(bx - 0.008, by + 0.01), (bx + 0.006, by - 0.09), (bx + 0.022, by + 0.005)]),
-               coat, roundness=0.4)
-    head = p.blob_mask([(0.69, 0.38), (0.75, 0.31), (0.84, 0.32), (0.9, 0.37), (0.98, 0.41),
-                        (0.97, 0.44), (0.88, 0.47), (0.76, 0.47)])
-    p.part(head, coat, texture='fur', texture_angle=0.2)
-    p.part(p.intersect(p.blob_mask([(0.8, 0.44), (0.9, 0.42), (0.98, 0.43), (0.9, 0.48), (0.78, 0.5)]), head),
-           belly, texture='fur')
-    p.part(p.ellipse_mask(0.973, 0.41, 0.014, 0.012), (24, 20, 22), gloss=0.8)
-    p.eye(0.84, 0.37, 0.019, eye_c, pupil='slit', look=(0.5, 0.0), squash=0.8)
-
-
-@species('hamster')
-def draw_hamster(p: Painter, pal):
-    coat, belly, eye_c = pal['coat'], pal['belly'], pal['eye']
-    p.shadow(0.5, 0.3)
-    body = p.blob_mask([(0.22, 0.78), (0.24, 0.62), (0.36, 0.5), (0.55, 0.47), (0.72, 0.52),
-                        (0.8, 0.64), (0.78, 0.82), (0.62, 0.91), (0.34, 0.91)])
-    p.part(body, coat, texture='fur', texture_angle=-0.3, texture_scale=1.2)
-    p.part(p.intersect(p.blob_mask([(0.5, 0.92), (0.58, 0.7), (0.72, 0.62), (0.86, 0.68), (0.82, 0.92)]), body),
-           belly, texture='fur')
-    # Ears
-    for ex, ey in ((0.6, 0.48), (0.69, 0.47)):
-        p.part(p.ellipse_mask(ex, ey, 0.032, 0.035), darken(coat, 0.1), texture='fur')
-        p.part(p.ellipse_mask(ex + 0.004, ey + 0.004, 0.018, 0.022), (226, 160, 160), roundness=0.4)
-    # Cheek pouch and face
-    p.part(p.ellipse_mask(0.73, 0.64, 0.085, 0.075), lighten(coat, 0.15), texture='fur', outline=0.2)
-    p.part(p.ellipse_mask(0.78, 0.6, 0.06, 0.05), lighten(belly, 0.1), texture='fur', roundness=0.6)
-    p.part(p.ellipse_mask(0.835, 0.585, 0.014, 0.011), (214, 140, 150), gloss=0.5)
-    p.stroke([(0.833, 0.598), (0.83, 0.612), (0.82, 0.616)], 0.003, (100, 60, 60))
-    p.eye(0.715, 0.555, 0.022, eye_c, sclera=eye_c, look=(0.0, 0.0))
-    whiskers(p, 0.82, 0.6, 0.07, (240, 236, 230))
-    # Paws
-    for x in (0.66, 0.72):
-        p.part(p.ellipse_mask(x, 0.78, 0.022, 0.018), (232, 172, 170), gloss=0.2)
-    p.part(p.ellipse_mask(0.36, 0.9, 0.05, 0.02), (232, 172, 170), gloss=0.2)
-
 
 @species('bird')
 def draw_bird(p: Painter, pal):
@@ -904,25 +720,6 @@ def draw_owl(p: Painter, pal):
     for x in (0.45, 0.55):
         for dx in (-0.02, 0.0, 0.02):
             p.stroke([(x, 0.875), (x + dx, 0.905), (x + dx * 1.3, 0.915)], 0.006, (60, 50, 44))
-
-
-@species('penguin')
-def draw_penguin(p: Painter, pal):
-    black, white, patch, eye_c = pal['coat'], pal['belly'], pal['markings'], pal['eye']
-    p.shadow(0.5, 0.22)
-    for x in (0.44, 0.56):
-        p.part(p.ellipse_mask(x + 0.02, 0.905, 0.05, 0.018), (230, 140, 60), gloss=0.3)
-    body = p.blob_mask([(0.34, 0.66), (0.36, 0.42), (0.44, 0.26), (0.56, 0.24), (0.64, 0.36),
-                        (0.68, 0.62), (0.62, 0.86), (0.5, 0.9), (0.38, 0.86)])
-    p.part(body, black, gloss=0.4, texture='skin')
-    belly = p.intersect(p.blob_mask([(0.46, 0.4), (0.58, 0.36), (0.66, 0.5), (0.66, 0.76), (0.56, 0.9), (0.44, 0.86),
-                                     (0.42, 0.6)]), body)
-    p.part(belly, white, color2=(226, 226, 222), gradient=0.6, gloss=0.2, texture='skin')
-    p.part(p.intersect(p.ellipse_mask(0.6, 0.42, 0.07, 0.05), body), patch, roundness=0.5, opacity=0.85)
-    p.part(p.limb_mask([(0.4, 0.46), (0.33, 0.6), (0.31, 0.72)], [0.04, 0.035, 0.012]), darken(black, 0.15),
-           gloss=0.35)
-    p.part(p.blob_mask([(0.6, 0.3), (0.7, 0.315), (0.74, 0.33), (0.68, 0.345), (0.6, 0.34)]), patch, gloss=0.6)
-    p.eye(0.57, 0.29, 0.016, eye_c, sclera=eye_c, look=(0.4, 0.0))
 
 
 @species('turtle')
@@ -997,8 +794,8 @@ def draw_dragon(p: Painter, pal):
                        [0.05, 0.04, 0.028, 0.018, 0.008])
     p.part(tail, skin, texture='scales', texture_angle=2.0)
     p.part(p.poly_mask([(0.02, 0.86), (0.07, 0.83), (0.06, 0.9), (0.01, 0.92)]), darken(skin, 0.2), gloss=0.3)
-    leg(p, (0.34, 0.68), (0.37, 0.8), (0.35, 0.9), 0.05, 0.025, far, texture='scales')
-    leg(p, (0.6, 0.64), (0.58, 0.78), (0.6, 0.9), 0.04, 0.022, far, texture='scales')
+    hind_leg(p, (0.35, 0.66), 0.03, far, foot='talon', foot_color=(236, 230, 214), texture='scales')
+    fore_leg(p, (0.6, 0.62), 0.026, far, foot='talon', foot_color=(236, 230, 214), texture='scales')
     body = p.blob_mask([(0.26, 0.64), (0.34, 0.52), (0.5, 0.48), (0.64, 0.5), (0.7, 0.6),
                         (0.62, 0.73), (0.44, 0.76), (0.3, 0.73)])
     p.part(body, skin, texture='scales', texture_angle=0.1)
@@ -1008,13 +805,8 @@ def draw_dragon(p: Painter, pal):
         p.stroke([(x, 0.69 - (x - 0.36) * 0.2), (x + 0.012, 0.75 - (x - 0.36) * 0.1)], 0.003, darken(belly, 0.3),
                  opacity=0.6)
     spikes(p, [(0.22, 0.68), (0.32, 0.52), (0.5, 0.47), (0.64, 0.48)], 0.045, wing_c, count=6)
-    p.part(p.ellipse_mask(0.34, 0.66, 0.09, 0.1, -0.3), skin, texture='scales', outline=0.25)
-    leg(p, (0.32, 0.72), (0.28, 0.82), (0.32, 0.9), 0.05, 0.026, skin, texture='scales')
-    for dx in (0.0, 0.02, 0.04):
-        p.part(p.poly_mask([(0.33 + dx, 0.9), (0.345 + dx, 0.885), (0.355 + dx, 0.915)]), (240, 236, 220), gloss=0.5)
-    leg(p, (0.64, 0.62), (0.67, 0.77), (0.66, 0.9), 0.042, 0.024, skin, texture='scales')
-    for dx in (0.0, 0.02, 0.04):
-        p.part(p.poly_mask([(0.66 + dx, 0.9), (0.675 + dx, 0.885), (0.685 + dx, 0.915)]), (240, 236, 220), gloss=0.5)
+    hind_leg(p, (0.33, 0.67), 0.033, skin, foot='talon', foot_color=(240, 236, 220), texture='scales')
+    fore_leg(p, (0.65, 0.62), 0.028, skin, foot='talon', foot_color=(240, 236, 220), texture='scales')
     neck = p.limb_mask([(0.62, 0.56), (0.7, 0.46), (0.71, 0.36), (0.75, 0.29)], [0.065, 0.05, 0.042, 0.04])
     p.part(neck, skin, texture='scales', texture_angle=-1.2)
     p.part(p.intersect(p.limb_mask([(0.66, 0.6), (0.74, 0.47), (0.75, 0.37)], [0.035, 0.028, 0.02]), neck), belly,
@@ -1023,83 +815,6 @@ def draw_dragon(p: Painter, pal):
     membrane_wing(p, (0.54, 0.5), [(0.5, 0.2), (0.28, 0.06), (0.26, 0.24), (0.32, 0.38)], wing_c,
                   darken(skin, 0.2), opacity=0.94)
     dragon_head(p, 0.77, 0.28, 1.0, skin, belly, (236, 226, 200), eye_c)
-
-
-@species('chimera')
-def draw_chimera(p: Painter, pal):
-    fur, mane_c, goat_c = pal['primary'], pal['secondary'], pal['accent']
-    lion = mix(fur, (200, 150, 80), 0.5)
-    mane_col = mix(mane_c, (150, 90, 40), 0.5)
-    p.shadow(0.5, 0.4)
-    # Serpent tail
-    snake = mix(goat_c, (80, 120, 60), 0.5)
-    p.part(p.limb_mask([(0.24, 0.6), (0.14, 0.58), (0.08, 0.46), (0.14, 0.34), (0.2, 0.3)],
-                       [0.025, 0.024, 0.022, 0.02, 0.018]), snake, texture='scales', texture_angle=-1.4)
-    sh = p.blob_mask([(0.17, 0.3), (0.21, 0.26), (0.27, 0.27), (0.29, 0.3), (0.24, 0.33), (0.18, 0.33)])
-    p.part(sh, snake, texture='scales', texture_scale=0.5)
-    p.eye(0.235, 0.29, 0.008, (240, 200, 40), pupil='slit', sclera=(240, 200, 40))
-    p.stroke([(0.29, 0.31), (0.31, 0.32), (0.32, 0.31)], 0.0025, (200, 40, 50))
-    far = darken(lion, 0.25)
-    leg(p, (0.32, 0.64), (0.35, 0.78), (0.33, 0.9), 0.045, 0.025, far, texture='fur')
-    leg(p, (0.62, 0.62), (0.6, 0.77), (0.61, 0.9), 0.045, 0.026, far, texture='fur')
-    paw(p, 0.34, 0.912, 0.03, far)
-    paw(p, 0.62, 0.912, 0.03, far)
-    body = p.blob_mask([(0.24, 0.6), (0.32, 0.5), (0.5, 0.48), (0.66, 0.5), (0.7, 0.62), (0.6, 0.7), (0.4, 0.7), (0.27, 0.68)])
-    p.part(body, lion, color2=lighten(lion, 0.25), gradient=0.5, texture='fur')
-    p.part(p.ellipse_mask(0.3, 0.62, 0.085, 0.1, -0.3), lion, texture='fur', outline=0.25)
-    leg(p, (0.28, 0.68), (0.25, 0.8), (0.28, 0.9), 0.048, 0.027, lion, texture='fur')
-    paw(p, 0.29, 0.912, 0.032, lion)
-    leg(p, (0.66, 0.62), (0.68, 0.77), (0.67, 0.9), 0.05, 0.028, lion, texture='fur')
-    paw(p, 0.685, 0.912, 0.033, lion)
-    # Goat head rising from the back: long face, swept-back ridged horns, small beard
-    goat = mix(goat_c, (206, 200, 188), 0.6)
-    p.part(p.limb_mask([(0.45, 0.52), (0.45, 0.42), (0.48, 0.34)], [0.034, 0.03, 0.026]), goat, texture='fur')
-    for k in range(2):
-        horn(p, (0.5 - k * 0.012, 0.28), (0.44 - k * 0.012, 0.16), (0.34 - k * 0.014, 0.18), 0.017 - k * 0.003,
-             darken(goat_c, 0.35 + 0.1 * k))
-    gh = p.blob_mask([(0.46, 0.31), (0.5, 0.26), (0.55, 0.27), (0.6, 0.31), (0.62, 0.35), (0.6, 0.37), (0.54, 0.35),
-                      (0.48, 0.36)])
-    p.part(gh, goat, texture='fur')
-    p.part(p.blob_mask([(0.49, 0.29), (0.47, 0.26), (0.5, 0.275)]), darken(goat, 0.15), roundness=0.4)
-    p.part(p.ellipse_mask(0.612, 0.345, 0.008, 0.006), darken(goat, 0.6))
-    p.eye(0.53, 0.3, 0.011, (220, 170, 60), pupil='goat', sclera=(220, 170, 60), squash=0.8)
-    # Lion head with mane
-    for k in range(14):
-        a = -math.pi * 0.95 + k * (math.pi * 1.5 / 13)
-        p.part(p.limb_mask([(0.76, 0.43), (0.76 + math.cos(a) * 0.09, 0.43 + math.sin(a) * 0.09),
-                            (0.75 + math.cos(a) * 0.14, 0.44 + math.sin(a) * 0.14)], [0.04, 0.035, 0.012]),
-               darken(mane_col, 0.12 * (k % 3)), texture='fur', texture_angle=a)
-    face = p.blob_mask([(0.74, 0.38), (0.8, 0.35), (0.87, 0.39), (0.9, 0.45), (0.86, 0.5), (0.78, 0.5), (0.74, 0.45)])
-    p.part(face, lion, texture='fur')
-    p.part(p.ellipse_mask(0.865, 0.46, 0.04, 0.03), lighten(lion, 0.3), texture='fur', roundness=0.6)
-    p.part(p.blob_mask([(0.875, 0.43), (0.905, 0.435), (0.895, 0.452)]), (80, 50, 44), gloss=0.5)
-    p.stroke([(0.89, 0.455), (0.885, 0.475), (0.87, 0.48)], 0.004, (60, 36, 30))
-    p.eye(0.815, 0.41, 0.017, (220, 160, 50), look=(0.4, 0.0), squash=0.8)
-
-
-@species('hydra')
-def draw_hydra(p: Painter, pal):
-    skin, belly = pal['primary'], pal['secondary']
-    p.shadow(0.48, 0.38)
-    body = p.blob_mask([(0.14, 0.86), (0.2, 0.7), (0.36, 0.62), (0.56, 0.62), (0.72, 0.7), (0.78, 0.86), (0.5, 0.9)])
-    p.part(p.limb_mask([(0.2, 0.84), (0.1, 0.86), (0.04, 0.8)], [0.04, 0.025, 0.008]), darken(skin, 0.1),
-           texture='scales')
-    necks = [((0.36, 0.66), (0.24, 0.5), (0.26, 0.34), (0.2, 0.24), 0.8),
-             ((0.48, 0.64), (0.48, 0.48), (0.55, 0.3), (0.52, 0.18), 1.0),
-             ((0.6, 0.66), (0.72, 0.54), (0.74, 0.4), (0.7, 0.3), 0.9)]
-    for k, (a, b, c, d, sc) in enumerate(necks):
-        shade = darken(skin, 0.18 * (1 - sc))
-        p.part(p.limb_mask([a, b, c, d], [0.05, 0.04, 0.034 * sc, 0.03 * sc]), shade, texture='scales',
-               texture_angle=-1.3)
-        p.part(p.limb_mask([(a[0] + 0.02, a[1]), (b[0] + 0.015, b[1]), (c[0] + 0.012, c[1])], [0.022, 0.018, 0.012]),
-               belly, roundness=0.4, opacity=0.8)
-        dragon_head(p, d[0] + 0.01, d[1] - 0.005, 0.7 * sc, shade, belly, (230, 220, 200), (240, 190, 40))
-    p.part(body, skin, texture='scales')
-    p.part(p.intersect(p.ellipse_mask(0.47, 0.84, 0.25, 0.08), body), belly, roundness=0.5)
-    for x in (0.28, 0.66):
-        leg(p, (x, 0.78), (x + 0.02, 0.86), (x + 0.01, 0.9), 0.04, 0.026, darken(skin, 0.1), texture='scales')
-        for dx in (0.0, 0.018, 0.036):
-            p.part(p.poly_mask([(x + dx - 0.01, 0.905), (x + dx, 0.89), (x + dx + 0.008, 0.915)]), (236, 230, 214))
 
 
 @species('basilisk')
@@ -1191,77 +906,6 @@ def draw_phoenix(p: Painter, pal):
         p.part(crest, gold, glow=0.6, roundness=0.5)
     p.part(p.blob_mask([(0.75, 0.29), (0.82, 0.31), (0.79, 0.34), (0.75, 0.335)]), (240, 200, 100), gloss=0.6)
     p.eye(0.72, 0.3, 0.013, (250, 220, 80), sclera=(250, 220, 80), look=(0.3, 0.0))
-
-
-@species('griffin')
-def draw_griffin(p: Painter, pal):
-    lion = mix(pal['primary'], (196, 150, 90), 0.6)
-    eagle = mix(pal['secondary'], (120, 84, 56), 0.6)
-    head_c = (244, 242, 236)
-    p.shadow(0.5, 0.4)
-    feather_wing(p, (0.5, 0.48), (0.24, 0.12), 0.1, darken(eagle, 0.2), darken(eagle, 0.4), rows=3)
-    p.part(p.limb_mask([(0.24, 0.6), (0.14, 0.66), (0.08, 0.76)], [0.02, 0.016, 0.012]), lion, texture='fur')
-    p.part(p.ellipse_mask(0.075, 0.79, 0.025, 0.035), darken(lion, 0.4), texture='fur')
-    far = darken(lion, 0.25)
-    leg(p, (0.3, 0.66), (0.34, 0.79), (0.32, 0.9), 0.045, 0.025, far, texture='fur')
-    leg(p, (0.62, 0.62), (0.6, 0.77), (0.61, 0.9), 0.035, 0.016, darken((230, 190, 80), 0.25), texture='scales',
-        texture_scale=0.5)
-    body = p.blob_mask([(0.22, 0.6), (0.32, 0.5), (0.5, 0.47), (0.66, 0.48), (0.72, 0.6), (0.6, 0.7), (0.4, 0.72), (0.25, 0.68)])
-    p.part(body, lion, texture='fur')
-    p.part(p.intersect(p.blob_mask([(0.5, 0.46), (0.72, 0.46), (0.74, 0.66), (0.56, 0.7)]), body), eagle,
-           texture='feathers', texture_scale=0.6)
-    p.part(p.ellipse_mask(0.28, 0.63, 0.085, 0.1, -0.3), lion, texture='fur', outline=0.25)
-    leg(p, (0.27, 0.68), (0.24, 0.8), (0.27, 0.9), 0.048, 0.027, lion, texture='fur')
-    paw(p, 0.28, 0.912, 0.032, lion)
-    leg(p, (0.67, 0.6), (0.69, 0.76), (0.68, 0.895), 0.036, 0.016, (230, 190, 80), texture='scales', texture_scale=0.5)
-    for dx in (-0.025, 0.0, 0.025):
-        p.stroke([(0.68, 0.895), (0.685 + dx, 0.91), (0.69 + dx * 1.3, 0.917)], 0.006, (60, 50, 40))
-    feather_wing(p, (0.56, 0.5), (0.36, 0.1), 0.11, eagle, darken(eagle, 0.3), rows=3)
-    p.part(p.limb_mask([(0.64, 0.52), (0.7, 0.42), (0.73, 0.35)], [0.06, 0.05, 0.045]), head_c, texture='feathers',
-           texture_scale=0.5)
-    head = p.ellipse_mask(0.75, 0.31, 0.065, 0.06)
-    p.part(head, head_c, texture='feathers', texture_scale=0.4)
-    p.part(p.blob_mask([(0.79, 0.28), (0.86, 0.29), (0.885, 0.33), (0.86, 0.35), (0.85, 0.33), (0.8, 0.34)]),
-           (236, 190, 60), gloss=0.6)
-    p.eye(0.765, 0.29, 0.014, (240, 170, 40), sclera=(240, 170, 40), look=(0.4, 0.0), lid=(60, 50, 40))
-
-
-@species('unicorn')
-def draw_unicorn(p: Painter, pal):
-    coat = mix(pal['secondary'], (246, 244, 250), 0.75)
-    mane = pal['primary']
-    accent = pal['accent']
-    far = darken(coat, 0.2)
-    p.shadow(0.5, 0.38)
-    flowing_hair(p, [(0.24, 0.5), (0.23, 0.52), (0.22, 0.54)], (-0.4, 1.0), 0.3, mane, width=0.03)
-    for x0, x1 in ((0.33, 0.35), (0.62, 0.6)):
-        leg(p, (x0, 0.6), (x1, 0.76), (x0, 0.88), 0.035, 0.018, far, texture='fur')
-        hoof(p, x0 + 0.005, 0.915, 0.022, (180, 160, 130))
-    body = p.blob_mask([(0.22, 0.52), (0.32, 0.44), (0.55, 0.44), (0.68, 0.46), (0.7, 0.58), (0.6, 0.64), (0.4, 0.64), (0.25, 0.6)])
-    p.part(body, coat, texture='fur', gloss=0.3)
-    p.part(p.ellipse_mask(0.29, 0.55, 0.08, 0.09, -0.3), coat, texture='fur', outline=0.25)
-    for x0, x1 in ((0.28, 0.25), (0.66, 0.68)):
-        leg(p, (x0, 0.6), (x1, 0.76), (x0 + 0.005, 0.88), 0.038, 0.019, coat, texture='fur')
-        hoof(p, x0 + 0.008, 0.915, 0.023, (200, 180, 150))
-    neck = p.limb_mask([(0.62, 0.52), (0.7, 0.4), (0.74, 0.3)], [0.07, 0.055, 0.045])
-    p.part(neck, coat, texture='fur')
-    head = p.blob_mask([(0.72, 0.26), (0.78, 0.22), (0.84, 0.25), (0.92, 0.33), (0.93, 0.38), (0.88, 0.39),
-                        (0.8, 0.34), (0.73, 0.33)])
-    p.part(head, coat, texture='fur', gloss=0.3)
-    p.part(p.ellipse_mask(0.905, 0.36, 0.008, 0.006), darken(coat, 0.5))
-    p.part(p.blob_mask([(0.76, 0.24), (0.77, 0.17), (0.79, 0.23)]), coat, roundness=0.5)
-    # Spiral horn
-    hb, ht = (0.81, 0.23), (0.9, 0.06)
-    p.part(p.limb_mask([hb, ht], [0.016, 0.003]), mix(accent, (250, 230, 170), 0.5), gloss=0.8, roundness=0.9)
-    for k in range(6):
-        t = (k + 0.5) / 6
-        x, y = hb[0] + (ht[0] - hb[0]) * t, hb[1] + (ht[1] - hb[1]) * t
-        p.stroke([(x - 0.012 * (1 - t), y + 0.004), (x + 0.012 * (1 - t), y - 0.006)], 0.0025,
-                 darken(accent, 0.3), opacity=0.6)
-    p.glow(p.limb_mask([hb, ht], [0.016, 0.003]), lighten(accent, 0.3), 0.02, 0.35)
-    p.eye(0.825, 0.29, 0.016, (90, 60, 140), look=(0.4, 0.0), squash=0.85)
-    flowing_hair(p, [(0.74, 0.26), (0.72, 0.31), (0.7, 0.36), (0.68, 0.41), (0.66, 0.46)], (-0.6, 0.6), 0.16,
-                 mane, width=0.022)
 
 
 def humanoid_body(p: Painter, cx, top, height, skin, cloth, hair, eye_c, float_y=0.0, legs=True):
@@ -1467,53 +1111,454 @@ def draw_kraken(p: Painter, pal):
         p.eye(x, 0.6, 0.032, (240, 190, 50), pupil='goat', sclera=(240, 190, 50))
 
 
+# Four-legged anatomy
+
+GROUND_FOOT = 0.912
+
+
+def fore_leg(p: Painter, shoulder: Point, w: float, color, foot='paw', foot_color=None, texture='fur'):
+    """Front leg: shoulder muscle, upper arm to elbow, forearm to wrist, short pastern, foot."""
+    x, y = shoulder
+    span = GROUND_FOOT - y
+    elbow = (x - 0.006, y + span * 0.38)
+    wrist = (x + 0.004, y + span * 0.8)
+    foot_pt = (x + 0.012, GROUND_FOOT - w * 0.4)
+    p.part(p.ellipse_mask(x, y + span * 0.08, w * 1.5, span * 0.26, 0.15), color, texture=texture, outline=0.35)
+    p.part(p.limb_mask([(x, y), elbow, wrist, foot_pt], [w * 1.3, w * 1.05, w * 0.82, w * 0.8]), color,
+           texture=texture, texture_angle=1.5)
+    _foot(p, foot_pt, w, foot, foot_color or color)
+
+
+def hind_leg(p: Painter, hip: Point, w: float, color, foot='paw', foot_color=None, texture='fur'):
+    """Hind leg: thigh, stifle forward, gaskin back to the hock, cannon down to the foot."""
+    x, y = hip
+    span = GROUND_FOOT - y
+    stifle = (x + 0.035, y + span * 0.36)
+    hock = (x - 0.03, y + span * 0.66)
+    foot_pt = (x - 0.012, GROUND_FOOT - w * 0.4)
+    p.part(p.ellipse_mask(x + 0.01, y + span * 0.16, w * 2.3, span * 0.34, -0.35), color, texture=texture,
+           outline=0.35)
+    p.part(p.limb_mask([(x + 0.01, y + span * 0.2), stifle, hock, foot_pt], [w * 1.6, w * 1.2, w * 0.82, w * 0.78]),
+           color, texture=texture, texture_angle=1.4)
+    _foot(p, foot_pt, w, foot, foot_color or color)
+
+
+def _foot(p: Painter, at: Point, w: float, kind: str, color):
+    x, y = at
+    if kind == 'hoof':
+        p.part(p.poly_mask([(x - w * 0.85, GROUND_FOOT + 0.004), (x - w * 0.65, y - w * 0.3),
+                            (x + w * 0.75, y - w * 0.3), (x + w * 0.95, GROUND_FOOT + 0.004)]), color, gloss=0.5,
+               roundness=0.5)
+    elif kind == 'talon':
+        for dx in (-0.022, 0.0, 0.022):
+            p.stroke([(x, y), (x + dx, GROUND_FOOT), (x + dx * 1.3 + 0.006, GROUND_FOOT + 0.004)], 0.012, color)
+    else:
+        p.part(p.ellipse_mask(x + w * 0.35, GROUND_FOOT - w * 0.25, w * 1.05, w * 0.55), color, texture='fur',
+               roundness=0.7)
+
+
+def quad_body(p: Painter, rump_x: float, chest_x: float, back_y: float, belly_y: float, color, belly_color=None,
+              texture='fur', deep_chest=0.06):
+    """Side-view body: rounded rump, gently dipping back, deep chest and a belly tucked up toward the flank."""
+    mid = (rump_x + chest_x) / 2
+    pts = [(rump_x + 0.02, back_y + 0.005), (mid, back_y + 0.015), (chest_x - 0.05, back_y - 0.008),
+           (chest_x + 0.02, back_y + 0.05), (chest_x + 0.005, belly_y + deep_chest * 0.3), (chest_x - 0.06, belly_y + 0.01),
+           (mid, belly_y - 0.012), (rump_x + 0.09, belly_y - 0.035), (rump_x - 0.012, back_y + 0.09)]
+    body = p.blob_mask(pts)
+    p.part(body, color, color2=belly_color, gradient=0.55 if belly_color else 0.0, texture=texture)
+    return body
+
+
+def neck_and_head_anchor(p: Painter, base: Point, head: Point, w0: float, w1: float, color, texture='fur'):
+    """Neck from the chest to the back of the head."""
+    mid = ((base[0] + head[0]) / 2 + 0.01, (base[1] + head[1]) / 2)
+    p.part(p.limb_mask([base, mid, head], [w0, (w0 + w1) / 2, w1]), color, texture=texture, texture_angle=-1.0)
+
+
+def lion_head(p: Painter, cx, cy, s, fur, mane, eye_c, fangs=False):
+    """Lion head in profile at (cx, cy) with a mane framing it, scale s."""
+    for k in range(18):
+        a = 0.35 * math.pi + k * (1.45 * math.pi / 17)
+        r0 = 0.05 * s
+        r1 = (0.12 + 0.025 * math.sin(k * 2.3)) * s
+        p.part(p.limb_mask([(cx - 0.02 * s + math.cos(a) * r0, cy + math.sin(a) * r0),
+                            (cx - 0.03 * s + math.cos(a) * r1 * 0.7, cy + math.sin(a) * r1 * 0.7 + 0.01 * s),
+                            (cx - 0.04 * s + math.cos(a) * r1, cy + math.sin(a) * r1 + 0.025 * s)],
+                           [0.04 * s, 0.035 * s, 0.012 * s]),
+               darken(mane, 0.12 * (k % 3)), texture='fur', texture_angle=a, outline=0.2)
+    face = p.blob_mask([(cx - 0.05 * s, cy - 0.02 * s), (cx + 0.0, cy - 0.06 * s), (cx + 0.06 * s, cy - 0.045 * s),
+                        (cx + 0.1 * s, cy + 0.0), (cx + 0.11 * s, cy + 0.04 * s), (cx + 0.06 * s, cy + 0.075 * s),
+                        (cx - 0.02 * s, cy + 0.07 * s), (cx - 0.05 * s, cy + 0.03 * s)])
+    p.part(face, fur, texture='fur', texture_angle=0.2)
+    p.part(p.ellipse_mask(cx + 0.075 * s, cy + 0.035 * s, 0.04 * s, 0.03 * s), lighten(fur, 0.3), texture='fur',
+           roundness=0.6)
+    p.part(p.blob_mask([(cx + 0.085 * s, cy + 0.0), (cx + 0.115 * s, cy + 0.008 * s), (cx + 0.1 * s, cy + 0.025 * s)]),
+           (80, 50, 46), gloss=0.5)
+    p.stroke([(cx + 0.1 * s, cy + 0.03 * s), (cx + 0.095 * s, cy + 0.05 * s), (cx + 0.07 * s, cy + 0.06 * s)],
+             0.004 * s, (60, 34, 30))
+    if fangs:
+        for dx in (0.07, 0.09):
+            p.part(p.poly_mask([(cx + dx * s, cy + 0.058 * s), (cx + (dx + 0.01) * s, cy + 0.058 * s),
+                                (cx + (dx + 0.005) * s, cy + 0.08 * s)]), (246, 242, 230), gloss=0.5)
+    p.part(p.ellipse_mask(cx + 0.0, cy - 0.055 * s, 0.018 * s, 0.016 * s), darken(fur, 0.15), roundness=0.5)
+    p.eye(cx + 0.045 * s, cy - 0.01 * s, 0.017 * s, eye_c, pupil='round', look=(0.5, 0.0), squash=0.8)
+
+
+def big_cat_colors(pal, base=(196, 146, 84)):
+    """Tawny coat with a palette tint, and a darker mane."""
+    fur = mix(base, pal['primary'], 0.22)
+    mane = mix(darken(base, 0.35), pal['secondary'], 0.2)
+    return fur, mane
+
+
+@species('cat')
+def draw_cat(p: Painter, pal):
+    coat, belly, eye_c, markings = pal['coat'], pal['belly'], pal['eye'], pal['markings']
+    far = darken(coat, 0.22)
+    p.shadow(0.5, 0.33)
+    p.part(p.limb_mask([(0.24, 0.6), (0.14, 0.58), (0.09, 0.45), (0.13, 0.32)], [0.03, 0.028, 0.025, 0.02]),
+           coat, texture='fur', texture_angle=-1.4)
+    hind_leg(p, (0.31, 0.6), 0.02, far)
+    fore_leg(p, (0.63, 0.6), 0.019, far)
+    body = quad_body(p, 0.24, 0.68, 0.52, 0.7, coat, belly)
+    if markings:
+        for x in (0.36, 0.44, 0.52, 0.6):
+            p.part(p.intersect(p.limb_mask([(x, 0.52), (x - 0.012, 0.59), (x + 0.004, 0.65)], [0.012, 0.009, 0.003]),
+                               body), markings, flat=True, opacity=0.75)
+    hind_leg(p, (0.29, 0.61), 0.022, coat)
+    fore_leg(p, (0.66, 0.6), 0.02, coat)
+    neck_and_head_anchor(p, (0.65, 0.58), (0.78, 0.45), 0.065, 0.05, coat)
+    for x0, y0, x1, y1, x2, y2 in ((0.72, 0.41, 0.735, 0.29, 0.78, 0.39), (0.8, 0.37, 0.84, 0.26, 0.875, 0.38)):
+        p.part(p.blob_mask([(x0, y0), (x1, y1), (x2, y2)]), coat, texture='fur', roundness=0.6)
+        p.part(p.blob_mask([(x0 + 0.017, y0 - 0.006), (x1 + 0.005, y1 + 0.035), (x2 - 0.014, y2 - 0.008)]),
+               (210, 150, 150), roundness=0.4)
+    head = p.blob_mask([(0.7, 0.46), (0.73, 0.39), (0.82, 0.36), (0.9, 0.4), (0.935, 0.47), (0.9, 0.53),
+                        (0.79, 0.55), (0.72, 0.52)])
+    p.part(head, coat, texture='fur', texture_angle=0.3)
+    if markings:
+        p.stroke([(0.8, 0.375), (0.795, 0.41)], 0.01, markings, opacity=0.8)
+    p.part(p.ellipse_mask(0.895, 0.49, 0.042, 0.034), lighten(belly, 0.25), roundness=0.7)
+    p.part(p.blob_mask([(0.912, 0.458), (0.937, 0.46), (0.926, 0.477)]), (196, 112, 120), gloss=0.5)
+    p.stroke([(0.925, 0.478), (0.92, 0.497), (0.905, 0.503)], 0.005, (70, 45, 45))
+    p.eye(0.84, 0.43, 0.03, eye_c, pupil='slit', look=(0.4, 0.0), squash=0.85)
+    whiskers(p, 0.9, 0.49, 0.08)
+
+
+@species('dog')
+def draw_dog(p: Painter, pal):
+    coat, belly, eye_c, patch = pal['coat'], pal['belly'], pal['eye'], pal['markings']
+    far = darken(coat, 0.22)
+    tan_points = pal['markings'] and pal['coat'][0] < 60
+    p.shadow(0.5, 0.36)
+    p.part(p.limb_mask([(0.2, 0.5), (0.13, 0.42), (0.14, 0.31)], [0.026, 0.022, 0.014]), coat, texture='fur',
+           texture_angle=-1.2)
+    hind_leg(p, (0.27, 0.56), 0.026, far, foot_color=belly if tan_points else None)
+    fore_leg(p, (0.62, 0.55), 0.024, far, foot_color=belly if tan_points else None)
+    body = quad_body(p, 0.19, 0.68, 0.46, 0.66, coat, belly, deep_chest=0.08)
+    if patch and pal['coat'][0] > 200:
+        p.part(p.intersect(p.ellipse_mask(0.38, 0.5, 0.09, 0.06, 0.2), body), patch, flat=True)
+    hind_leg(p, (0.25, 0.57), 0.028, coat, foot_color=belly if tan_points else None)
+    fore_leg(p, (0.66, 0.55), 0.026, coat, foot_color=belly if tan_points else None)
+    neck_and_head_anchor(p, (0.64, 0.54), (0.78, 0.36), 0.08, 0.06, coat)
+    neck = p.limb_mask([(0.64, 0.54), (0.72, 0.45), (0.78, 0.36)], [0.08, 0.07, 0.06])
+    p.part(p.intersect(p.limb_mask([(0.64, 0.41), (0.71, 0.455), (0.78, 0.5)], [0.016, 0.016, 0.016]), neck),
+           pal['primary'], gloss=0.5, roundness=0.6)
+    p.part(p.ellipse_mask(0.75, 0.51, 0.013, 0.016), (230, 196, 70), gloss=0.9)
+    head = p.blob_mask([(0.72, 0.32), (0.78, 0.25), (0.86, 0.26), (0.9, 0.32), (0.97, 0.35),
+                        (0.975, 0.41), (0.9, 0.44), (0.79, 0.43), (0.73, 0.39)])
+    p.part(head, coat, texture='fur')
+    p.part(p.ellipse_mask(0.92, 0.4, 0.05, 0.033), belly if tan_points or coat[0] > 150 else lighten(coat, 0.15),
+           texture='fur', roundness=0.7)
+    p.part(p.ellipse_mask(0.965, 0.36, 0.019, 0.015), (30, 26, 28), gloss=0.8)
+    p.stroke([(0.965, 0.378), (0.95, 0.415), (0.92, 0.423)], 0.005, (60, 40, 36))
+    p.eye(0.855, 0.315, 0.024, eye_c, look=(0.5, 0.0))
+    ear = p.blob_mask([(0.77, 0.27), (0.81, 0.26), (0.82, 0.33), (0.8, 0.42), (0.76, 0.4), (0.75, 0.32)])
+    p.part(ear, darken(coat, 0.18) if not patch else patch, texture='fur', texture_angle=1.4)
+
+
+@species('fox')
+def draw_fox(p: Painter, pal):
+    coat, belly, socks, eye_c = pal['coat'], pal['belly'], pal['markings'], pal['eye']
+    p.shadow(0.5, 0.38)
+    tail = p.blob_mask([(0.25, 0.53), (0.14, 0.57), (0.05, 0.67), (0.03, 0.78), (0.1, 0.8), (0.2, 0.72), (0.28, 0.6)])
+    p.part(tail, coat, texture='fur', texture_angle=2.2, texture_scale=1.4)
+    p.part(p.intersect(p.ellipse_mask(0.05, 0.77, 0.06, 0.06), tail), (248, 246, 242), texture='fur')
+    hind_leg(p, (0.31, 0.58), 0.018, socks)
+    fore_leg(p, (0.63, 0.57), 0.016, socks)
+    quad_body(p, 0.25, 0.69, 0.49, 0.65, coat, belly)
+    hind_leg(p, (0.29, 0.59), 0.02, coat, foot_color=socks)
+    p.part(p.limb_mask([(0.262, 0.8), (0.276, 0.9)], [0.012, 0.011]), socks, texture='fur')
+    fore_leg(p, (0.67, 0.57), 0.018, coat, foot_color=socks)
+    p.part(p.limb_mask([(0.674, 0.77), (0.682, 0.9)], [0.011, 0.011]), socks, texture='fur')
+    neck_and_head_anchor(p, (0.66, 0.55), (0.75, 0.41), 0.06, 0.05, coat)
+    p.part(p.blob_mask([(0.69, 0.47), (0.76, 0.44), (0.76, 0.56), (0.69, 0.6)]), belly, texture='fur', roundness=0.6)
+    for bx, by in ((0.72, 0.36), (0.79, 0.34)):
+        p.part(p.blob_mask([(bx - 0.02, by + 0.02), (bx + 0.005, by - 0.12), (bx + 0.035, by + 0.01)]), socks,
+               texture='fur', roundness=0.6)
+        p.part(p.blob_mask([(bx - 0.008, by + 0.01), (bx + 0.006, by - 0.08), (bx + 0.022, by + 0.005)]), coat,
+               roundness=0.4)
+    head = p.blob_mask([(0.7, 0.39), (0.75, 0.32), (0.84, 0.33), (0.9, 0.38), (0.98, 0.42),
+                        (0.97, 0.45), (0.88, 0.48), (0.76, 0.48)])
+    p.part(head, coat, texture='fur', texture_angle=0.2)
+    p.part(p.intersect(p.blob_mask([(0.8, 0.45), (0.9, 0.43), (0.98, 0.44), (0.9, 0.49), (0.78, 0.51)]), head),
+           belly, texture='fur')
+    p.part(p.ellipse_mask(0.973, 0.42, 0.014, 0.012), (24, 20, 22), gloss=0.8)
+    p.eye(0.84, 0.38, 0.02, eye_c, pupil='slit', look=(0.5, 0.0), squash=0.8)
+
+
+@species('unicorn')
+def draw_unicorn(p: Painter, pal):
+    coat = mix(pal['secondary'], (246, 244, 250), 0.75)
+    mane, accent = pal['primary'], pal['accent']
+    far = darken(coat, 0.2)
+    hoof_c = (176, 156, 128)
+    p.shadow(0.5, 0.38)
+    flowing_hair(p, [(0.22, 0.47), (0.21, 0.49), (0.2, 0.51)], (-0.3, 1.0), 0.32, mane, width=0.028)
+    hind_leg(p, (0.3, 0.55), 0.02, far, foot='hoof', foot_color=darken(hoof_c, 0.15))
+    fore_leg(p, (0.62, 0.53), 0.018, far, foot='hoof', foot_color=darken(hoof_c, 0.15))
+    quad_body(p, 0.21, 0.69, 0.44, 0.62, coat, lighten(coat, 0.1), deep_chest=0.05)
+    hind_leg(p, (0.28, 0.56), 0.022, coat, foot='hoof', foot_color=hoof_c)
+    fore_leg(p, (0.66, 0.53), 0.02, coat, foot='hoof', foot_color=hoof_c)
+    neck_and_head_anchor(p, (0.63, 0.5), (0.75, 0.29), 0.075, 0.045, coat)
+    head = p.blob_mask([(0.72, 0.26), (0.78, 0.22), (0.84, 0.25), (0.92, 0.33), (0.93, 0.38), (0.88, 0.39),
+                        (0.8, 0.34), (0.73, 0.33)])
+    p.part(head, coat, texture='fur', gloss=0.3)
+    p.part(p.ellipse_mask(0.905, 0.36, 0.008, 0.006), darken(coat, 0.5))
+    p.part(p.blob_mask([(0.76, 0.24), (0.77, 0.17), (0.79, 0.23)]), coat, roundness=0.5)
+    hb, ht = (0.81, 0.23), (0.9, 0.06)
+    p.part(p.limb_mask([hb, ht], [0.016, 0.004]), mix(accent, (250, 230, 170), 0.5), gloss=0.8, roundness=0.9)
+    for k in range(5):
+        t = (k + 0.5) / 5
+        x, y = hb[0] + (ht[0] - hb[0]) * t, hb[1] + (ht[1] - hb[1]) * t
+        p.stroke([(x - 0.012 * (1 - t), y + 0.004), (x + 0.012 * (1 - t), y - 0.006)], 0.008, darken(accent, 0.3))
+    p.eye(0.825, 0.29, 0.016, (90, 60, 140), look=(0.4, 0.0), squash=0.85)
+    flowing_hair(p, [(0.74, 0.26), (0.72, 0.31), (0.7, 0.36), (0.68, 0.41), (0.66, 0.46)], (-0.6, 0.6), 0.16,
+                 mane, width=0.022)
+
+
+@species('griffin')
+def draw_griffin(p: Painter, pal):
+    lion, _ = big_cat_colors(pal)
+    eagle = mix(pal['secondary'], (120, 84, 56), 0.7)
+    head_c = (244, 242, 236)
+    talon_leg = (226, 186, 80)
+    p.shadow(0.5, 0.4)
+    feather_wing(p, (0.5, 0.48), (0.24, 0.12), 0.1, darken(eagle, 0.2), darken(eagle, 0.4))
+    p.part(p.limb_mask([(0.22, 0.58), (0.13, 0.64), (0.08, 0.75)], [0.018, 0.015, 0.012]), lion, texture='fur')
+    p.part(p.ellipse_mask(0.075, 0.78, 0.025, 0.035), darken(lion, 0.45), texture='fur')
+    hind_leg(p, (0.3, 0.58), 0.024, darken(lion, 0.25))
+    fore_leg(p, (0.62, 0.56), 0.015, darken(talon_leg, 0.25), foot='talon', foot_color=(60, 50, 40), texture='scales')
+    body = quad_body(p, 0.21, 0.7, 0.48, 0.67, lion, lighten(lion, 0.2))
+    p.part(p.intersect(p.blob_mask([(0.52, 0.45), (0.74, 0.45), (0.76, 0.68), (0.56, 0.72)]), body), eagle,
+           texture='feathers', texture_scale=0.8)
+    hind_leg(p, (0.28, 0.59), 0.026, lion)
+    fore_leg(p, (0.67, 0.56), 0.016, talon_leg, foot='talon', foot_color=(60, 50, 40), texture='scales')
+    feather_wing(p, (0.56, 0.5), (0.36, 0.1), 0.11, eagle, darken(eagle, 0.3))
+    neck_and_head_anchor(p, (0.66, 0.53), (0.75, 0.33), 0.065, 0.05, head_c, texture='feathers')
+    head = p.ellipse_mask(0.76, 0.31, 0.065, 0.058)
+    p.part(head, head_c, texture='feathers', texture_scale=0.6)
+    p.part(p.blob_mask([(0.8, 0.28), (0.87, 0.29), (0.895, 0.33), (0.87, 0.35), (0.86, 0.33), (0.81, 0.34)]),
+           (236, 190, 60), gloss=0.6)
+    p.eye(0.775, 0.29, 0.015, (240, 170, 40), sclera=(240, 170, 40), look=(0.4, 0.0), lid=(60, 50, 40))
+
+
+@species('chimera')
+def draw_chimera(p: Painter, pal):
+    lion, mane = big_cat_colors(pal)
+    goat_c = pal['accent']
+    snake = mix(goat_c, (80, 120, 60), 0.5)
+    p.shadow(0.5, 0.4)
+    p.part(p.limb_mask([(0.24, 0.58), (0.14, 0.56), (0.08, 0.45), (0.13, 0.34), (0.19, 0.3)],
+                       [0.024, 0.023, 0.021, 0.019, 0.017]), snake, texture='scales', texture_angle=-1.4)
+    p.part(p.blob_mask([(0.16, 0.3), (0.2, 0.26), (0.26, 0.27), (0.29, 0.3), (0.24, 0.33), (0.17, 0.33)]), snake,
+           texture='scales', texture_scale=0.6)
+    p.eye(0.23, 0.29, 0.009, (240, 200, 40), pupil='slit', sclera=(240, 200, 40))
+    p.stroke([(0.29, 0.31), (0.315, 0.318)], 0.008, (200, 40, 50))
+    hind_leg(p, (0.3, 0.6), 0.025, darken(lion, 0.25))
+    fore_leg(p, (0.6, 0.58), 0.025, darken(lion, 0.25))
+    quad_body(p, 0.23, 0.67, 0.5, 0.69, lion, lighten(lion, 0.2), deep_chest=0.08)
+    hind_leg(p, (0.28, 0.61), 0.027, lion)
+    fore_leg(p, (0.64, 0.58), 0.027, lion)
+    # Goat head and neck rising from the back
+    goat = mix(goat_c, (206, 200, 188), 0.6)
+    p.part(p.limb_mask([(0.45, 0.52), (0.45, 0.42), (0.48, 0.34)], [0.034, 0.03, 0.026]), goat, texture='fur')
+    for k in range(2):
+        horn(p, (0.5 - k * 0.012, 0.28), (0.44 - k * 0.012, 0.16), (0.34 - k * 0.014, 0.18), 0.017 - k * 0.003,
+             darken(goat_c, 0.35 + 0.1 * k))
+    gh = p.blob_mask([(0.46, 0.31), (0.5, 0.26), (0.55, 0.27), (0.6, 0.31), (0.62, 0.35), (0.6, 0.37), (0.54, 0.35),
+                      (0.48, 0.36)])
+    p.part(gh, goat, texture='fur')
+    p.part(p.ellipse_mask(0.612, 0.345, 0.008, 0.006), darken(goat, 0.6))
+    p.eye(0.53, 0.3, 0.011, (220, 170, 60), pupil='goat', sclera=(220, 170, 60), squash=0.8)
+    # Lion neck carries the head forward from the chest, mane around both
+    neck_and_head_anchor(p, (0.62, 0.56), (0.74, 0.45), 0.08, 0.065, lion)
+    lion_head(p, 0.78, 0.45, 1.0, lion, mane, (220, 160, 50))
+
+
 @species('manticore')
 def draw_manticore(p: Painter, pal):
-    lion = mix(pal['primary'], (190, 110, 70), 0.55)
-    mane_c = darken(mix(pal['secondary'], (130, 60, 40), 0.5), 0.1)
+    lion, mane = big_cat_colors(pal, base=(190, 116, 74))
     wing_c = darken(pal['accent'], 0.3)
     p.shadow(0.5, 0.4)
     membrane_wing(p, (0.48, 0.48), [(0.42, 0.24), (0.2, 0.14), (0.2, 0.3), (0.28, 0.42)], darken(wing_c, 0.2),
                   darken(lion, 0.4))
-    # Scorpion tail arching over the back
-    seg = [(0.25, 0.58), (0.16, 0.5), (0.14, 0.36), (0.22, 0.24), (0.34, 0.2), (0.42, 0.24)]
     shell = mix(lion, (90, 60, 50), 0.45)
-    p.part(p.limb_mask(seg, [0.032, 0.03, 0.027, 0.024, 0.02, 0.016]), shell, gloss=0.6, roundness=0.9)
+    seg = [(0.25, 0.56), (0.16, 0.48), (0.14, 0.35), (0.21, 0.23), (0.33, 0.19), (0.41, 0.23)]
+    p.part(p.limb_mask(seg, [0.03, 0.028, 0.025, 0.022, 0.018, 0.014]), shell, gloss=0.6, roundness=0.9)
     path = catmull_rom(seg, closed=False, steps=4)
     for i in range(2, len(path) - 1, 2):
         (x0, y0), (x1, y1) = path[i - 1], path[i + 1]
         a = math.atan2(y1 - y0, x1 - x0) + math.pi / 2
-        r = 0.031 - i * 0.0007
+        r = 0.03 - i * 0.0007
         x, y = path[i]
-        p.stroke([(x - math.cos(a) * r, y - math.sin(a) * r), (x + math.cos(a) * r, y + math.sin(a) * r)], 0.004,
-                 darken(shell, 0.4), opacity=0.7, smooth=False)
-    p.part(p.blob_mask([(0.41, 0.22), (0.47, 0.25), (0.5, 0.31), (0.45, 0.28), (0.41, 0.27)]), (40, 30, 30), gloss=0.8)
-    far = darken(lion, 0.25)
-    leg(p, (0.3, 0.64), (0.33, 0.78), (0.31, 0.9), 0.045, 0.025, far, texture='fur')
-    leg(p, (0.62, 0.62), (0.6, 0.77), (0.61, 0.9), 0.045, 0.026, far, texture='fur')
-    paw(p, 0.32, 0.912, 0.03, far)
-    paw(p, 0.62, 0.912, 0.03, far)
-    body = p.blob_mask([(0.22, 0.6), (0.3, 0.5), (0.5, 0.48), (0.66, 0.5), (0.7, 0.62), (0.6, 0.7), (0.4, 0.7), (0.25, 0.68)])
-    p.part(body, lion, texture='fur')
-    p.part(p.ellipse_mask(0.28, 0.62, 0.085, 0.1, -0.3), lion, texture='fur', outline=0.25)
-    leg(p, (0.26, 0.68), (0.23, 0.8), (0.26, 0.9), 0.048, 0.027, lion, texture='fur')
-    paw(p, 0.27, 0.912, 0.032, lion)
-    leg(p, (0.66, 0.62), (0.68, 0.77), (0.67, 0.9), 0.05, 0.028, lion, texture='fur')
-    paw(p, 0.685, 0.912, 0.033, lion)
+        p.stroke([(x - math.cos(a) * r, y - math.sin(a) * r), (x + math.cos(a) * r, y + math.sin(a) * r)], 0.008,
+                 darken(shell, 0.4), smooth=False)
+    p.part(p.blob_mask([(0.4, 0.21), (0.46, 0.24), (0.5, 0.31), (0.45, 0.28), (0.4, 0.26)]), (40, 30, 30), gloss=0.8)
+    hind_leg(p, (0.3, 0.6), 0.025, darken(lion, 0.25))
+    fore_leg(p, (0.6, 0.58), 0.025, darken(lion, 0.25))
+    quad_body(p, 0.22, 0.67, 0.5, 0.69, lion, lighten(lion, 0.2), deep_chest=0.08)
+    hind_leg(p, (0.28, 0.61), 0.027, lion)
+    fore_leg(p, (0.64, 0.58), 0.027, lion)
     membrane_wing(p, (0.54, 0.5), [(0.5, 0.22), (0.3, 0.1), (0.3, 0.26), (0.36, 0.4)], wing_c, darken(lion, 0.3))
-    for k in range(16):
-        a = -math.pi * 1.0 + k * (math.pi * 1.6 / 15)
-        p.part(p.limb_mask([(0.76, 0.44), (0.76 + math.cos(a) * 0.1, 0.44 + math.sin(a) * 0.1),
-                            (0.75 + math.cos(a) * 0.15, 0.45 + math.sin(a) * 0.15)], [0.042, 0.036, 0.012]),
-               darken(mane_c, 0.1 * (k % 3)), texture='fur', texture_angle=a)
-    face = p.blob_mask([(0.73, 0.38), (0.8, 0.35), (0.87, 0.39), (0.9, 0.46), (0.86, 0.51), (0.77, 0.51), (0.73, 0.45)])
-    p.part(face, lion, texture='fur')
-    p.part(p.ellipse_mask(0.86, 0.47, 0.04, 0.03), lighten(lion, 0.25), texture='fur', roundness=0.6)
-    p.part(p.blob_mask([(0.87, 0.44), (0.9, 0.445), (0.89, 0.462)]), (70, 44, 40), gloss=0.5)
-    p.stroke([(0.82, 0.49), (0.86, 0.495), (0.885, 0.485)], 0.004, (60, 30, 30))
-    for x in (0.835, 0.865):
-        p.part(p.poly_mask([(x, 0.49), (x + 0.008, 0.49), (x + 0.004, 0.508)]), (246, 242, 230), gloss=0.5)
-    p.eye(0.81, 0.415, 0.018, (230, 80, 40), pupil='slit', look=(0.4, 0.0), squash=0.75)
+    neck_and_head_anchor(p, (0.62, 0.56), (0.74, 0.45), 0.08, 0.065, lion)
+    lion_head(p, 0.78, 0.45, 1.0, lion, mane, (230, 80, 40), fangs=True)
+
+
+def serpent_head(p: Painter, x, y, angle, s, skin, belly, eye_c):
+    """Reptile head at the end of a neck, pointing along angle."""
+    ca, sa = math.cos(angle), math.sin(angle)
+
+    def at(u, v):
+        return (x + (u * ca - v * sa) * s, y + (u * sa + v * ca) * s)
+    head = p.blob_mask([at(-0.03, -0.035), at(0.04, -0.04), at(0.1, -0.02), at(0.12, 0.01), at(0.08, 0.03),
+                        at(0.0, 0.035), at(-0.035, 0.02)])
+    p.part(head, skin, texture='scales', texture_scale=0.8)
+    p.part(p.intersect(p.blob_mask([at(-0.02, 0.02), at(0.1, 0.012), at(0.07, 0.035), at(-0.01, 0.04)]), head), belly,
+           roundness=0.5)
+    p.stroke([at(0.02, 0.018), at(0.11, 0.008)], 0.005 * s, darken(skin, 0.5))
+    for k in range(3):
+        p.part(p.poly_mask([at(-0.03 + k * 0.02, -0.03), at(-0.05 + k * 0.02, -0.065), at(-0.01 + k * 0.02, -0.032)]),
+               darken(skin, 0.25), roundness=0.4)
+    ex, ey = at(0.035, -0.012)
+    p.eye(ex, ey, 0.014 * s, eye_c, pupil='slit', sclera=eye_c, squash=0.8)
+
+
+@species('hydra')
+def draw_hydra(p: Painter, pal):
+    skin = pal['primary']
+    belly = lighten(mix(skin, (236, 220, 170), 0.6), 0.1)
+    p.shadow(0.48, 0.42)
+    p.part(p.limb_mask([(0.26, 0.76), (0.14, 0.8), (0.06, 0.86), (0.02, 0.82)], [0.045, 0.032, 0.018, 0.006]),
+           darken(skin, 0.1), texture='scales')
+    hind_leg(p, (0.33, 0.7), 0.03, darken(skin, 0.2), texture='scales')
+    fore_leg(p, (0.64, 0.7), 0.028, darken(skin, 0.2), texture='scales')
+    # Necks rise from the shoulders in S-curves, outer ones swinging out to the sides
+    necks = [((0.56, 0.62), (0.44, 0.52), (0.38, 0.38), (0.28, 0.3), (0.22, 0.26), -0.5, 0.82),
+             ((0.6, 0.6), (0.6, 0.46), (0.54, 0.34), (0.58, 0.22), (0.6, 0.16), -0.15, 1.0),
+             ((0.64, 0.62), (0.74, 0.54), (0.74, 0.42), (0.8, 0.34), (0.84, 0.3), 0.15, 0.9)]
+    for a, b, c, d, e, ang, sc in necks:
+        shade = darken(skin, 0.2 * (1.0 - sc))
+        p.part(p.limb_mask([a, b, c, d, e], [0.055, 0.045, 0.038 * sc, 0.033 * sc, 0.03 * sc]), shade,
+               texture='scales', texture_angle=-1.3)
+        p.part(p.limb_mask([(a[0] + 0.02, a[1] + 0.02), (b[0] + 0.018, b[1] + 0.01), (c[0] + 0.015, c[1] + 0.008),
+                            (d[0] + 0.012, d[1] + 0.01)], [0.026, 0.021, 0.016, 0.012]), belly, roundness=0.5,
+               outline=0.0)
+        serpent_head(p, e[0], e[1], ang, 0.95 * sc, shade, belly, (240, 190, 40))
+    body = p.blob_mask([(0.22, 0.76), (0.28, 0.64), (0.42, 0.58), (0.58, 0.57), (0.7, 0.62), (0.74, 0.74),
+                        (0.62, 0.8), (0.36, 0.81)])
+    p.part(body, skin, texture='scales')
+    p.part(p.intersect(p.ellipse_mask(0.5, 0.8, 0.24, 0.05), body), belly, roundness=0.5, outline=0.0)
+    hind_leg(p, (0.31, 0.71), 0.033, skin, texture='scales')
+    fore_leg(p, (0.68, 0.7), 0.03, skin, texture='scales')
+
+
+@species('bunny')
+def draw_bunny(p: Painter, pal):
+    coat, belly, eye_c = pal['coat'], pal['belly'], pal['eye']
+    p.shadow(0.48, 0.3)
+    p.part(p.limb_mask([(0.66, 0.38), (0.63, 0.22), (0.61, 0.09)], [0.03, 0.036, 0.018]), darken(coat, 0.2),
+           texture='fur', texture_angle=-1.5)
+    # Crouched body: rounded rump, back sloping up to the shoulders
+    body = p.blob_mask([(0.2, 0.78), (0.22, 0.62), (0.32, 0.52), (0.48, 0.48), (0.6, 0.5), (0.68, 0.6),
+                        (0.68, 0.76), (0.56, 0.88), (0.3, 0.9)])
+    p.part(body, coat, color2=belly, gradient=0.35, texture='fur', texture_angle=-0.3)
+    p.part(p.ellipse_mask(0.19, 0.68, 0.04, 0.04), (250, 250, 248), texture='fur')
+    # Haunch blended into the body, long hind foot
+    p.part(p.intersect(p.ellipse_mask(0.36, 0.74, 0.12, 0.13, -0.4), body), coat, texture='fur', outline=0.0)
+    p.part(p.blob_mask([(0.28, 0.87), (0.46, 0.865), (0.52, 0.89), (0.5, 0.915), (0.28, 0.915)]), lighten(coat, 0.08),
+           texture='fur')
+    # Front legs
+    for x in (0.6, 0.64):
+        p.part(p.limb_mask([(x, 0.72), (x + 0.008, 0.84), (x + 0.012, 0.9)], [0.022, 0.016, 0.015]),
+               coat if x > 0.6 else darken(coat, 0.15), texture='fur')
+        p.part(p.ellipse_mask(x + 0.022, 0.905, 0.022, 0.011), belly, texture='fur')
+    # Head on a short neck, near ear
+    neck_and_head_anchor(p, (0.6, 0.56), (0.7, 0.46), 0.07, 0.06, coat)
+    head = p.blob_mask([(0.62, 0.43), (0.67, 0.36), (0.76, 0.34), (0.83, 0.39), (0.85, 0.46),
+                        (0.8, 0.52), (0.69, 0.53), (0.63, 0.49)])
+    p.part(head, coat, texture='fur')
+    p.part(p.ellipse_mask(0.805, 0.475, 0.04, 0.035), lighten(belly, 0.1), texture='fur', roundness=0.6)
+    p.part(p.limb_mask([(0.71, 0.37), (0.69, 0.21), (0.71, 0.06)], [0.032, 0.04, 0.02]), coat, texture='fur',
+           texture_angle=-1.5)
+    p.part(p.limb_mask([(0.712, 0.34), (0.697, 0.21), (0.707, 0.09)], [0.014, 0.022, 0.008]), (220, 166, 166),
+           roundness=0.5)
+    p.part(p.blob_mask([(0.84, 0.445), (0.856, 0.45), (0.848, 0.463)]), (210, 140, 150), gloss=0.4)
+    p.stroke([(0.848, 0.463), (0.842, 0.48), (0.83, 0.485)], 0.005, (90, 60, 60))
+    p.eye(0.765, 0.41, 0.028, eye_c, look=(0.3, 0.0), squash=1.05)
+    whiskers(p, 0.83, 0.47, 0.07, (230, 230, 230))
+
+
+@species('hamster')
+def draw_hamster(p: Painter, pal):
+    coat, belly, eye_c = pal['coat'], pal['belly'], pal['eye']
+    p.shadow(0.5, 0.3)
+    # Hind foot behind the body
+    p.part(p.ellipse_mask(0.36, 0.905, 0.045, 0.016), (226, 170, 168), roundness=0.5)
+    body = p.blob_mask([(0.2, 0.78), (0.22, 0.62), (0.32, 0.52), (0.48, 0.48), (0.62, 0.5), (0.72, 0.58),
+                        (0.74, 0.74), (0.66, 0.88), (0.48, 0.92), (0.28, 0.9)])
+    p.part(body, coat, texture='fur', texture_angle=-0.3)
+    # White underside from chin to belly
+    p.part(p.intersect(p.blob_mask([(0.46, 0.94), (0.52, 0.76), (0.64, 0.64), (0.8, 0.66), (0.78, 0.94)]), body),
+           belly, texture='fur', outline=0.0)
+    # Head: rounded, merging into the body, with full cheek pouch
+    head = p.blob_mask([(0.6, 0.5), (0.68, 0.45), (0.77, 0.47), (0.83, 0.53), (0.84, 0.6), (0.78, 0.66),
+                        (0.68, 0.67), (0.6, 0.6)])
+    p.part(head, coat, texture='fur', outline=0.0)
+    p.part(p.ellipse_mask(0.73, 0.62, 0.06, 0.045), belly, texture='fur', outline=0.0)
+    for ex, ey in ((0.64, 0.46), (0.7, 0.44)):
+        p.part(p.ellipse_mask(ex, ey, 0.026, 0.026), darken(coat, 0.1), texture='fur')
+        p.part(p.ellipse_mask(ex + 0.004, ey + 0.004, 0.014, 0.014), (220, 156, 156), roundness=0.4)
+    p.part(p.blob_mask([(0.825, 0.545), (0.845, 0.55), (0.835, 0.565)]), (214, 140, 150), gloss=0.5)
+    p.stroke([(0.835, 0.565), (0.83, 0.58), (0.815, 0.585)], 0.005, (100, 60, 60))
+    p.eye(0.75, 0.52, 0.022, eye_c, sclera=eye_c, look=(0.0, 0.0))
+    whiskers(p, 0.82, 0.56, 0.06, (240, 236, 230))
+    # Small front paws held under the chin
+    for x in (0.7, 0.74):
+        p.part(p.ellipse_mask(x, 0.71, 0.016, 0.012), (226, 170, 168), roundness=0.5)
+
+
+@species('penguin')
+def draw_penguin(p: Painter, pal):
+    black, white, patch = pal['coat'], pal['belly'], pal['markings']
+    p.shadow(0.5, 0.22)
+    for x in (0.44, 0.56):
+        p.part(p.ellipse_mask(x + 0.02, 0.905, 0.05, 0.016), (40, 36, 40), gloss=0.3)
+    body = p.blob_mask([(0.34, 0.66), (0.36, 0.42), (0.44, 0.26), (0.56, 0.24), (0.64, 0.36),
+                        (0.68, 0.62), (0.62, 0.86), (0.5, 0.9), (0.38, 0.86)])
+    p.part(body, black, gloss=0.4)
+    front = p.intersect(p.blob_mask([(0.5, 0.42), (0.6, 0.38), (0.67, 0.5), (0.67, 0.76), (0.58, 0.9), (0.46, 0.88),
+                                     (0.44, 0.62)]), body)
+    p.part(front, white, color2=(214, 216, 222), gradient=0.6, gloss=0.2, outline=0.0)
+    # Golden wash on the upper chest and a patch behind the eye
+    p.part(p.intersect(p.ellipse_mask(0.6, 0.43, 0.065, 0.05), front), lighten(patch, 0.3), flat=True, opacity=0.75)
+    p.part(p.intersect(p.blob_mask([(0.52, 0.32), (0.58, 0.31), (0.6, 0.37), (0.55, 0.4), (0.51, 0.37)]), body),
+           patch, roundness=0.5)
+    p.part(p.limb_mask([(0.4, 0.46), (0.33, 0.6), (0.31, 0.72)], [0.04, 0.035, 0.012]), darken(black, 0.15),
+           gloss=0.35)
+    # Long dark bill with a coloured lower mandible
+    p.part(p.blob_mask([(0.6, 0.285), (0.7, 0.3), (0.745, 0.315), (0.7, 0.322), (0.6, 0.315)]), (40, 38, 44), gloss=0.6)
+    p.part(p.blob_mask([(0.62, 0.315), (0.7, 0.318), (0.72, 0.325), (0.64, 0.328)]), patch, gloss=0.5)
+    p.eye(0.575, 0.285, 0.014, (40, 30, 30), sclera=(40, 30, 30), look=(0.4, 0.0))
 
 
 def draw_egg(p: Painter):
