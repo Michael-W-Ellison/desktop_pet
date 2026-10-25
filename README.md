@@ -11,8 +11,10 @@ An interactive desktop pet application for Windows that lives on your desktop! W
 - **Death & Rebirth**: If neglected, your creature will pass on and leave a new egg
 
 ### 🎨 Procedurally Generated Creatures
-- **10 Different Species**: Dragon, Cat, Dog, Bunny, Bird, Fox, Hamster, Owl, Penguin, Turtle
-- **Unique Color Palettes**: Each creature has randomized colors
+- **25 Species**, each with its own pixel-art design: Dragon, Cat, Dog, Bunny, Bird, Fox, Hamster, Owl,
+  Penguin, Turtle, plus fantasy creatures (Phoenix, Sprite, Golem, Griffin, Unicorn, Chimera, Wisp, Kraken,
+  Hydra, Basilisk, Manticore, Salamander, Sylph, Undine, Gnome)
+- **Unique Color Palettes**: Real animals get a natural colouring chosen by the palette; fantasy creatures use it directly
 - **8 Personality Types**:
   - **Playful**: Loves to play and interact frequently
   - **Shy**: Prefers hiding and quiet time
@@ -159,7 +161,8 @@ desktop_pet/
 │   │   ├── persistence.py     # Save/load functionality
 │   │   └── pet_manager.py     # Main game logic coordinator
 │   ├── ui/
-│   │   ├── sprite_generator.py # Procedural sprite generation
+│   │   ├── creature_art.py    # Pixel-art drawing of every species and item
+│   │   ├── sprite_generator.py # Sprite sizes, stages, facing and caching
 │   │   └── pet_window.py      # Transparent overlay windows
 │   ├── utils/
 │   └── main.py                # Application entry point
@@ -193,11 +196,12 @@ desktop_pet/
 - Friction and damping for natural movement
 
 ### Sprite Generation
-All graphics are **procedurally generated** - no image files needed!
-- Unique creatures based on species and color palette
-- Egg and shelter icons
-- Toys and items
-- Everything drawn with PIL
+All graphics are **pixel art generated in code** - no image files needed!
+- Each species is built from body parts on a 64x64 pixel grid, shaded with five-tone colour ramps,
+  light dithering and a coloured outline, and shown at 3x with crisp pixels
+- Each evolution stage is drawn on its own grid (a Baby on 32x32), so pixels stay the same size as it grows
+- Egg, ball, food bowl, shelter and the application icon are drawn the same way
+- Everything drawn with PIL and NumPy
 
 ## Customization
 
@@ -212,8 +216,8 @@ Edit `src/core/config.py` to customize:
 
 ### Adding New Creature Types
 1. Add species name to `CREATURE_TYPES` in `config.py`
-2. Add drawing function in `sprite_generator.py`
-3. Follow the pattern of existing creature types
+2. Add a drawing function decorated with `@species('name')` in `src/ui/creature_art.py`
+3. Follow the pattern of existing creature types (body parts in unit coordinates, facing right)
 
 ### Adding New Personalities
 1. Add to `PersonalityType` enum in `config.py`

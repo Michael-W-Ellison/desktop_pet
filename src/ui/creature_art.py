@@ -1,11 +1,12 @@
 """
-Shaded creature illustrations, drawn in code.
+Pixel-art creatures, drawn in code.
 
-Each body part is a mask (ellipse, smooth outline or tapered limb) rendered at
-SUPERSAMPLE times the final resolution and shaded as a rounded surface lit from
-the upper left: a height map from the blurred mask gives surface normals for
-diffuse light and a specular highlight. Parts can carry fur, scale, feather or
-stone texture. The finished picture is downsampled for smooth edges.
+Each species is built from body parts (ellipses, smooth outlines, tapered
+limbs) on a small pixel grid (64x64 for a full-grown pet). Shapes are reduced
+to hard-edged pixels by coverage; each part is lit as a rounded surface and
+quantised to a five-tone colour ramp (cool shadows, warm lights) with light
+ordered dithering, and the sprite gets a coloured outline. Callers scale the
+grid up with nearest-neighbour resampling for crisp pixels.
 
 Coordinates are in a unit square (0-1), creature facing right, ground at GROUND.
 """
@@ -13,9 +14,9 @@ import math
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw
 
-SUPERSAMPLE = 3
+MASK_SUPERSAMPLE = 4
 GROUND = 0.93
 LIGHT = np.array([-0.45, -0.7, 0.55])
 LIGHT = LIGHT / np.linalg.norm(LIGHT)
@@ -116,25 +117,58 @@ def blur(a: np.ndarray, sigma: float) -> np.ndarray:
     return a
 
 
+# Ordered-dither thresholds (4x4 Bayer matrix, 0-1)
+BAYER = (np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]], dtype=np.float32) + 0.5) / 16
+
+# Tone levels of a colour ramp, darkest to lightest
+RAMP = (0.42, 0.62, 0.82, 1.0, 1.18)
+
+
+def ramp(color) -> List[Color]:
+    """Pixel-art colour ramp: shadows shift toward cool purple, lights toward warm yellow."""
+    c = rgb(color)
+    out = []
+    for level in RAMP:
+        if level < 1:
+            tone = mix(mix(c, (52, 36, 92), 0.35 * (1 - level) / 0.58), (0, 0, 0), (1 - level) * 0.75)
+        else:
+            tone = mix(c, (255, 244, 214), (level - 1) / 0.18 * 0.45)
+        out.append(tone)
+    return out
+
+
 class Painter:
-    """Builds one creature picture from shaded parts."""
+    """
+    Builds one pixel-art creature on a grid x grid canvas.
+
+    Shapes are drawn at MASK_SUPERSAMPLE times the grid and reduced to pixels by
+    coverage (at least half covered), so outlines are clean and hard-edged.
+    Each part is lit as a rounded surface and its brightness is quantised to a
+    five-tone ramp with light ordered dithering; part edges are darkened one
+    tone, and finish() adds a coloured outline around the whole sprite.
+    """
 
     def __init__(self, size: int, seed: int = 0):
-        self.size = size
-        self.n = size * SUPERSAMPLE
-        self.image = Image.new('RGBA', (self.n, self.n), (0, 0, 0, 0))
+        self.grid = size
+        self.n = size * MASK_SUPERSAMPLE
         self.seed = seed
         self._parts = 0
-        yy, xx = np.mgrid[0:self.n, 0:self.n].astype(np.float32)
-        self._xx, self._yy = xx, yy
+        self.rgb = np.zeros((size, size, 3), dtype=np.float32)
+        self.alpha = np.zeros((size, size), dtype=np.float32)
+        gy, gx = np.mgrid[0:size, 0:size]
+        self._gx, self._gy = gx, gy
+        self._bayer = np.tile(BAYER, (size // 4 + 1, size // 4 + 1))[:size, :size]
 
-    # Coordinates
+    # Coordinates (masks use the supersampled resolution)
 
     def px(self, v: float) -> float:
         return v * self.n
 
     def pts(self, points: Sequence[Point]) -> List[Tuple[float, float]]:
         return [(x * self.n, y * self.n) for x, y in points]
+
+    def gpx(self, v: float) -> float:
+        return v * self.grid
 
     # Masks
 
@@ -189,200 +223,213 @@ class Painter:
     def intersect(mask: Image.Image, keep: Image.Image) -> Image.Image:
         return Image.fromarray(np.minimum(np.asarray(mask), np.asarray(keep)))
 
-    # Textures (values around 0, multiplied into brightness)
+    def coverage(self, mask: Image.Image) -> np.ndarray:
+        """Share of each pixel the mask covers (0-1)."""
+        return np.asarray(mask.resize((self.grid, self.grid), Image.Resampling.BOX), dtype=np.float32) / 255.0
 
-    def texture(self, kind: str, mask: np.ndarray, scale: float = 1.0, angle: float = 0.0) -> np.ndarray:
-        n = self.n
+    # Textures at pixel scale (values around 0, added to the tone level)
+
+    def texture(self, kind: str, scale: float = 1.0, angle: float = 0.0) -> np.ndarray:
+        g = self.grid
         seed = self.seed * 31 + self._parts
+        rng = np.random.default_rng(seed)
+        ca, sa = math.cos(angle), math.sin(angle)
+        u = self._gx * ca + self._gy * sa
+        v = -self._gx * sa + self._gy * ca
         if kind == 'fur':
-            # Fine streaks along the angle
-            rng = np.random.default_rng(seed)
-            big = int(n * 1.5)
-            streak = Image.fromarray((rng.random((big // 2, big // 5)) * 255).astype(np.uint8), 'L')
-            streak = streak.resize((big, big), Image.BICUBIC).rotate(math.degrees(angle) + 90, Image.BICUBIC)
-            off = (big - n) // 2
-            t = np.asarray(streak, dtype=np.float32)[off:off + n, off:off + n] / 255.0 - 0.5
-            return t * 0.13 * scale + (_value_noise((n, n), n / 12, seed + 1) - 0.5) * 0.1
+            # Short strands: runs of slightly darker pixels along the fur direction
+            noise = rng.random((g, g))
+            strands = (np.sin(v * 1.7 + noise * 2.0) > 0.75).astype(np.float32)
+            return -strands * 0.5 * min(1.5, scale)
         if kind in ('scales', 'feathers', 'scutes'):
-            s = self.px((0.04 if kind == 'feathers' else 0.022) * scale)
-            sx = s * (1.5 if kind == 'feathers' else 1.0)
-            ca, sa = math.cos(angle), math.sin(angle)
-            u = (self._xx * ca + self._yy * sa) / sx
-            v = (-self._xx * sa + self._yy * ca) / s
-            row = np.floor(v)
-            u2 = u + 0.5 * (row % 2)
-            fu, fv = u2 - np.floor(u2) - 0.5, v - row
-            # Overlapping rounded scales: dark at the lower rim of each cell
-            d = np.sqrt(fu ** 2 * 1.6 + (fv - 0.15) ** 2)
-            edge = np.clip((d - 0.38) / 0.18, 0, 1)
-            sheen = np.clip(0.45 - d, 0, 1)
-            return (sheen * 0.15 - edge * 0.38) * 0.4
+            size = max(2.0, (3.0 if kind == 'feathers' else 2.5) * scale * g / 64)
+            row = np.floor(v / size)
+            uu = u / (size * (1.4 if kind == 'feathers' else 1.0)) + 0.5 * (row % 2)
+            fu, fv = uu - np.floor(uu), v / size - row
+            edge = ((fv > 0.66) | ((fu < 0.18) & (fv > 0.3))).astype(np.float32)
+            return -edge * 0.7
         if kind == 'stone':
-            a = _value_noise((n, n), n / 14, seed) - 0.5
-            b = _value_noise((n, n), n / 40, seed + 7) - 0.5
-            cracks = np.abs(_value_noise((n, n), n / 9, seed + 3) - 0.5)
-            return a * 0.35 + b * 0.2 - np.clip(0.05 - cracks, 0, 1) * 6
+            a = _value_noise((g, g), max(2, g / 10), seed) - 0.5
+            cracks = (np.abs(_value_noise((g, g), max(2, g / 7), seed + 3) - 0.5) < 0.04).astype(np.float32)
+            return a * 1.2 - cracks * 1.0
         if kind == 'skin':
-            return (_value_noise((n, n), n / 50, seed) - 0.5) * 0.12
-        return np.zeros((n, n), dtype=np.float32)
+            return (_value_noise((g, g), max(2, g / 12), seed) - 0.5) * 0.2
+        return np.zeros((g, g), dtype=np.float32)
 
-    # Shaded part
+    # Compositing
+
+    def _over(self, colors: np.ndarray, alpha: np.ndarray):
+        a = alpha[..., None]
+        total = self.alpha + alpha * (1 - self.alpha)
+        safe = np.where(total > 0, total, 1)[..., None]
+        self.rgb = (colors * a + self.rgb * self.alpha[..., None] * (1 - a)) / safe
+        self.alpha = total
 
     def part(self, mask: Image.Image, color, *, color2=None, gradient: float = 0.0,
              gloss: float = 0.25, roundness: float = 1.0, texture: Optional[str] = None,
              texture_scale: float = 1.0, texture_angle: float = 0.0, outline: float = 0.35,
-             opacity: float = 1.0, glow: float = 0.0, flat: bool = False,
-             color_map: Optional[np.ndarray] = None):
+             opacity: float = 1.0, glow: float = 0.0, flat: bool = False):
         """
-        Composite one shaded part.
+        Composite one part as pixels.
 
         Args:
             mask: Part outline
             color: Base colour; color2 with gradient (0-1) blends toward it downward
-            gloss: Specular highlight strength
+            gloss: Strength of the lightest highlight pixels
             roundness: How domed the surface looks
             texture: 'fur', 'scales', 'feathers', 'scutes', 'stone', 'skin' or None
-            outline: Darkening of the rim
-            opacity: Overall alpha (translucent wings, spirits)
+            outline: Above zero, the part's edge pixels are drawn one tone darker
+            opacity: Overall alpha (translucent wings, spirits), kept to a few steps
             glow: Self-illumination (0-1) for fiery or magical parts
-            flat: Skip shading (markings drawn on an already shaded part)
-            color_map: Optional per-pixel RGB array (n, n, 3) in place of color
+            flat: One tone only (markings drawn on an already shaded part)
         """
         self._parts += 1
-        m = np.asarray(mask, dtype=np.float32) / 255.0
-        if m.max() <= 0:
+        cov = self.coverage(mask)
+        solid = cov >= 0.5
+        if not solid.any():
             return
-        ys, xs = np.nonzero(m > 0.5)
-        if len(ys) == 0:
-            return
-        y0, y1 = ys.min(), ys.max()
-        base = np.empty((self.n, self.n, 3), dtype=np.float32)
-        if color_map is not None:
-            base[:] = color_map
+        g = self.grid
+        rows = np.nonzero(solid.any(axis=1))[0]
+        y0, y1 = rows.min(), rows.max()
+        c1 = np.array(rgb(color), dtype=np.float32)
+        if color2 is not None and gradient > 0:
+            c2 = np.array(rgb(color2), dtype=np.float32)
+            t = np.clip((self._gy - y0) / max(1, y1 - y0), 0, 1)[..., None] * gradient
+            base = c1 + (c2 - c1) * t
         else:
-            c1 = np.array(rgb(color), dtype=np.float32)
-            if color2 is not None and gradient > 0:
-                c2 = np.array(rgb(color2), dtype=np.float32)
-                t = np.clip((self._yy - y0) / max(1.0, y1 - y0), 0, 1)[..., None] * gradient
-                base[:] = c1 + (c2 - c1) * t
-            else:
-                base[:] = c1
+            base = np.broadcast_to(c1, (g, g, 3)).astype(np.float32)
 
         if flat:
-            shade = np.ones((self.n, self.n), dtype=np.float32)
-            spec = 0.0
+            level = np.full((g, g), 3.0, dtype=np.float32)
         else:
-            area = m.sum()
+            area = solid.sum()
             r_eq = math.sqrt(area / math.pi)
-            sigma = max(2.0, 0.42 * r_eq)
-            h = np.sqrt(np.clip(blur(m, sigma), 0, 1))
+            h = np.sqrt(np.clip(blur(solid.astype(np.float32), max(0.8, 0.42 * r_eq)), 0, 1))
             gy, gx = np.gradient(h)
             k = r_eq * 0.55 * roundness
             nx, ny, nz = -gx * k, -gy * k, np.ones_like(h)
             norm = np.sqrt(nx ** 2 + ny ** 2 + nz ** 2)
             nx, ny, nz = nx / norm, ny / norm, nz / norm
             diffuse = np.clip(nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2], 0, 1)
-            spec = np.clip(nx * HALF[0] + ny * HALF[1] + nz * HALF[2], 0, 1) ** 28 * gloss
-            ao = np.clip(h * 1.6, 0, 1)
-            shade = 0.38 + 0.72 * diffuse
-            shade = shade * (1 - outline * (1 - ao))
-            shade = shade + glow * (1 - shade) * 0.8
+            spec = np.clip(nx * HALF[0] + ny * HALF[1] + nz * HALF[2], 0, 1) ** 20
+            # Level 0-4 on the ramp; 3 is the base colour
+            level = 0.6 + diffuse * 3.0 + glow * 1.5
+            if texture:
+                level = level + self.texture(texture, texture_scale, texture_angle)
+            level = level + (spec > 0.75) * gloss * 3.0
+        # Ordered dithering between neighbouring tones
+        tone = np.clip(np.floor(level + (self._bayer - 0.5) * 0.35 + 0.5), 0, 4).astype(np.int32)
+        if outline > 0 and not flat:
+            inner = solid & ~(np.roll(solid, 1, 0) & np.roll(solid, -1, 0) & np.roll(solid, 1, 1) & np.roll(solid, -1, 1))
+            tone = np.where(inner, np.maximum(tone - 1, 0), tone)
 
-        if texture:
-            shade = shade * (1 + self.texture(texture, m, texture_scale, texture_angle))
-
-        out = base * shade[..., None] + np.asarray(spec)[..., None] * 255 if not flat else base
-        if glow > 0:
-            out = out + glow * 40
-        out = np.clip(out, 0, 255)
-        alpha = np.clip(m * opacity, 0, 1)
-        layer = np.dstack([out, alpha * 255]).astype(np.uint8)
-        self.image = Image.alpha_composite(self.image, Image.fromarray(layer, 'RGBA'))
+        ramps = np.zeros((g, g, 3), dtype=np.float32)
+        for lv in range(5):
+            if color2 is not None and gradient > 0:
+                # Per-pixel base: apply the ramp factor to each pixel's own base colour
+                factor = np.array(ramp((128, 128, 128))[lv], dtype=np.float32) / 128.0
+                layer = np.clip(base * factor, 0, 255)
+            else:
+                layer = np.broadcast_to(np.array(ramp(c1)[lv], dtype=np.float32), (g, g, 3))
+            ramps = np.where((tone == lv)[..., None], layer, ramps)
+        alpha = solid.astype(np.float32) * (round(opacity * 4) / 4)
+        self._over(ramps, alpha)
 
     # Line work and details
 
     def stroke(self, points: Sequence[Point], width: float, color, opacity: float = 1.0, smooth: bool = True):
-        layer = Image.new('RGBA', (self.n, self.n), (0, 0, 0, 0))
+        g = self.grid
+        layer = Image.new('L', (g, g), 0)
         d = ImageDraw.Draw(layer)
         path = catmull_rom(points, closed=False) if smooth and len(points) > 2 else list(points)
-        w = max(1, int(round(self.px(width))))
-        d.line(self.pts(path), fill=rgb(color) + (int(255 * opacity),), width=w, joint='curve')
-        for x, y in (path[0], path[-1]):
-            r = w / 2
-            d.ellipse([x * self.n - r, y * self.n - r, x * self.n + r, y * self.n + r],
-                      fill=rgb(color) + (int(255 * opacity),))
-        self.image = Image.alpha_composite(self.image, layer)
+        w = max(1, int(round(width * g)))
+        d.line([(x * g, y * g) for x, y in path], fill=255, width=w)
+        m = np.asarray(layer, dtype=np.float32) / 255.0
+        if opacity < 0.6 and w == 1:
+            return  # Too faint to show as pixels
+        self._over(np.broadcast_to(np.array(rgb(color), dtype=np.float32), (g, g, 3)),
+                   (m >= 0.5) * (1.0 if opacity >= 0.6 else 0.5))
 
     def dot(self, cx, cy, r, color, opacity: float = 1.0, blur: float = 0.0):
-        layer = Image.new('RGBA', (self.n, self.n), (0, 0, 0, 0))
-        d = ImageDraw.Draw(layer)
-        x, y, rr = self.px(cx), self.px(cy), self.px(r)
-        d.ellipse([x - rr, y - rr, x + rr, y + rr], fill=rgb(color) + (int(255 * opacity),))
+        g = self.grid
+        rr = max(0.5, r * g)
+        dist = np.hypot(self._gx + 0.5 - cx * g, self._gy + 0.5 - cy * g)
+        core = (dist <= rr).astype(np.float32)
+        col = np.broadcast_to(np.array(rgb(color), dtype=np.float32), (g, g, 3))
         if blur:
-            layer = layer.filter(ImageFilter.GaussianBlur(self.px(blur)))
-        self.image = Image.alpha_composite(self.image, layer)
+            halo = ((dist <= rr + max(1.0, blur * g)) & (core == 0)).astype(np.float32)
+            self._over(col, halo * 0.35 * opacity)
+        self._over(col, core * (1.0 if opacity >= 0.6 else 0.5))
 
     def eye(self, cx, cy, r, iris, pupil: str = 'round', sclera=(250, 248, 240),
             look: Point = (0.25, 0.0), lid=None, squash: float = 1.0):
-        """Eye with radial iris gradient, pupil, highlights and a lid line."""
-        n = self.n
-        x, y, rr = self.px(cx), self.px(cy), self.px(r)
-        layer = Image.new('RGBA', (n, n), (0, 0, 0, 0))
-        d = ImageDraw.Draw(layer)
+        """Pixel eye: iris, pupil and a highlight pixel, sized from the radius."""
+        g = self.grid
+        rr = max(1.0, r * g)
         ry = rr * squash
-        d.ellipse([x - rr, y - ry, x + rr, y + ry], fill=rgb(sclera) + (255,))
-        ix, iy = x + look[0] * rr * 0.5, y + look[1] * rr * 0.5
-        ir = rr * (0.98 if sclera is None or pupil in ('slit', 'goat') else 0.72)
-        iris_c = rgb(iris)
-        steps = 14
-        for s in range(steps):
-            t = s / (steps - 1)
-            c = mix(darken(iris_c, 0.45), lighten(iris_c, 0.25), t)
-            rad = ir * (1 - t * 0.85)
-            d.ellipse([ix - rad, iy - rad * squash, ix + rad, iy + rad * squash], fill=c + (255,))
-        pc = (15, 12, 14, 255)
+        x, y = cx * g, cy * g
+        dx = (self._gx + 0.5 - x) / rr
+        dy = (self._gy + 0.5 - y) / max(0.8, ry)
+        inside = dx ** 2 + dy ** 2 <= 1.15
+        if not inside.any():
+            iy, ix = int(y), int(x)
+            inside = np.zeros((g, g), bool)
+            inside[min(g - 1, iy), min(g - 1, ix)] = True
+        lid_c = np.array(rgb(lid) if lid else (28, 20, 26), dtype=np.float32)
+        iris_r = np.array(ramp(iris)[3], dtype=np.float32)
+        iris_d = np.array(ramp(iris)[1], dtype=np.float32)
+        colors = np.where((dy < -0.2)[..., None], iris_d, iris_r)
+        if sclera is not None and rr >= 2.5 and pupil not in ('slit', 'goat'):
+            colors = np.where(((dx - look[0] * 0.5) ** 2 + dy ** 2 > 0.45)[..., None],
+                              np.array(rgb(sclera), dtype=np.float32), colors)
+        px, py = x + look[0] * rr * 0.5, y + look[1] * rr * 0.5
+        pdx, pdy = self._gx + 0.5 - px, self._gy + 0.5 - py
         if pupil == 'slit':
-            d.ellipse([ix - ir * 0.22, iy - ir * 0.88, ix + ir * 0.22, iy + ir * 0.88], fill=pc)
+            pup = (np.abs(pdx) < max(0.5, rr * 0.22)) & (np.abs(pdy) < rr * 0.8)
         elif pupil == 'goat':
-            d.ellipse([ix - ir * 0.75, iy - ir * 0.2, ix + ir * 0.75, iy + ir * 0.2], fill=pc)
+            pup = (np.abs(pdy) < max(0.5, rr * 0.2)) & (np.abs(pdx) < rr * 0.7)
         else:
-            pr = ir * 0.48
-            d.ellipse([ix - pr, iy - pr, ix + pr, iy + pr], fill=pc)
-        # Keep everything inside the eye
-        clip = Image.new('L', (n, n), 0)
-        ImageDraw.Draw(clip).ellipse([x - rr, y - ry, x + rr, y + ry], fill=255)
-        layer.putalpha(Image.fromarray(np.minimum(np.asarray(layer)[..., 3], np.asarray(clip))))
-        d = ImageDraw.Draw(layer)
-        hr = rr * 0.26
-        d.ellipse([x - rr * 0.35 - hr, y - ry * 0.4 - hr, x - rr * 0.35 + hr, y - ry * 0.4 + hr],
-                  fill=(255, 255, 255, 235))
-        hr2 = rr * 0.11
-        d.ellipse([x + rr * 0.3 - hr2, y + ry * 0.3 - hr2, x + rr * 0.3 + hr2, y + ry * 0.3 + hr2],
-                  fill=(255, 255, 255, 170))
-        lid_c = rgb(lid) if lid else (25, 20, 20)
-        d.arc([x - rr, y - ry, x + rr, y + ry], 180, 360, fill=lid_c + (255,), width=max(2, int(rr * 0.22)))
-        d.arc([x - rr, y - ry, x + rr, y + ry], 0, 180, fill=lid_c + (140,), width=max(1, int(rr * 0.1)))
-        self.image = Image.alpha_composite(self.image, layer)
+            pup = np.hypot(pdx, pdy) < max(0.7, rr * 0.45)
+        colors = np.where(pup[..., None], np.array((16, 12, 18), dtype=np.float32), colors)
+        # Top lid line on larger eyes
+        if rr >= 2.5:
+            top = inside & ~np.roll(inside, 1, 0)
+            colors = np.where(top[..., None], lid_c, colors)
+        self._over(colors, inside.astype(np.float32))
+        # Highlight pixel up and to the left of centre
+        hx, hy = int(np.floor(x - rr * 0.35)), int(np.floor(y - ry * 0.35))
+        if 0 <= hx < g and 0 <= hy < g:
+            hl = np.zeros((g, g), np.float32)
+            hl[hy, hx] = 1.0
+            self._over(np.broadcast_to(np.array((255, 255, 255), np.float32), (g, g, 3)), hl)
 
     def shadow(self, cx, width, opacity: float = 0.28, y: float = GROUND):
-        layer = Image.new('RGBA', (self.n, self.n), (0, 0, 0, 0))
-        d = ImageDraw.Draw(layer)
-        x, w, yy = self.px(cx), self.px(width), self.px(y)
-        h = w * 0.13
-        d.ellipse([x - w, yy - h, x + w, yy + h], fill=(20, 15, 25, int(255 * opacity)))
-        layer = layer.filter(ImageFilter.GaussianBlur(self.px(0.02)))
-        self.image = Image.alpha_composite(self.image, layer)
+        """Dithered oval shadow on the ground."""
+        g = self.grid
+        dx = (self._gx + 0.5 - cx * g) / max(1.0, width * g)
+        dy = (self._gy + 0.5 - y * g) / max(1.0, width * g * 0.16)
+        d = dx ** 2 + dy ** 2
+        m = (d <= 1).astype(np.float32) * np.where(d < 0.45, 1.0, (self._bayer < 0.5).astype(np.float32))
+        self._over(np.broadcast_to(np.array((40, 30, 56), np.float32), (g, g, 3)), m * min(0.75, opacity * 1.6))
 
     def glow(self, mask: Image.Image, color, radius: float, opacity: float = 0.6):
-        """Soft coloured halo around a mask."""
-        a = mask.filter(ImageFilter.GaussianBlur(self.px(radius)))
-        arr = (np.asarray(a, dtype=np.float32) * opacity).astype(np.uint8)
-        layer = Image.new('RGBA', (self.n, self.n), rgb(color) + (0,))
-        layer.putalpha(Image.fromarray(arr))
-        self.image = Image.alpha_composite(self.image, layer)
+        """Stepped halo of light around a mask."""
+        g = self.grid
+        cov = self.coverage(mask)
+        spread = blur((cov >= 0.5).astype(np.float32), max(1.0, radius * g))
+        halo = np.where(spread > 0.25, 0.5, np.where(spread > 0.06, 0.25, 0.0)) * opacity
+        halo = np.where((halo > 0) & (halo < 0.3) & (self._bayer > 0.5), 0.0, halo)
+        self._over(np.broadcast_to(np.array(lighten(color, 0.2), np.float32), (g, g, 3)), halo)
 
     def finish(self) -> Image.Image:
-        return self.image.resize((self.size, self.size), Image.Resampling.LANCZOS)
+        """The pixel canvas with a coloured outline around the whole sprite."""
+        solid = self.alpha >= 0.5
+        edge = solid & ~(np.roll(solid, 1, 0) & np.roll(solid, -1, 0) & np.roll(solid, 1, 1) & np.roll(solid, -1, 1))
+        dark = self.rgb * 0.45 + np.array((30, 18, 40), np.float32) * 0.55 * 0.45
+        out = np.where(edge[..., None], dark, self.rgb)
+        alpha = np.where(self.alpha >= 0.94, 1.0, np.round(self.alpha * 4) / 4)
+        img = np.dstack([np.clip(out, 0, 255), alpha * 255]).astype(np.uint8)
+        return Image.fromarray(img, 'RGBA')
 
 
 # Species
@@ -1482,9 +1529,9 @@ def draw_egg(p: Painter):
                                           rng.uniform(0, 3)), egg), (170, 130, 70), flat=True, opacity=0.55)
 
 
-def render_creature(name: str, palette: Sequence, size: int, palette_index: Optional[int] = None) -> Image.Image:
-    """Picture of a creature facing right, size x size pixels, with a transparent background."""
-    p = Painter(size, seed=sum(map(ord, name)))
+def render_creature(name: str, palette: Sequence, grid: int, palette_index: Optional[int] = None) -> Image.Image:
+    """Pixel-art creature facing right on a grid x grid canvas with a transparent background."""
+    p = Painter(grid, seed=sum(map(ord, name)))
     SPECIES.get(name, SPECIES['cat'])(p, palette_for(name, palette, palette_index))
     return p.finish()
 
@@ -1494,18 +1541,11 @@ def render_creature(name: str, palette: Sequence, size: int, palette_index: Opti
 def draw_ball(p: Painter):
     """Rubber ball with a white band; no ground shadow (it bounces in its own window)."""
     ball = p.ellipse_mask(0.5, 0.5, 0.42, 0.42)
-    p.part(ball, (220, 64, 64), gloss=0.7, roundness=1.3)
+    p.part(ball, (214, 60, 64), gloss=0.8, roundness=1.3)
     band = p.intersect(p.subtract(p.ellipse_mask(0.5, 0.5, 0.5, 0.2, -0.5), p.ellipse_mask(0.5, 0.5, 0.5, 0.11, -0.5)),
                        ball)
-    p.part(band, (246, 244, 238), gloss=0.7, roundness=0.5, flat=True, opacity=0.95)
-    p.dot(0.36, 0.33, 0.08, (255, 255, 255), opacity=0.45, blur=0.04)
-    p.dot(0.34, 0.31, 0.03, (255, 255, 255), opacity=0.8, blur=0.01)
-    # Shade the lower right so the band sits on a sphere
-    shade = Image.new('RGBA', (p.n, p.n), (40, 10, 20, 0))
-    m = np.asarray(ball, dtype=np.float32) / 255.0
-    d = np.clip(((p._xx - p.px(0.32)) ** 2 + (p._yy - p.px(0.3)) ** 2) ** 0.5 / p.px(0.75), 0, 1)
-    shade.putalpha(Image.fromarray((m * d ** 2 * 150).astype(np.uint8)).filter(ImageFilter.GaussianBlur(2)))
-    p.image = Image.alpha_composite(p.image, shade)
+    p.part(band, (240, 236, 228), gloss=0.8, roundness=1.3, outline=0.0)
+    p.dot(0.35, 0.32, 0.035, (255, 255, 255))
 
 
 def draw_food(p: Painter):
@@ -1558,25 +1598,27 @@ def draw_shelter(p: Painter):
     p.part(p.limb_mask([(0.06, 0.57), (0.5, 0.15), (0.94, 0.57)], [0.016, 0.018, 0.016]), (120, 44, 36), gloss=0.4)
 
 
-def render_item(name: str, size: int) -> Image.Image:
-    """Picture of an item: 'ball', 'food', 'shelter' or 'egg'."""
+def render_item(name: str, grid: int) -> Image.Image:
+    """Pixel-art item on a grid x grid canvas: 'ball', 'food', 'shelter' or 'egg'."""
     draw = {'ball': draw_ball, 'food': draw_food, 'shelter': draw_shelter, 'egg': draw_egg}[name]
-    p = Painter(size, seed=len(name))
+    p = Painter(grid, seed=len(name))
     draw(p)
     return p.finish()
 
 
-def render_icon(size: int) -> Image.Image:
-    """Application icon: portrait of an orange tabby cat."""
-    n = size * 4
-    big = render_creature('cat', ['#FF6B6B', '#FFE66D', '#4ECDC4'], n, palette_index=0)
-    head = big.crop((int(n * 0.62), int(n * 0.2), int(n * 1.0), int(n * 0.58))).resize((n, n), Image.Resampling.LANCZOS)
-    # Round badge with a soft gradient behind the portrait
-    yy, xx = np.mgrid[0:n, 0:n].astype(np.float32) / n
-    bg = np.dstack([90 + 60 * (1 - yy), 150 + 50 * (1 - yy), 170 + 40 * (1 - yy)])
-    badge = Image.fromarray(np.dstack([bg, np.full((n, n), 255)]).astype(np.uint8), 'RGBA')
+def render_icon(grid: int = 64) -> Image.Image:
+    """Application icon: pixel-art portrait of an orange tabby cat in a round badge (grid x grid)."""
+    # Draw the whole cat large enough that its head spans the grid
+    big = render_creature('cat', ['#FF6B6B', '#FFE66D', '#4ECDC4'], int(grid / 0.5), palette_index=0)
+    x0, y0 = int(big.width * 0.52), int(big.height * 0.15)
+    head = big.crop((x0, y0, x0 + grid, y0 + grid))
+    yy, xx = np.mgrid[0:grid, 0:grid]
+    inside = (xx + 0.5 - grid / 2) ** 2 + (yy + 0.5 - grid / 2) ** 2 <= (grid / 2 - 0.5) ** 2
+    band = np.clip(np.floor((1 - yy / grid) * 4) / 4, 0, 1)[..., None]
+    bg = np.array((70, 120, 150), np.float32) + band * np.array((60, 50, 40), np.float32)
+    rim = inside & ~((xx + 0.5 - grid / 2) ** 2 + (yy + 0.5 - grid / 2) ** 2 <= (grid / 2 - 2) ** 2)
+    bg = np.where(rim[..., None], np.array((40, 60, 80), np.float32), bg)
+    badge = Image.fromarray(np.dstack([bg, inside * 255]).astype(np.uint8), 'RGBA')
     badge = Image.alpha_composite(badge, head)
-    circle = Image.new('L', (n, n), 0)
-    ImageDraw.Draw(circle).ellipse([n * 0.02, n * 0.02, n * 0.98, n * 0.98], fill=255)
-    badge.putalpha(circle)
-    return badge.resize((size, size), Image.Resampling.LANCZOS)
+    badge.putalpha(Image.fromarray((inside * 255).astype(np.uint8)))
+    return badge

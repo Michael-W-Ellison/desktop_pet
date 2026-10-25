@@ -7,6 +7,8 @@ Run this script before building the installer.
 import os
 import sys
 
+from PIL import Image
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src'))
 
 from ui.creature_art import render_icon  # noqa: E402
@@ -14,7 +16,10 @@ from ui.creature_art import render_icon  # noqa: E402
 
 def create_pet_icon(size=256):
     """
-    Create the pet icon: a shaded cat portrait in a round badge.
+    Create the pet icon: a pixel-art cat portrait in a round badge.
+
+    Sizes up to 64 are drawn on their own pixel grid; larger sizes scale the
+    64x64 portrait up by whole pixels.
 
     Args:
         size: Icon size in pixels
@@ -22,7 +27,9 @@ def create_pet_icon(size=256):
     Returns:
         PIL Image object
     """
-    return render_icon(size)
+    grid = min(size, 64)
+    icon = render_icon(grid)
+    return icon if grid == size else icon.resize((size, size), Image.Resampling.NEAREST)
 
 
 def generate_ico_file(output_path='assets/icon.ico'):
